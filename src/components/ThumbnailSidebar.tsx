@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { usePdfThumbnails } from "./PageThumbnailGrid";
 import { cn } from "../lib/utils";
+import type { LocalAnnot } from "./AnnotationLayer";
 
 interface Props {
   file: File;
@@ -8,10 +10,19 @@ interface Props {
   onSelect: (page: number) => void;
   collapsed: boolean;
   onToggle: () => void;
+  /** Optional — when provided, show annotation count badges on thumbnails */
+  annotations?: LocalAnnot[];
 }
 
-export default function ThumbnailSidebar({ file, currentPage, onSelect, collapsed, onToggle }: Props) {
+export default function ThumbnailSidebar({ file, currentPage, onSelect, collapsed, onToggle, annotations = [] }: Props) {
   const { thumbnails, pageCount } = usePdfThumbnails(file, 0.2);
+
+  // Build per-page annotation counts
+  const countsByPage = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const a of annotations) m.set(a.page, (m.get(a.page) ?? 0) + 1);
+    return m;
+  }, [annotations]);
 
   return (
     <div
@@ -31,29 +42,43 @@ export default function ThumbnailSidebar({ file, currentPage, onSelect, collapse
 
       {!collapsed && (
         <div className="flex-1 overflow-y-auto p-2 space-y-1.5 pt-3">
-          {Array.from({ length: pageCount }, (_, i) => i + 1).map((p) => (
-            <button
-              key={p}
-              onClick={() => onSelect(p)}
-              className={cn(
-                "w-full flex flex-col items-center gap-0.5 rounded p-1 transition",
-                p === currentPage
-                  ? "ring-2 ring-blue-500 bg-gray-800"
-                  : "hover:bg-gray-800"
-              )}
-            >
-              {thumbnails[p - 1] ? (
-                <img
-                  src={thumbnails[p - 1]}
-                  alt={`Page ${p}`}
-                  className="w-full rounded shadow"
-                />
-              ) : (
-                <div className="w-full aspect-[3/4] bg-gray-700 rounded animate-pulse" />
-              )}
-              <span className="text-[9px] text-gray-400">{p}</span>
-            </button>
-          ))}
+          {Array.from({ length: pageCount }, (_, i) => i + 1).map((p) => {
+            const count = countsByPage.get(p) ?? 0;
+            return (
+              <button
+                key={p}
+                onClick={() => onSelect(p)}
+                className={cn(
+                  "w-full flex flex-col items-center gap-0.5 rounded p-1 transition relative",
+                  p === currentPage
+                    ? "ring-2 ring-blue-500 bg-gray-800"
+                    : "hover:bg-gray-800"
+                )}
+              >
+                <div className="relative w-full">
+                  {thumbnails[p - 1] ? (
+                    <img
+                      src={thumbnails[p - 1]}
+                      alt={`Page ${p}`}
+                      className="w-full rounded shadow"
+                    />
+                  ) : (
+                    <div className="w-full aspect-[3/4] bg-gray-700 rounded animate-pulse" />
+                  )}
+                  {/* Annotation count badge */}
+                  {count > 0 && (
+                    <div
+                      title={`${count} annotation${count !== 1 ? "s" : ""} on this page`}
+                      className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-[3px] rounded-full bg-blue-500 text-white text-[8px] font-bold flex items-center justify-center shadow leading-none"
+                    >
+                      {count > 9 ? "9+" : count}
+                    </div>
+                  )}
+                </div>
+                <span className="text-[9px] text-gray-400">{p}</span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

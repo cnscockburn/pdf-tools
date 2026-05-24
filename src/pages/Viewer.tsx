@@ -8,14 +8,22 @@ import {
   Eye, MessageSquare, EyeOff, Crop, AlignLeft,
   Minimize2, Stamp, Scissors, FileOutput, RotateCw, Lock, FileImage,
   ExternalLink, Loader2, Highlighter, Type, Pencil, Check, X, Download,
+  Underline, Strikethrough, Search, HelpCircle, List, User, FileText,
 } from "lucide-react";
 import { cn, downloadBlob } from "../lib/utils";
 import ThumbnailSidebar from "../components/ThumbnailSidebar";
 import RightPanel, { type PanelTool } from "../components/RightPanel";
 import AnnotationLayer, {
-  type LocalAnnot, type HlColor, type CreateMode,
+  type LocalAnnot, type HlColor, type CreateMode, type AnnotId, type AnnotStatus,
+  type FracRect, newId, boundingBox,
 } from "../components/AnnotationLayer";
+import TextLayer from "../components/TextLayer";
+import QuickActionBar from "../components/QuickActionBar";
+import SearchBar, { type SearchResult } from "../components/SearchBar";
+import KeyboardCheatSheet from "../components/KeyboardCheatSheet";
 import { annotatePDF, redactPDF, cropPDF, checkHealth, type Annotation, type RedactRegion } from "../api/client";
+import { useSettings } from "../lib/storage";
+import { downloadAnnotationReport } from "../lib/annotationReport";
 
 type CanvasMode = "view" | "annotate" | "redact" | "crop";
 
@@ -29,9 +37,21 @@ const HIGHLIGHT_COLORS: HlColor[] = [
 /** Convert AnnotationLayer's local types to the backend API shape. */
 function toApiAnnotations(localAnns: LocalAnnot[]): Annotation[] {
   return localAnns.map((a) => {
-    if (a.type === "note")      return { type: "note",      page: a.page, x: a.x, y: a.y, text: a.text };
-    if (a.type === "highlight") return { type: "highlight", page: a.page, x0: a.x0, y0: a.y0, x1: a.x1, y1: a.y1, color: a.color };
-    return                             { type: "freetext",  page: a.page, x0: a.x0, y0: a.y0, x1: a.x1, y1: a.y1, text: a.text };
+    if (a.type === "note")
+      return { type: "note", page: a.page, x: a.x, y: a.y, text: a.text };
+    if (a.type === "highlight")
+      return { type: "highlight", page: a.page, x0: a.x0, y0: a.y0, x1: a.x1, y1: a.y1,
+               color: a.color, ...(a.rects ? { rects: a.rects } : {}) };
+    if (a.type === "freetext")
+      return { type: "freetext", page: a.page, x0: a.x0, y0: a.y0, x1: a.x1, y1: a.y1, text: a.text };
+    if (a.type === "underline")
+      return { type: "underline", page: a.page, x0: a.x0, y0: a.y0, x1: a.x1, y1: a.y1,
+               ...(a.rects ? { rects: a.rects } : {}), ...(a.text ? { text: a.text } : {}) };
+    if (a.type === "strikethrough")
+      return { type: "strikethrough", page: a.page, x0: a.x0, y0: a.y0, x1: a.x1, y1: a.y1,
+               ...(a.rects ? { rects: a.rects } : {}), ...(a.text ? { text: a.text } : {}) };
+    // fallback — should never happen
+    return { type: "note", page: (a as LocalAnnot).page, x: 0, y: 0, text: "" };
   });
 }
 
@@ -41,7 +61,20 @@ const newRid = () => `r${++_rid}`;
 
 type CropSel = { x0: number; y0: number; x1: number; y1: number };
 
+/** Build a per-page string index from PDF.js for in-document search. */
+interface PageText {
+  page: number;
+  text: string;
+  items: Array<{ str: string; start: number; end: number; transform: number[]; width: number; height: number }>;
+  viewport: { width: number; height: number; convertToViewportPoint: (x: number, y: number) => [number, number] };
+}
+
 export default function Viewer() {
+  // ── Settings ───────────────────────────────────────────────────────────────
+  const { settings, updateSettings } = useSettings();
+  const [editingAuthor, setEditingAuthor] = useState(false);
+  const [authorInput, setAuthorInput]     = useState("");
+
   // ── File & PDF ─────────────────────────────────────────────────────────────
   const [file, setFile]           = useState<File | null>(null);
   const [workingBlob, setWorkingBlob] = useState<Blob | null>(null);
@@ -71,6 +104,23 @@ export default function Viewer() {
   const [autoSaving, setAutoSaving]           = useState(false);
   const [annotateError, setAnnotateError]     = useState<string | null>(null);
 
+  // ── Text selection / QuickActionBar ───────────────────────────────────────
+  const [textSelectActive, setTextSelectActive] = useState(false);
+  const [quickBar, setQuickBar] = useState<{
+    rects: FracRect[]; text: string; barX: number; barY: number;
+  } | null>(null);
+
+  // ── Search ─────────────────────────────────────────────────────────────────
+  const [searchOpen, setSearchOpen]     = useState(false);
+  const [searchQuery, setSearchQuery]   = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchIdx, setSearchIdx]       = useState(0);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [pageIndex, setPageIndex]       = useState<PageText[]>([]);
+
+  // ── Keyboard cheat sheet ──────────────────────────────────────────────────
+  const [cheatSheetOpen, setCheatSheetOpen] = useState(false);
+
   // ── Backend health ─────────────────────────────────────────────────────────
   const [backendOk, setBackendOk] = useState<boolean | null>(null);
 
@@ -97,10 +147,10 @@ export default function Viewer() {
   const renderTaskRef = useRef<RenderTask | null>(null);
   const location      = useLocation();
 
-  // ── Ref to latest switchMode (so keyboard handler is always current) ────────
+  // ── Stable ref for mode switch ─────────────────────────────────────────────
   const switchModeRef = useRef<(m: CanvasMode) => void>(() => {});
 
-  // ── Keyboard shortcut state ref (avoids stale closures in stable handler) ──
+  // ── Keyboard shortcut state ref ────────────────────────────────────────────
   const kbRef = useRef({
     currentPage: 1,
     pdf:           null as PDFDocumentProxy | null,
@@ -110,21 +160,21 @@ export default function Viewer() {
   });
   kbRef.current = { currentPage, pdf, workingBlob, filename, selectedRedact };
 
-  // ── Working file (original file or blob-wrapped replacement) ───────────────
+  // ── Working file ──────────────────────────────────────────────────────────
   const workingFile = useMemo<File | null>(() => {
     if (!file) return null;
     if (!workingBlob) return file;
     return new File([workingBlob], filename, { type: "application/pdf" });
   }, [file, workingBlob, filename]);
 
-  // ── Load from router state ─────────────────────────────────────────────────
+  // ── Load from router state ────────────────────────────────────────────────
   useEffect(() => {
     const stateFile = (location.state as { file?: File } | null)?.file;
     if (stateFile) loadFile(stateFile);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── PDF canvas render ──────────────────────────────────────────────────────
+  // ── PDF canvas render ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!pdf || !canvasRef.current) return;
     let cancelled = false;
@@ -142,9 +192,6 @@ export default function Viewer() {
         const ctx = canvas.getContext("2d")!;
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        // Disable PDF.js annotation rendering while the interactive AnnotationLayer
-        // overlay is active — prevents double-drawing baked-in annotations.
-        // In view mode let PDF.js render them normally so they're always visible.
         const task = page.render({
           canvasContext: ctx,
           viewport: vp,
@@ -157,9 +204,90 @@ export default function Viewer() {
     })();
 
     return () => { cancelled = true; renderTaskRef.current?.cancel(); };
-  // canvasMode added: switching modes must re-render with/without annotation appearances.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pdf, currentPage, scale, canvasMode]);
+
+  // ── Build text search index when PDF loads ────────────────────────────────
+  useEffect(() => {
+    if (!pdf) { setPageIndex([]); return; }
+    let cancelled = false;
+    (async () => {
+      const index: PageText[] = [];
+      for (let i = 1; i <= pdf.numPages; i++) {
+        if (cancelled) return;
+        try {
+          const page = await pdf.getPage(i);
+          const vp = page.getViewport({ scale: 1 });
+          const tc = await page.getTextContent();
+          let text = "";
+          const items: PageText["items"] = [];
+          for (const item of tc.items) {
+            if (!("str" in item)) continue;
+            const { str, transform, width, height } = item as {
+              str: string; transform: number[]; width: number; height: number;
+            };
+            const start = text.length;
+            text += str;
+            items.push({ str, start, end: text.length, transform, width, height });
+          }
+          index.push({ page: i, text, items, viewport: vp as unknown as PageText["viewport"] });
+        } catch { /* page unavailable */ }
+      }
+      if (!cancelled) setPageIndex(index);
+    })();
+    return () => { cancelled = true; };
+  }, [pdf]);
+
+  // ── Search: run when query changes ────────────────────────────────────────
+  useEffect(() => {
+    if (!searchQuery.trim() || pageIndex.length === 0) {
+      setSearchResults([]); setSearchIdx(0); return;
+    }
+    setSearchLoading(true);
+    const lower = searchQuery.toLowerCase();
+    const results: SearchResult[] = [];
+
+    for (const pt of pageIndex) {
+      const lowerText = pt.text.toLowerCase();
+      let idx = 0;
+      while ((idx = lowerText.indexOf(lower, idx)) !== -1) {
+        const end = idx + lower.length;
+        // Find all overlapping text items
+        const matchItems = pt.items.filter(it => it.end > idx && it.start < end);
+        const rects: SearchResult["rects"] = [];
+        for (const it of matchItems) {
+          try {
+            const [a,, , d, tx, ty] = it.transform;
+            const fontH = Math.abs(d) || Math.abs(a) || 10;
+            const bl = pt.viewport.convertToViewportPoint(tx, ty);
+            const tr = pt.viewport.convertToViewportPoint(tx + it.width, ty + fontH);
+            const vw = pt.viewport.width, vh = pt.viewport.height;
+            rects.push({
+              x0: Math.max(0, Math.min(bl[0], tr[0]) / vw),
+              y0: Math.max(0, Math.min(bl[1], tr[1]) / vh),
+              x1: Math.min(1, Math.max(bl[0], tr[0]) / vw),
+              y1: Math.min(1, Math.max(bl[1], tr[1]) / vh),
+            });
+          } catch { /* skip */ }
+        }
+        if (rects.length > 0) results.push({ page: pt.page, rects });
+        idx += lower.length;
+      }
+    }
+
+    setSearchResults(results);
+    setSearchIdx(0);
+    setSearchLoading(false);
+  }, [searchQuery, pageIndex]);
+
+  // ── Navigate to search result page ────────────────────────────────────────
+  useEffect(() => {
+    if (searchResults.length > 0 && searchResults[searchIdx]) {
+      const target = searchResults[searchIdx].page;
+      if (target !== currentPage) { setCurrentPage(target); setPageInput(String(target)); }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchIdx, searchResults]);
 
   // ── Backend health check ──────────────────────────────────────────────────
   useEffect(() => {
@@ -173,29 +301,90 @@ export default function Viewer() {
     return () => { cancelled = true; clearInterval(id); };
   }, []);
 
+  // ── Text selection → QuickActionBar ──────────────────────────────────────
+  useEffect(() => {
+    if (canvasMode !== "annotate") return;
+
+    function onMouseUp(_e: MouseEvent) {
+      // Small delay so the selection settles
+      setTimeout(() => {
+        const sel = window.getSelection();
+        if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
+          setQuickBar(null);
+          return;
+        }
+        // Only act on selections within our canvas wrapper
+        if (!canvasWrapRef.current) return;
+        const wrapEl = canvasWrapRef.current;
+        const range = sel.getRangeAt(0);
+        if (!wrapEl.contains(range.commonAncestorContainer)) {
+          setQuickBar(null);
+          return;
+        }
+
+        const wrapRect = wrapEl.getBoundingClientRect();
+        const clientRects = Array.from(range.getClientRects());
+        const rects: FracRect[] = clientRects
+          .map(r => ({
+            x0: Math.max(0, (r.left   - wrapRect.left) / wrapRect.width),
+            y0: Math.max(0, (r.top    - wrapRect.top)  / wrapRect.height),
+            x1: Math.min(1, (r.right  - wrapRect.left) / wrapRect.width),
+            y1: Math.min(1, (r.bottom - wrapRect.top)  / wrapRect.height),
+          }))
+          .filter(r => r.x1 - r.x0 > 0.001 && r.y1 - r.y0 > 0.001);
+
+        if (rects.length === 0) { setQuickBar(null); return; }
+
+        const text = sel.toString();
+        // Position bar above the topmost rect, centred on its midpoint
+        const topRect = clientRects.reduce((t, r) => r.top < t.top ? r : t, clientRects[0]);
+        setQuickBar({
+          rects,
+          text,
+          barX: topRect.left + topRect.width / 2,
+          barY: topRect.top,
+        });
+      }, 10);
+    }
+
+    window.addEventListener("mouseup", onMouseUp);
+    return () => window.removeEventListener("mouseup", onMouseUp);
+  }, [canvasMode]);
+
+  // Dismiss QuickActionBar when clicking elsewhere
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if ((e.target as HTMLElement).closest("[data-quickbar]")) return;
+      setQuickBar(null);
+      // Don't clear browser selection here — user may still want to read it
+    }
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, []);
+
   // ── Keyboard shortcuts (stable handler via ref) ────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
+      // Allow search input to capture everything
       if (tag === "INPUT" || tag === "TEXTAREA") return;
 
       const { currentPage, pdf, workingBlob, filename, selectedRedact } = kbRef.current;
 
-      // ── Mode shortcuts (no modifier) ────────────────────────────────────
-      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-        if (e.key === "v" || e.key === "V") { e.preventDefault(); switchModeRef.current("view"); return; }
-        if (e.key === "a" || e.key === "A") { e.preventDefault(); switchModeRef.current("annotate"); setAnnotateSubMode("note"); return; }
-        if (e.key === "h" || e.key === "H") { e.preventDefault(); switchModeRef.current("annotate"); setAnnotateSubMode("highlight"); return; }
-        if (e.key === "t" || e.key === "T") { e.preventDefault(); switchModeRef.current("annotate"); setAnnotateSubMode("freetext"); return; }
-        if (e.key === "r" || e.key === "R") { e.preventDefault(); switchModeRef.current("redact"); return; }
-        if (e.key === "c" || e.key === "C") { e.preventDefault(); switchModeRef.current("crop"); return; }
-        if (e.key === "+" || e.key === "=") { setScale(s => parseFloat(Math.min(s + 0.2, 4).toFixed(2))); return; }
-        if (e.key === "-")                  { setScale(s => parseFloat(Math.max(s - 0.2, 0.5).toFixed(2))); return; }
+      // ── Cheat sheet ────────────────────────────────────────────────────
+      if (e.key === "?" && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setCheatSheetOpen(v => !v);
+        return;
       }
-      if (e.key === "Escape") { switchModeRef.current("view"); return; }
 
-      // ── Ctrl/Cmd shortcuts ───────────────────────────────────────────────
+      // ── Ctrl shortcuts ────────────────────────────────────────────────
       if (e.ctrlKey || e.metaKey) {
+        if (e.key === "f" || e.key === "F") {
+          e.preventDefault();
+          setSearchOpen(v => !v);
+          return;
+        }
         if (e.key === "s" || e.key === "S") {
           e.preventDefault();
           if (workingBlob) downloadBlob(workingBlob, filename);
@@ -210,7 +399,32 @@ export default function Viewer() {
         if (e.key === "-")                  { e.preventDefault(); setScale(s => parseFloat(Math.max(s - 0.2, 0.5).toFixed(2))); return; }
       }
 
-      // ── Navigation ──────────────────────────────────────────────────────
+      if (e.key === "Escape") {
+        if (cheatSheetOpen) { setCheatSheetOpen(false); return; }
+        if (searchOpen)     { setSearchOpen(false); return; }
+        switchModeRef.current("view");
+        return;
+      }
+
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+      // ── Mode shortcuts (no modifier) ──────────────────────────────────
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (e.key === "v" || e.key === "V") { e.preventDefault(); switchModeRef.current("view"); return; }
+        if (e.key === "a" || e.key === "A") { e.preventDefault(); switchModeRef.current("annotate"); setAnnotateSubMode("note"); return; }
+        if (e.key === "h" || e.key === "H") { e.preventDefault(); switchModeRef.current("annotate"); setAnnotateSubMode("highlight"); return; }
+        if (e.key === "u" || e.key === "U") { e.preventDefault(); switchModeRef.current("annotate"); setAnnotateSubMode("underline"); return; }
+        if (e.key === "s" || e.key === "S") { e.preventDefault(); switchModeRef.current("annotate"); setAnnotateSubMode("strikethrough"); return; }
+        if (e.key === "t" || e.key === "T") { e.preventDefault(); switchModeRef.current("annotate"); setAnnotateSubMode("freetext"); return; }
+        if (e.key === "r" || e.key === "R") { e.preventDefault(); switchModeRef.current("redact"); return; }
+        if (e.key === "c" || e.key === "C") { e.preventDefault(); switchModeRef.current("crop"); return; }
+        if (e.key === "+" || e.key === "=") { setScale(s => parseFloat(Math.min(s + 0.2, 4).toFixed(2))); return; }
+        if (e.key === "-")                  { setScale(s => parseFloat(Math.max(s - 0.2, 0.5).toFixed(2))); return; }
+        // Highlight colour shortcuts (1-4) while in annotate/highlight mode
+        if (e.key >= "1" && e.key <= "4")  { setHlColor(Number(e.key) - 1); return; }
+      }
+
+      // ── Navigation ────────────────────────────────────────────────────
       if (!pdf) return;
       const nav = (delta: number) => {
         const p = Math.max(1, Math.min(currentPage + delta, pdf.numPages));
@@ -221,7 +435,7 @@ export default function Viewer() {
       if (e.key === "Home") { e.preventDefault(); setCurrentPage(1);             setPageInput("1");                    return; }
       if (e.key === "End")  { e.preventDefault(); setCurrentPage(pdf.numPages); setPageInput(String(pdf.numPages)); return; }
 
-      // ── Delete selected redact box ───────────────────────────────────────
+      // ── Delete selected redact box ────────────────────────────────────
       if ((e.key === "Delete" || e.key === "Backspace") && selectedRedact) {
         e.preventDefault();
         setRedactBoxes(prev => prev.filter(b => b.id !== selectedRedact));
@@ -232,9 +446,8 @@ export default function Viewer() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  // Intentionally empty deps — state values accessed via kbRef; setters are stable.
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────────────
   async function loadFile(f: File) {
     if (renderTaskRef.current) { renderTaskRef.current.cancel(); renderTaskRef.current = null; }
     setPdf(null);
@@ -248,12 +461,14 @@ export default function Viewer() {
     setCropSelection(null);
     doSwitchMode("view");
     setPanelTool(null);
+    setSearchQuery("");
+    setSearchResults([]);
+    setQuickBar(null);
     const buf = await f.arrayBuffer();
     const doc = await pdfjsLib.getDocument({ data: buf }).promise;
     setPdf(doc);
   }
 
-  /** Replace the working document with a new blob, reloading the PDF viewer. */
   async function applyBlob(blob: Blob) {
     if (renderTaskRef.current) { renderTaskRef.current.cancel(); renderTaskRef.current = null; }
     setPdf(null);
@@ -266,22 +481,15 @@ export default function Viewer() {
     setPdf(doc);
   }
 
-  /** Raw synchronous mode switch — no auto-save logic. */
   function doSwitchMode(m: CanvasMode) {
     setCanvasMode(m);
-    setCropSelection(null);
-    setCropLive(null);
-    setRedactLive(null);
-    setSelectedRedact(null);
-    setAnnotateError(null);
-    setRedactError(null);
-    setCropError(null);
+    setCropSelection(null); setCropLive(null);
+    setRedactLive(null); setSelectedRedact(null);
+    setAnnotateError(null); setRedactError(null); setCropError(null);
+    setTextSelectActive(false);
+    setQuickBar(null);
   }
 
-  /**
-   * Smart mode switch — if leaving annotate mode with pending annotations,
-   * auto-saves them first, then switches. Blocks concurrent saves.
-   */
   function switchMode(m: CanvasMode) {
     if (autoSaving) return;
     if (canvasMode === "annotate" && m !== "annotate" && annotations.length > 0 && workingFile) {
@@ -290,7 +498,6 @@ export default function Viewer() {
     }
     doSwitchMode(m);
   }
-  // Keep ref in sync so keyboard handler always calls current version
   switchModeRef.current = switchMode;
 
   function goTo(n: number) {
@@ -315,9 +522,8 @@ export default function Viewer() {
     setPanelTool(prev => (prev === t ? null : t));
   }
 
-  // ── Apply operations (each updates the working blob) ──────────────────────
+  // ── Operations ────────────────────────────────────────────────────────────
 
-  /** Auto-save annotations to the working blob, then switch to targetMode. */
   async function autoSaveAnnotations(targetMode: CanvasMode) {
     if (!workingFile || annotations.length === 0) { doSwitchMode(targetMode); return; }
     if (backendOk === false) {
@@ -327,14 +533,10 @@ export default function Viewer() {
     setAutoSaving(true); setAnnotateError(null);
     try {
       const blob = await annotatePDF(workingFile, toApiAnnotations(annotations));
-      // Do NOT clear annotations — they remain editable. The backend uses replace
-      // semantics (clears existing PDF annotations then writes the current set),
-      // so re-saving the same list is always safe and idempotent.
       await applyBlob(blob);
       doSwitchMode(targetMode);
     } catch (e) {
       setAnnotateError(e instanceof Error ? e.message : "Unknown error");
-      // Stay in annotate mode so the user can see the error and retry
     } finally { setAutoSaving(false); }
   }
 
@@ -342,16 +544,13 @@ export default function Viewer() {
     if (!workingFile || redactBoxes.length === 0) return;
     setRedactLoading(true); setRedactError(null);
     try {
-      const regions: RedactRegion[] = redactBoxes.map(b => ({
-        page: b.page, x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y1,
-      }));
+      const regions: RedactRegion[] = redactBoxes.map(b => ({ page: b.page, x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y1 }));
       const blob = await redactPDF(workingFile, regions);
       setRedactBoxes([]);
       await applyBlob(blob);
       switchMode("view");
-    } catch (e) {
-      setRedactError(e instanceof Error ? e.message : "Unknown error");
-    } finally { setRedactLoading(false); }
+    } catch (e) { setRedactError(e instanceof Error ? e.message : "Unknown error"); }
+    finally { setRedactLoading(false); }
   }
 
   async function applyCrop() {
@@ -363,9 +562,59 @@ export default function Viewer() {
       setCropSelection(null);
       await applyBlob(blob);
       switchMode("view");
-    } catch (e) {
-      setCropError(e instanceof Error ? e.message : "Unknown error");
-    } finally { setCropLoading(false); }
+    } catch (e) { setCropError(e instanceof Error ? e.message : "Unknown error"); }
+    finally { setCropLoading(false); }
+  }
+
+  // ── QuickActionBar handlers ───────────────────────────────────────────────
+
+  function createAnnotFromSelection(type: "highlight" | "underline" | "strikethrough") {
+    if (!quickBar) return;
+    const { rects } = quickBar;
+    const bb = boundingBox(rects);
+    const id = newId();
+    const base = { id, page: currentPage, author: settings.author || undefined };
+    if (type === "highlight") {
+      setAnnotations(prev => [...prev, {
+        ...base, type: "highlight",
+        x0: bb.x0, y0: bb.y0, x1: bb.x1, y1: bb.y1,
+        rects, colorIdx: hlColor, color: HIGHLIGHT_COLORS[hlColor].rgb,
+      }]);
+    } else {
+      setAnnotations(prev => [...prev, {
+        ...base, type,
+        x0: bb.x0, y0: bb.y0, x1: bb.x1, y1: bb.y1,
+        rects,
+      }]);
+    }
+    window.getSelection()?.removeAllRanges();
+    setQuickBar(null);
+    // Make sure we're in annotate mode
+    if (canvasMode !== "annotate") doSwitchMode("annotate");
+  }
+
+  function addNoteAtSelection() {
+    if (!quickBar) return;
+    const bb = boundingBox(quickBar.rects);
+    const id = newId();
+    setAnnotations(prev => [...prev, {
+      id, page: currentPage, type: "note",
+      x: bb.x0, y: bb.y0, text: quickBar.text.slice(0, 200),
+      author: settings.author || undefined,
+    }]);
+    window.getSelection()?.removeAllRanges();
+    setQuickBar(null);
+    if (canvasMode !== "annotate") doSwitchMode("annotate");
+  }
+
+  // ── Annotation management ─────────────────────────────────────────────────
+
+  function deleteAnnot(id: AnnotId) {
+    setAnnotations(prev => prev.filter(a => a.id !== id));
+  }
+
+  function changeAnnotStatus(id: AnnotId, status: AnnotStatus) {
+    setAnnotations(prev => prev.map(a => a.id === id ? { ...a, status } : a));
   }
 
   // ── Drop zone ──────────────────────────────────────────────────────────────
@@ -375,7 +624,7 @@ export default function Viewer() {
     multiple: false,
   });
 
-  // ── Overlay coordinate helper ──────────────────────────────────────────────
+  // ── Overlay coordinate helper ─────────────────────────────────────────────
   function overlayFrac(el: HTMLElement, clientX: number, clientY: number) {
     const r = el.getBoundingClientRect();
     return {
@@ -397,10 +646,7 @@ export default function Viewer() {
     const onMove = (me: MouseEvent) => {
       if (!redactDragRef.current) return;
       const cur = overlayFrac(el, me.clientX, me.clientY);
-      setRedactLive({
-        x0: Math.min(sf.x, cur.x), y0: Math.min(sf.y, cur.y),
-        x1: Math.max(sf.x, cur.x), y1: Math.max(sf.y, cur.y),
-      });
+      setRedactLive({ x0: Math.min(sf.x, cur.x), y0: Math.min(sf.y, cur.y), x1: Math.max(sf.x, cur.x), y1: Math.max(sf.y, cur.y) });
     };
     const onUp = (me: MouseEvent) => {
       window.removeEventListener("mousemove", onMove);
@@ -408,10 +654,7 @@ export default function Viewer() {
       if (!redactDragRef.current) return;
       redactDragRef.current = null;
       const cur = overlayFrac(el, me.clientX, me.clientY);
-      const box = {
-        x0: Math.min(sf.x, cur.x), y0: Math.min(sf.y, cur.y),
-        x1: Math.max(sf.x, cur.x), y1: Math.max(sf.y, cur.y),
-      };
+      const box = { x0: Math.min(sf.x, cur.x), y0: Math.min(sf.y, cur.y), x1: Math.max(sf.x, cur.x), y1: Math.max(sf.y, cur.y) };
       setRedactLive(null);
       if (box.x1 - box.x0 > 0.01 && box.y1 - box.y0 > 0.005)
         setRedactBoxes(prev => [...prev, { id: newRid(), page: currentPage, ...box }]);
@@ -432,10 +675,7 @@ export default function Viewer() {
     const onMove = (me: MouseEvent) => {
       if (!cropDragRef.current) return;
       const cur = overlayFrac(el, me.clientX, me.clientY);
-      setCropLive({
-        x0: Math.min(sf.x, cur.x), y0: Math.min(sf.y, cur.y),
-        x1: Math.max(sf.x, cur.x), y1: Math.max(sf.y, cur.y),
-      });
+      setCropLive({ x0: Math.min(sf.x, cur.x), y0: Math.min(sf.y, cur.y), x1: Math.max(sf.x, cur.x), y1: Math.max(sf.y, cur.y) });
     };
     const onUp = (me: MouseEvent) => {
       window.removeEventListener("mousemove", onMove);
@@ -443,16 +683,24 @@ export default function Viewer() {
       if (!cropDragRef.current) return;
       cropDragRef.current = null;
       const cur = overlayFrac(el, me.clientX, me.clientY);
-      const sel = {
-        x0: Math.min(sf.x, cur.x), y0: Math.min(sf.y, cur.y),
-        x1: Math.max(sf.x, cur.x), y1: Math.max(sf.y, cur.y),
-      };
+      const sel = { x0: Math.min(sf.x, cur.x), y0: Math.min(sf.y, cur.y), x1: Math.max(sf.x, cur.x), y1: Math.max(sf.y, cur.y) };
       setCropLive(null);
       if (sel.x1 - sel.x0 > 0.01 && sel.y1 - sel.y0 > 0.005) setCropSelection(sel);
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   }
+
+  // ── Current-page search rects ──────────────────────────────────────────────
+  const pageSearchRects = useMemo(() => {
+    if (!searchQuery) return [];
+    return searchResults
+      .filter(r => r.page === currentPage)
+      .flatMap(r => r.rects);
+  }, [searchResults, currentPage, searchQuery]);
+
+  const currentSearchResult = searchResults[searchIdx];
+  const currentSearchIsOnPage = currentSearchResult?.page === currentPage;
 
   // ── Derived display values ─────────────────────────────────────────────────
   const pageRedactBoxes = redactBoxes.filter(b => b.page === currentPage);
@@ -509,7 +757,7 @@ export default function Viewer() {
   return (
     <div className="h-screen flex flex-col bg-gray-800 overflow-hidden">
 
-      {/* ── Top bar ─────────────────────────────────────────────────────────── */}
+      {/* ── Top bar ───────────────────────────────────────────────────────────── */}
       <div className="bg-gray-900 border-b border-gray-700 px-4 py-2 flex items-center gap-3 shrink-0">
         <Link to="/" className="shrink-0 text-gray-400 hover:text-white transition flex items-center gap-1 text-xs">
           <ChevronLeft className="h-3.5 w-3.5" /> Home
@@ -537,6 +785,33 @@ export default function Viewer() {
         )}
 
         <div className="ml-auto flex items-center gap-2 shrink-0">
+          {/* Author badge */}
+          {editingAuthor ? (
+            <div className="flex items-center gap-1">
+              <input
+                autoFocus
+                value={authorInput}
+                onChange={e => setAuthorInput(e.target.value)}
+                onBlur={() => { updateSettings({ author: authorInput.trim() }); setEditingAuthor(false); }}
+                onKeyDown={e => {
+                  if (e.key === "Enter") { updateSettings({ author: authorInput.trim() }); setEditingAuthor(false); }
+                  if (e.key === "Escape") setEditingAuthor(false);
+                }}
+                placeholder="Your name"
+                className="w-28 bg-gray-800 border border-blue-500 rounded px-2 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+          ) : (
+            <button
+              onClick={() => { setAuthorInput(settings.author); setEditingAuthor(true); }}
+              title="Set your name for annotations"
+              className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-300 transition"
+            >
+              <User className="h-3 w-3" />
+              <span className="hidden sm:inline">{settings.author || "Set name"}</span>
+            </button>
+          )}
+
           {/* Backend status dot */}
           <div
             title={
@@ -553,7 +828,7 @@ export default function Viewer() {
           />
           {rendering && <span className="text-[10px] text-gray-500 animate-pulse">Rendering…</span>}
 
-          {/* Download button — shown when there are unsaved changes */}
+          {/* Download button */}
           {workingBlob && (
             <button
               onClick={() => downloadBlob(workingBlob, filename)}
@@ -564,6 +839,18 @@ export default function Viewer() {
             </button>
           )}
 
+          {/* Export report */}
+          {annotations.length > 0 && (
+            <button
+              onClick={() => downloadAnnotationReport(annotations, filename)}
+              title="Export review report as Markdown"
+              className="flex items-center gap-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 px-2.5 py-1.5 text-xs text-gray-300 hover:text-white transition"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Report</span>
+            </button>
+          )}
+
           <div {...getRootProps()} className="cursor-pointer">
             <input {...getInputProps()} />
             <button className="text-xs px-2.5 py-1.5 rounded bg-gray-700 hover:bg-gray-600 transition text-gray-300">Open…</button>
@@ -571,28 +858,38 @@ export default function Viewer() {
         </div>
       </div>
 
-      {/* ── Middle: sidebar + canvas + right panel ───────────────────────────── */}
+      {/* ── Middle: sidebar + canvas + right panel ─────────────────────────────── */}
       <div className="flex-1 flex overflow-hidden">
 
-        {/* Left: thumbnail sidebar — shows working document */}
+        {/* Left: thumbnail sidebar */}
         <ThumbnailSidebar
           file={sidebarFile}
           currentPage={currentPage}
           onSelect={goTo}
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(c => !c)}
+          annotations={annotations}
         />
 
-        {/* Center: canvas + context bars + bottom toolbar */}
+        {/* Center: canvas + context bars + toolbar */}
         <div className="flex-1 flex flex-col overflow-hidden">
 
           {/* Canvas scroll area */}
           <div ref={canvasAreaRef} className="flex-1 overflow-auto flex flex-col items-center py-8 px-4">
-            {/* Unified canvas wrapper — overlays sit on top */}
             <div ref={canvasWrapRef} className="relative inline-block shadow-2xl rounded" style={{ lineHeight: 0 }}>
               <canvas ref={canvasRef} className="rounded block" />
 
-              {/* ── Annotate overlay ───────────────────────────────────────── */}
+              {/* ── Text layer (always in annotate mode) ────────────────────── */}
+              {canvasMode === "annotate" && pdf && (
+                <TextLayer
+                  pdf={pdf}
+                  pageNum={currentPage}
+                  scale={scale}
+                  active={textSelectActive}
+                />
+              )}
+
+              {/* ── Annotate overlay ────────────────────────────────────────── */}
               {canvasMode === "annotate" && (
                 <AnnotationLayer
                   annotations={annotations}
@@ -601,7 +898,25 @@ export default function Viewer() {
                   hlColorIdx={hlColor}
                   highlightColors={HIGHLIGHT_COLORS}
                   onAnnotationsChange={setAnnotations}
+                  textSelectActive={textSelectActive}
+                  author={settings.author}
                 />
+              )}
+
+              {/* ── Search result highlight overlays ───────────────────────── */}
+              {pageSearchRects.length > 0 && (
+                <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 5 }}>
+                  {pageSearchRects.map((r, i) => (
+                    <div key={i} className="absolute" style={{
+                      left: `${r.x0 * 100}%`, top: `${r.y0 * 100}%`,
+                      width: `${(r.x1 - r.x0) * 100}%`, height: `${(r.y1 - r.y0) * 100}%`,
+                      backgroundColor: currentSearchIsOnPage && i === 0
+                        ? "rgba(255,120,0,0.45)"
+                        : "rgba(255,200,0,0.35)",
+                      borderRadius: 2,
+                    }} />
+                  ))}
+                </div>
               )}
 
               {/* ── Redact overlay ─────────────────────────────────────────── */}
@@ -611,15 +926,11 @@ export default function Viewer() {
                 >
                   {pageRedactBoxes.map(box => (
                     <div key={box.id} data-rbox="true"
-                      className={cn(
-                        "absolute pointer-events-auto",
-                        selectedRedact === box.id && "ring-2 ring-offset-0 ring-blue-400"
-                      )}
+                      className={cn("absolute pointer-events-auto", selectedRedact === box.id && "ring-2 ring-offset-0 ring-blue-400")}
                       style={{
                         left: `${box.x0 * 100}%`, top: `${box.y0 * 100}%`,
                         width: `${(box.x1 - box.x0) * 100}%`, height: `${(box.y1 - box.y0) * 100}%`,
-                        background: "rgba(0,0,0,0.88)",
-                        cursor: "pointer",
+                        background: "rgba(0,0,0,0.88)", cursor: "pointer",
                       }}
                       onClick={e => { e.stopPropagation(); setSelectedRedact(box.id === selectedRedact ? null : box.id); }}
                     >
@@ -632,13 +943,11 @@ export default function Viewer() {
                       )}
                     </div>
                   ))}
-                  {/* In-progress drag preview */}
                   {redactLive && (
                     <div className="absolute pointer-events-none" style={{
                       left: `${redactLive.x0 * 100}%`, top: `${redactLive.y0 * 100}%`,
                       width: `${(redactLive.x1 - redactLive.x0) * 100}%`, height: `${(redactLive.y1 - redactLive.y0) * 100}%`,
-                      background: "rgba(0,0,0,0.55)",
-                      border: "2px dashed rgba(255,255,255,0.4)",
+                      background: "rgba(0,0,0,0.55)", border: "2px dashed rgba(255,255,255,0.4)",
                     }} />
                   )}
                 </div>
@@ -649,33 +958,15 @@ export default function Viewer() {
                 <div className="absolute inset-0 cursor-crosshair" style={{ userSelect: "none" }}
                   onMouseDown={onCropDown}
                 >
-                  {/* Dim mask — cut out the selection rect */}
                   {displayCrop && (
-                    <div className="absolute inset-0 pointer-events-none" style={{ userSelect: "none" }}>
-                      {/* Top strip */}
+                    <div className="absolute inset-0 pointer-events-none">
                       <div className="absolute bg-black/40" style={{ top: 0, left: 0, right: 0, height: `${displayCrop.y0 * 100}%` }} />
-                      {/* Bottom strip */}
                       <div className="absolute bg-black/40" style={{ bottom: 0, left: 0, right: 0, top: `${displayCrop.y1 * 100}%` }} />
-                      {/* Left strip */}
-                      <div className="absolute bg-black/40" style={{
-                        top: `${displayCrop.y0 * 100}%`, bottom: `${(1 - displayCrop.y1) * 100}%`,
-                        left: 0, width: `${displayCrop.x0 * 100}%`,
-                      }} />
-                      {/* Right strip */}
-                      <div className="absolute bg-black/40" style={{
-                        top: `${displayCrop.y0 * 100}%`, bottom: `${(1 - displayCrop.y1) * 100}%`,
-                        right: 0, left: `${displayCrop.x1 * 100}%`,
-                      }} />
-                      {/* Selection border */}
-                      <div className="absolute" style={{
-                        left: `${displayCrop.x0 * 100}%`, top: `${displayCrop.y0 * 100}%`,
-                        width: `${(displayCrop.x1 - displayCrop.x0) * 100}%`,
-                        height: `${(displayCrop.y1 - displayCrop.y0) * 100}%`,
-                        border: "2px solid #3b82f6",
-                      }} />
+                      <div className="absolute bg-black/40" style={{ top: `${displayCrop.y0 * 100}%`, bottom: `${(1 - displayCrop.y1) * 100}%`, left: 0, width: `${displayCrop.x0 * 100}%` }} />
+                      <div className="absolute bg-black/40" style={{ top: `${displayCrop.y0 * 100}%`, bottom: `${(1 - displayCrop.y1) * 100}%`, right: 0, left: `${displayCrop.x1 * 100}%` }} />
+                      <div className="absolute" style={{ left: `${displayCrop.x0 * 100}%`, top: `${displayCrop.y0 * 100}%`, width: `${(displayCrop.x1 - displayCrop.x0) * 100}%`, height: `${(displayCrop.y1 - displayCrop.y0) * 100}%`, border: "2px solid #3b82f6" }} />
                     </div>
                   )}
-                  {/* No-selection hint */}
                   {!displayCrop && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <span className="bg-black/50 text-white text-xs px-3 py-1.5 rounded-full">Drag to select crop area</span>
@@ -692,24 +983,34 @@ export default function Viewer() {
             <div className="shrink-0 px-4 pb-2 flex justify-center">
               <div className="flex flex-wrap items-center gap-2 bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 shadow-lg w-full max-w-3xl">
                 {/* Sub-mode */}
-                <div className="flex gap-1">
+                <div className="flex gap-1 flex-wrap">
                   {([
-                    { m: "note"      as CreateMode, icon: <MessageSquare className="h-3.5 w-3.5" />, label: "Note",      key: "A" },
-                    { m: "highlight" as CreateMode, icon: <Highlighter    className="h-3.5 w-3.5" />, label: "Highlight", key: "H" },
-                    { m: "freetext"  as CreateMode, icon: <Type           className="h-3.5 w-3.5" />, label: "Text",      key: "T" },
+                    { m: "note"          as CreateMode, icon: <MessageSquare className="h-3.5 w-3.5" />, label: "Note",    key: "A" },
+                    { m: "highlight"     as CreateMode, icon: <Highlighter   className="h-3.5 w-3.5" />, label: "Highlight", key: "H" },
+                    { m: "underline"     as CreateMode, icon: <Underline     className="h-3.5 w-3.5" />, label: "Underline", key: "U" },
+                    { m: "strikethrough" as CreateMode, icon: <Strikethrough className="h-3.5 w-3.5" />, label: "Strike",  key: "S" },
+                    { m: "freetext"      as CreateMode, icon: <Type          className="h-3.5 w-3.5" />, label: "Text",    key: "T" },
                   ]).map(({ m, icon, label, key }) => (
-                    <button key={m} onClick={() => setAnnotateSubMode(m)} title={`${label} (${key})`}
+                    <button key={m} onClick={() => { setAnnotateSubMode(m); setTextSelectActive(false); }} title={`${label} (${key})`}
                       className={cn("flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition",
-                        annotateSubMode === m ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600")}>
+                        annotateSubMode === m && !textSelectActive ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600")}>
                       {icon} {label}
                     </button>
                   ))}
+                  {/* Text select toggle */}
+                  <button
+                    onClick={() => setTextSelectActive(v => !v)}
+                    title="Select text to highlight/underline/strike (X)"
+                    className={cn("flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition",
+                      textSelectActive ? "bg-purple-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600")}>
+                    <Type className="h-3.5 w-3.5" /> Select
+                  </button>
                 </div>
                 {/* Highlight colour swatches */}
-                {annotateSubMode === "highlight" && (
+                {(annotateSubMode === "highlight") && !textSelectActive && (
                   <div className="flex items-center gap-1">
                     {HIGHLIGHT_COLORS.map((c, i) => (
-                      <button key={i} onClick={() => setHlColor(i)} title={c.label}
+                      <button key={i} onClick={() => setHlColor(i)} title={`${c.label} (${i + 1})`}
                         className={cn("h-5 w-5 rounded-full border-2 transition",
                           hlColor === i ? "border-white scale-125" : "border-transparent")}
                         style={{ background: c.bg }} />
@@ -718,7 +1019,6 @@ export default function Viewer() {
                 )}
                 {/* Controls */}
                 <div className="flex items-center gap-2 ml-auto">
-                  {/* Auto-save status */}
                   {autoSaving ? (
                     <span className="flex items-center gap-1 text-xs text-blue-400">
                       <Loader2 className="h-3 w-3 animate-spin" /> Saving…
@@ -730,9 +1030,7 @@ export default function Viewer() {
                     </span>
                   )}
                   {annotateError && (
-                    <span className="text-xs text-red-400 max-w-56 truncate cursor-help" title={annotateError}>
-                      ⚠ {annotateError}
-                    </span>
+                    <span className="text-xs text-red-400 max-w-56 truncate cursor-help" title={annotateError}>⚠ {annotateError}</span>
                   )}
                   {annotations.length > 0 && !autoSaving && (
                     <>
@@ -743,7 +1041,6 @@ export default function Viewer() {
                     </>
                   )}
                   {annotateError && annotations.length > 0 && (
-                    /* Retry button when auto-save failed */
                     <button onClick={() => autoSaveAnnotations("view")} disabled={autoSaving}
                       className="flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-50 transition">
                       <Check className="h-3 w-3" /> Retry Save
@@ -764,8 +1061,7 @@ export default function Viewer() {
                   {redactError && <span className="text-xs text-red-300 max-w-40 truncate" title={redactError}>{redactError}</span>}
                   {redactBoxes.length > 0 && (
                     <>
-                      <button onClick={() => setRedactBoxes([])}
-                        className="text-xs text-red-400 hover:text-red-300 transition">Clear all</button>
+                      <button onClick={() => setRedactBoxes([])} className="text-xs text-red-400 hover:text-red-300 transition">Clear all</button>
                       <button onClick={applyRedactions} disabled={redactLoading}
                         className="flex items-center gap-1.5 rounded-lg bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition">
                         {redactLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <EyeOff className="h-3.5 w-3.5" />}
@@ -793,8 +1089,7 @@ export default function Viewer() {
                 <div className="flex items-center gap-2 ml-auto">
                   {cropSelection && (
                     <>
-                      <button onClick={() => setCropSelection(null)}
-                        className="text-xs text-blue-400 hover:text-blue-300 transition">Clear</button>
+                      <button onClick={() => setCropSelection(null)} className="text-xs text-blue-400 hover:text-blue-300 transition">Clear</button>
                       <button onClick={applyCrop} disabled={cropLoading}
                         className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-50 transition">
                         {cropLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Crop className="h-3.5 w-3.5" />}
@@ -807,7 +1102,23 @@ export default function Viewer() {
             </div>
           )}
 
-          {/* ── Bottom toolbar — floating pill ──────────────────────────────── */}
+          {/* ── Search bar ──────────────────────────────────────────────────── */}
+          {searchOpen && (
+            <div className="shrink-0 px-4 pb-2 flex justify-center">
+              <SearchBar
+                query={searchQuery}
+                onChange={q => { setSearchQuery(q); setSearchIdx(0); }}
+                results={searchResults}
+                focusIdx={searchIdx}
+                loading={searchLoading}
+                onNext={() => setSearchIdx(i => searchResults.length > 0 ? (i + 1) % searchResults.length : 0)}
+                onPrev={() => setSearchIdx(i => searchResults.length > 0 ? (i - 1 + searchResults.length) % searchResults.length : 0)}
+                onClose={() => { setSearchOpen(false); setSearchQuery(""); setSearchResults([]); }}
+              />
+            </div>
+          )}
+
+          {/* ── Bottom toolbar ──────────────────────────────────────────────── */}
           <div className="shrink-0 px-4 pb-4 flex justify-center">
             <div className="flex items-center gap-1 bg-gray-900 border border-gray-700 rounded-2xl px-3 py-2 shadow-xl flex-wrap">
 
@@ -868,6 +1179,18 @@ export default function Viewer() {
 
               <div className="w-px h-5 bg-gray-700 mx-0.5" />
 
+              {/* Search */}
+              <button onClick={() => setSearchOpen(v => !v)} title="Search (Ctrl+F)"
+                className={cn("p-1.5 rounded-lg transition text-gray-400 hover:text-white hover:bg-gray-700",
+                  searchOpen && "bg-blue-600 text-white")}>
+                <Search className="h-3.5 w-3.5" />
+              </button>
+
+              {/* Annotations panel */}
+              {panelBtn("annotations", <List className="h-3.5 w-3.5" />, "Annotations")}
+
+              <div className="w-px h-5 bg-gray-700 mx-0.5" />
+
               {/* Panel tool buttons */}
               {panelBtn("compress",      <Minimize2 className="h-3.5 w-3.5" />,  "Compress")}
               {panelBtn("watermark",     <Stamp className="h-3.5 w-3.5" />,      "Watermark")}
@@ -881,7 +1204,7 @@ export default function Viewer() {
 
               {/* External links */}
               <Link to="/rearrange" state={{ file: workingFile ?? file }}
-                title="Rearrange pages (separate view)"
+                title="Rearrange pages"
                 className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700 transition">
                 <AlignLeft className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Rearrange</span>
@@ -893,6 +1216,12 @@ export default function Viewer() {
                 <span className="hidden sm:inline">Merge</span>
                 <ExternalLink className="h-2.5 w-2.5 ml-0.5" />
               </Link>
+
+              {/* Keyboard cheat sheet */}
+              <button onClick={() => setCheatSheetOpen(true)} title="Keyboard shortcuts (?)"
+                className="p-1.5 rounded-lg hover:bg-gray-700 transition text-gray-500 hover:text-gray-300">
+                <HelpCircle className="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
 
@@ -907,12 +1236,39 @@ export default function Viewer() {
             onClose={() => setPanelTool(null)}
             onApplied={async (blob) => {
               await applyBlob(blob);
-              setPanelTool(null);
+              if (panelTool !== "annotations") setPanelTool(null);
             }}
+            // Annotations panel props
+            annotations={annotations}
+            currentPage={currentPage}
+            onGoToPage={goTo}
+            onDeleteAnnot={deleteAnnot}
+            onStatusChange={changeAnnotStatus}
+            onExportReport={() => downloadAnnotationReport(annotations, filename)}
           />
         )}
 
       </div>
+
+      {/* ── QuickActionBar ────────────────────────────────────────────────────── */}
+      {quickBar && canvasMode === "annotate" && (
+        <div data-quickbar="true">
+          <QuickActionBar
+            x={quickBar.barX}
+            y={quickBar.barY}
+            onHighlight={() => createAnnotFromSelection("highlight")}
+            onUnderline={() => createAnnotFromSelection("underline")}
+            onStrikethrough={() => createAnnotFromSelection("strikethrough")}
+            onComment={addNoteAtSelection}
+            onCopy={() => { navigator.clipboard.writeText(quickBar.text).catch(() => {}); setQuickBar(null); }}
+          />
+        </div>
+      )}
+
+      {/* ── Keyboard cheat sheet ──────────────────────────────────────────────── */}
+      {cheatSheetOpen && (
+        <KeyboardCheatSheet onClose={() => setCheatSheetOpen(false)} />
+      )}
     </div>
   );
 }

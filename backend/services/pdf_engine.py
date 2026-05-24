@@ -345,6 +345,29 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
             )
             a.update()
 
+        elif ann["type"] in ("underline", "strikethrough"):
+            # Build list of fitz.Rect from rects[] if provided, else single bbox
+            raw_rects = ann.get("rects") or [{
+                "x0": ann["x0"], "y0": ann["y0"],
+                "x1": ann["x1"], "y1": ann["y1"],
+            }]
+            quads = [
+                fitz.Rect(
+                    pb.x0 + r["x0"] * pb.width,  pb.y0 + r["y0"] * pb.height,
+                    pb.x0 + r["x1"] * pb.width,  pb.y0 + r["y1"] * pb.height,
+                )
+                for r in raw_rects
+            ]
+            if ann["type"] == "underline":
+                a = page.add_underline_annot(quads)
+            else:
+                a = page.add_strikeout_annot(quads)
+            color = ann.get("color", [0, 0, 0])
+            a.set_colors(stroke=color)
+            if ann.get("text"):
+                a.set_info(content=ann["text"])
+            a.update()
+
     return _save(doc)
 
 

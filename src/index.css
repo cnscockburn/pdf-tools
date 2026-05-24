@@ -13,3 +13,37 @@
     scrollbar-width: thin;
   }
 }
+
+/* ── PDF.js text layer ──────────────────────────────────────────────────────── */
+.textLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  line-height: 1;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+}
+
+.textLayer span,
+.textLayer br {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+
+.textLayer ::selection {
+  background: rgba(60, 130, 246, 0.35);
+}
+
+/* Search match highlight injected by Viewer */
+.textLayer .search-highlight {
+  background: rgba(255, 200, 0, 0.45);
+  border-radius: 1px;
+}
+.textLayer .search-highlight-active {
+  background: rgba(255, 120, 0, 0.55);
+}

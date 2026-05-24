@@ -1,38 +1,77 @@
 /**
  * AnnotationLayer — absolute overlay that sits on top of the PDF canvas.
+ *
  * Handles: create / select / drag-move / corner-resize / double-click-edit / delete.
  * All coordinates are fractional (0–1) relative to the canvas element.
+ *
+ * Annotation types: note, highlight (multi-rect), freetext, underline, strikethrough.
+ * Every annotation carries optional status + author metadata.
  */
 import { useEffect, useRef, useState } from "react";
 import { cn } from "../lib/utils";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export type AnnotId = string;
+export type AnnotId  = string;
+export type AnnotStatus = "open" | "resolved" | "wontfix";
+
 let _seq = 0;
 export const newId = (): AnnotId => `a${++_seq}_${Date.now()}`;
+
+/** A fractional rectangle (0–1 relative to the page). */
+export interface FracRect {
+  x0: number; y0: number; x1: number; y1: number;
+}
 
 export interface NoteAnnot {
   id: AnnotId; type: "note"; page: number;
   x: number; y: number; text: string;
+  author?: string; status?: AnnotStatus;
 }
 export interface HighlightAnnot {
   id: AnnotId; type: "highlight"; page: number;
   x0: number; y0: number; x1: number; y1: number;
+  /** Individual line rects for text-selection highlights; undefined = single rect */
+  rects?: FracRect[];
   colorIdx: number; color: [number, number, number];
+  text?: string;   // optional comment
+  author?: string; status?: AnnotStatus;
 }
 export interface FreetextAnnot {
   id: AnnotId; type: "freetext"; page: number;
   x0: number; y0: number; x1: number; y1: number;
   text: string;
+  author?: string; status?: AnnotStatus;
 }
-export type LocalAnnot = NoteAnnot | HighlightAnnot | FreetextAnnot;
+export interface UnderlineAnnot {
+  id: AnnotId; type: "underline"; page: number;
+  x0: number; y0: number; x1: number; y1: number;
+  rects?: FracRect[];
+  color?: [number, number, number];
+  text?: string;
+  author?: string; status?: AnnotStatus;
+}
+export interface StrikethroughAnnot {
+  id: AnnotId; type: "strikethrough"; page: number;
+  x0: number; y0: number; x1: number; y1: number;
+  rects?: FracRect[];
+  color?: [number, number, number];
+  text?: string;
+  author?: string; status?: AnnotStatus;
+}
+
+export type LocalAnnot =
+  | NoteAnnot
+  | HighlightAnnot
+  | FreetextAnnot
+  | UnderlineAnnot
+  | StrikethroughAnnot;
 
 export interface HlColor {
   label: string; rgb: [number, number, number]; bg: string; border: string;
 }
 
-export type CreateMode = "note" | "highlight" | "freetext";
+export type CreateMode = "note" | "highlight" | "freetext" | "underline" | "strikethrough";
 
 // Corner resize handles
 const CORNERS = ["nw", "ne", "sw", "se"] as const;
@@ -54,10 +93,17 @@ function applyDrag(ann: LocalAnnot, dx: number, dy: number): LocalAnnot {
   const w = ann.x1 - ann.x0, h = ann.y1 - ann.y0;
   const x0 = clamp(ann.x0 + dx, 0, 1 - w);
   const y0 = clamp(ann.y0 + dy, 0, 1 - h);
-  return { ...ann, x0, y0, x1: x0 + w, y1: y0 + h };
+  // Move rects together with the bounding box
+  const rects = (ann as HighlightAnnot).rects?.map(r => ({
+    x0: r.x0 + dx, y0: r.y0 + dy, x1: r.x1 + dx, y1: r.y1 + dy,
+  }));
+  return { ...ann, x0, y0, x1: x0 + w, y1: y0 + h, ...(rects ? { rects } : {}) };
 }
 
-function applyResize(ann: HighlightAnnot | FreetextAnnot, corner: Corner, dx: number, dy: number): typeof ann {
+function applyResize(
+  ann: HighlightAnnot | FreetextAnnot | UnderlineAnnot | StrikethroughAnnot,
+  corner: Corner, dx: number, dy: number,
+): typeof ann {
   let { x0, y0, x1, y1 } = ann;
   const MIN = 0.02;
   if (corner.includes("n")) y0 = clamp(y0 + dy, 0, y1 - MIN);
@@ -65,6 +111,16 @@ function applyResize(ann: HighlightAnnot | FreetextAnnot, corner: Corner, dx: nu
   if (corner.includes("w")) x0 = clamp(x0 + dx, 0, x1 - MIN);
   if (corner.includes("e")) x1 = clamp(x1 + dx, x0 + MIN, 1);
   return { ...ann, x0, y0, x1, y1 };
+}
+
+/** Expand line rects (underline/strikethrough) to a tight bounding box */
+function boundingBox(rects: FracRect[]): FracRect {
+  return rects.reduce((acc, r) => ({
+    x0: Math.min(acc.x0, r.x0),
+    y0: Math.min(acc.y0, r.y0),
+    x1: Math.max(acc.x1, r.x1),
+    y1: Math.max(acc.y1, r.y1),
+  }), { x0: 1, y0: 1, x1: 0, y1: 0 });
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -76,23 +132,26 @@ interface Props {
   hlColorIdx: number;
   highlightColors: HlColor[];
   onAnnotationsChange: (a: LocalAnnot[]) => void;
-  /** Notify parent of selected ID (for Delete key shortcut in parent) */
+  /** When true, background has pointer-events:none so text selection works through it */
+  textSelectActive?: boolean;
+  /** Default author stamped on new annotations */
+  author?: string;
+  /** Notify parent of selected ID */
   onSelectedChange?: (id: AnnotId | null) => void;
 }
 
 export default function AnnotationLayer({
   annotations, page, createMode, hlColorIdx, highlightColors,
-  onAnnotationsChange, onSelectedChange,
+  onAnnotationsChange, textSelectActive, author, onSelectedChange,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Selection / editing
-  const [selectedId, setSelectedId]   = useState<AnnotId | null>(null);
-  const [editingId, setEditingId]     = useState<AnnotId | null>(null);
-  const [editText, setEditText]       = useState("");
-  const [hlPicker, setHlPicker]       = useState<AnnotId | null>(null);
+  const [selectedId,  setSelectedId]  = useState<AnnotId | null>(null);
+  const [editingId,   setEditingId]   = useState<AnnotId | null>(null);
+  const [editText,    setEditText]     = useState("");
+  const [hlPicker,    setHlPicker]     = useState<AnnotId | null>(null);
+  const [, forceUpdate] = useState(0);
 
-  // Drag / resize (tracked via refs so event handlers are stable)
   const dragRef = useRef<{
     kind: "create" | "move" | "resize";
     id?: AnnotId;
@@ -100,13 +159,13 @@ export default function AnnotationLayer({
     corner?: Corner;
     startMouse: { x: number; y: number };
     startFrac: { x: number; y: number };
-    live: { x0: number; y0: number; x1: number; y1: number } | null;
+    live: FracRect | null;
   } | null>(null);
 
   // Sync selection to parent
   useEffect(() => { onSelectedChange?.(selectedId); }, [selectedId]);
 
-  // Keyboard handling (delete selected / escape)
+  // Keyboard: delete / escape
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName;
@@ -121,7 +180,7 @@ export default function AnnotationLayer({
     return () => window.removeEventListener("keydown", onKey);
   }, [selectedId, editingId, annotations]);
 
-  // ── Annotation list helpers ─────────────────────────────────────────────
+  // ── Annotation helpers ────────────────────────────────────────────────────
   const pageAnns = annotations.filter(a => a.page === page);
 
   function updateAnnot(updated: LocalAnnot) {
@@ -131,14 +190,14 @@ export default function AnnotationLayer({
   function deleteAnnot(id: AnnotId) {
     onAnnotationsChange(annotations.filter(a => a.id !== id));
     if (selectedId === id) { setSelectedId(null); onSelectedChange?.(null); }
-    if (editingId === id)  setEditingId(null);
+    if (editingId  === id) setEditingId(null);
   }
 
   function addAnnot(ann: LocalAnnot) {
     onAnnotationsChange([...annotations, ann]);
   }
 
-  // ── Edit helpers ────────────────────────────────────────────────────────
+  // ── Edit helpers ──────────────────────────────────────────────────────────
   function startEdit(ann: NoteAnnot | FreetextAnnot) {
     setEditingId(ann.id);
     setEditText(ann.text);
@@ -155,26 +214,22 @@ export default function AnnotationLayer({
 
   function cancelEdit() { setEditingId(null); }
 
-  // ── Mouse event helpers ─────────────────────────────────────────────────
+  // ── Mouse helpers ─────────────────────────────────────────────────────────
   function getContainerFrac(e: { clientX: number; clientY: number }) {
     return containerRef.current ? getFrac(containerRef.current, e.clientX, e.clientY) : { x: 0, y: 0 };
   }
-
   function getContainerSize() {
     const r = containerRef.current?.getBoundingClientRect();
     return r ? { w: r.width, h: r.height } : { w: 1, h: 1 };
   }
 
-  // ── Background interaction — create new annotation ──────────────────────
+  // ── Background: create new annotation ────────────────────────────────────
   function onBgMouseDown(e: React.MouseEvent<HTMLDivElement>) {
     if (e.button !== 0) return;
-    // Clicked on existing annotation?
     if ((e.target as HTMLElement).closest("[data-annot]")) return;
+    setSelectedId(null); setHlPicker(null); onSelectedChange?.(null);
 
-    setSelectedId(null); setHlPicker(null);
-    onSelectedChange?.(null);
-
-    if (createMode === "note") return; // note is handled in onClick
+    if (createMode === "note") return; // handled in onClick
 
     e.preventDefault();
     const startFrac = getContainerFrac(e);
@@ -196,27 +251,29 @@ export default function AnnotationLayer({
       forceUpdate(n => n + 1);
     };
 
-    const onUp = (_me: MouseEvent) => {
+    const onUp = () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
       if (!dragRef.current || dragRef.current.kind !== "create") return;
       const { live } = dragRef.current;
       dragRef.current = null;
-      if (!live || (live.x1 - live.x0 < 0.01 && live.y1 - live.y0 < 0.005)) {
+      if (!live || (live.x1 - live.x0 < 0.01 && live.y1 - live.y0 < 0.004)) {
         forceUpdate(n => n + 1); return;
       }
       const id = newId();
+      const base = { id, page, author: author || undefined };
       if (createMode === "highlight") {
-        const ann: HighlightAnnot = {
-          id, type: "highlight", page,
-          x0: live.x0, y0: live.y0, x1: live.x1, y1: live.y1,
-          colorIdx: hlColorIdx, color: highlightColors[hlColorIdx].rgb,
-        };
-        addAnnot(ann); setSelectedId(id); onSelectedChange?.(id);
+        addAnnot({ ...base, type: "highlight",
+          ...live, colorIdx: hlColorIdx, color: highlightColors[hlColorIdx].rgb });
       } else if (createMode === "freetext") {
-        const ann: FreetextAnnot = { id, type: "freetext", page, ...live, text: "" };
-        addAnnot(ann); setEditingId(id); setEditText(""); setSelectedId(id); onSelectedChange?.(id);
+        addAnnot({ ...base, type: "freetext", ...live, text: "" });
+        setEditingId(id); setEditText(""); setSelectedId(id); onSelectedChange?.(id);
+      } else if (createMode === "underline") {
+        addAnnot({ ...base, type: "underline", ...live });
+      } else if (createMode === "strikethrough") {
+        addAnnot({ ...base, type: "strikethrough", ...live });
       }
+      setSelectedId(id); onSelectedChange?.(id);
       forceUpdate(n => n + 1);
     };
 
@@ -230,20 +287,16 @@ export default function AnnotationLayer({
     if (createMode === "note") {
       const pt = getContainerFrac(e);
       const id = newId();
-      const ann: NoteAnnot = { id, type: "note", page, x: pt.x, y: pt.y, text: "" };
-      addAnnot(ann); setEditingId(id); setEditText(""); setSelectedId(id); onSelectedChange?.(id);
+      addAnnot({ id, type: "note", page, x: pt.x, y: pt.y, text: "", author: author || undefined });
+      setEditingId(id); setEditText(""); setSelectedId(id); onSelectedChange?.(id);
     }
   }
 
-  // Force re-render during drag (refs don't trigger renders)
-  const [, forceUpdate] = useState(0);
-
-  // ── Annotation drag / resize start ──────────────────────────────────────
+  // ── Annotation drag / resize ──────────────────────────────────────────────
   function onAnnotMouseDown(e: React.MouseEvent, ann: LocalAnnot) {
     if (e.button !== 0) return;
     if (editingId === ann.id) return;
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
     setSelectedId(ann.id); setHlPicker(null); onSelectedChange?.(ann.id);
 
     const startAnnot = { ...ann } as LocalAnnot;
@@ -255,16 +308,13 @@ export default function AnnotationLayer({
       const size = getContainerSize();
       const dx = (me.clientX - startMouse.x) / size.w;
       const dy = (me.clientY - startMouse.y) / size.h;
-      const updated = applyDrag(startAnnot, dx, dy);
-      onAnnotationsChange(annotations.map(a => a.id === ann.id ? updated : a));
+      onAnnotationsChange(annotations.map(a => a.id === ann.id ? applyDrag(startAnnot, dx, dy) : a));
     };
-
     const onUp = () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
       dragRef.current = null;
     };
-
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   }
@@ -273,51 +323,134 @@ export default function AnnotationLayer({
     e.stopPropagation();
     if (ann.type === "note" || ann.type === "freetext") startEdit(ann);
     else if (ann.type === "highlight") setHlPicker(ann.id);
+    else if (ann.type === "underline" || ann.type === "strikethrough") {
+      // Treat double-click as open note editor for comment
+      setEditingId(ann.id);
+      setEditText(ann.text ?? "");
+      setSelectedId(ann.id);
+    }
   }
 
-  // ── Corner resize handle ────────────────────────────────────────────────
-  function onResizeMouseDown(e: React.MouseEvent, ann: HighlightAnnot | FreetextAnnot, corner: Corner) {
+  function onResizeMouseDown(
+    e: React.MouseEvent,
+    ann: HighlightAnnot | FreetextAnnot | UnderlineAnnot | StrikethroughAnnot,
+    corner: Corner,
+  ) {
     e.preventDefault(); e.stopPropagation();
     const startAnnot = { ...ann };
     const startMouse = { x: e.clientX, y: e.clientY };
-
     const onMove = (me: MouseEvent) => {
       const size = getContainerSize();
       const dx = (me.clientX - startMouse.x) / size.w;
       const dy = (me.clientY - startMouse.y) / size.h;
-      const updated = applyResize(startAnnot, corner, dx, dy);
-      onAnnotationsChange(annotations.map(a => a.id === ann.id ? updated : a));
+      onAnnotationsChange(annotations.map(a => a.id === ann.id ? applyResize(startAnnot, corner, dx, dy) : a));
     };
-
     const onUp = () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   }
 
-  // ── Drag preview rect ────────────────────────────────────────────────────
+  // ── Drag preview ──────────────────────────────────────────────────────────
   const live = dragRef.current?.kind === "create" ? dragRef.current.live : null;
-  const dragColor = createMode === "highlight" ? highlightColors[hlColorIdx].border : "#3b82f6";
-  const dragBg    = createMode === "highlight" ? highlightColors[hlColorIdx].bg     : "rgba(59,130,246,0.1)";
+  const dragColor = createMode === "highlight" ? highlightColors[hlColorIdx].border
+    : createMode === "underline" ? "#3b82f6"
+    : createMode === "strikethrough" ? "#ef4444"
+    : "#3b82f6";
+  const dragBg = createMode === "highlight" ? highlightColors[hlColorIdx].bg
+    : "rgba(59,130,246,0.08)";
 
   const cursorClass = createMode === "note" ? "cursor-cell"
     : selectedId ? "cursor-default"
     : "cursor-crosshair";
 
+  // ── Inline comment editor for underline/strikethrough ─────────────────────
+  function renderLineCommentEditor(ann: UnderlineAnnot | StrikethroughAnnot) {
+    if (editingId !== ann.id) return null;
+    return (
+      <div
+        className="absolute top-full left-0 mt-1 z-40 pointer-events-auto"
+        style={{ minWidth: 180 }}
+        onMouseDown={e => e.stopPropagation()}
+      >
+        <div className="bg-yellow-50 border-2 border-yellow-400 rounded-xl shadow-xl p-2 w-52 space-y-1.5">
+          <textarea
+            autoFocus rows={2} value={editText}
+            onChange={e => setEditText(e.target.value)}
+            onKeyDown={e => {
+              e.stopPropagation();
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                updateAnnot({ ...ann, text: editText.trim() });
+                setEditingId(null);
+              }
+              if (e.key === "Escape") { e.preventDefault(); setEditingId(null); }
+            }}
+            onBlur={() => { updateAnnot({ ...ann, text: editText.trim() }); setEditingId(null); }}
+            placeholder="Add comment…"
+            className="w-full rounded border border-yellow-300 bg-white px-2 py-1 text-xs text-gray-800 resize-none focus:outline-none focus:ring-1 focus:ring-yellow-500"
+          />
+          <div className="flex gap-1">
+            <button
+              onClick={() => { updateAnnot({ ...ann, text: editText.trim() }); setEditingId(null); }}
+              className="flex-1 rounded bg-yellow-400 hover:bg-yellow-300 py-0.5 text-xs font-semibold text-gray-800 transition">
+              Save
+            </button>
+            <button
+              onClick={() => setEditingId(null)}
+              className="px-2 rounded bg-gray-200 hover:bg-gray-300 text-xs text-gray-600 transition">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Render helpers ────────────────────────────────────────────────────────
+  function renderResizeHandles(
+    ann: HighlightAnnot | FreetextAnnot | UnderlineAnnot | StrikethroughAnnot,
+    borderColor: string,
+  ) {
+    return CORNERS.map(corner => (
+      <div key={corner}
+        className="absolute w-3 h-3 bg-white border-2 rounded-sm z-10"
+        style={{
+          borderColor,
+          cursor: `${corner}-resize`,
+          top:    corner.startsWith("n") ? -4 : undefined,
+          bottom: corner.startsWith("s") ? -4 : undefined,
+          left:   corner.endsWith("w")   ? -4 : undefined,
+          right:  corner.endsWith("e")   ? -4 : undefined,
+        }}
+        onMouseDown={e => onResizeMouseDown(e, ann, corner)}
+      />
+    ));
+  }
+
+  function deleteBtn(id: AnnotId) {
+    return (
+      <button
+        className="absolute -top-1.5 -right-1.5 z-10 bg-red-500 hover:bg-red-400 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] transition"
+        onMouseDown={e => e.stopPropagation()}
+        onClick={e => { e.stopPropagation(); deleteAnnot(id); }}
+      >×</button>
+    );
+  }
+
   return (
     <div
       ref={containerRef}
       className={`absolute inset-0 ${cursorClass}`}
-      style={{ userSelect: "none" }}
-      onMouseDown={onBgMouseDown}
-      onClick={onBgClick}
+      style={{ userSelect: "none", pointerEvents: textSelectActive ? "none" : "auto" }}
+      onMouseDown={textSelectActive ? undefined : onBgMouseDown}
+      onClick={textSelectActive ? undefined : onBgClick}
     >
-      {/* ── Existing annotations ────────────────────────────────────────── */}
+      {/* ── Existing annotations ────────────────────────────────────────────── */}
       {pageAnns.map(ann => {
-        const sel = ann.id === selectedId;
+        const sel     = ann.id === selectedId;
         const editing = ann.id === editingId;
 
         /* ── Note ── */
@@ -330,15 +463,7 @@ export default function AnnotationLayer({
           >
             <div className={cn("relative group select-none", sel ? "cursor-move drop-shadow-xl" : "cursor-pointer")}>
               <span className="text-xl leading-none">📌</span>
-              {/* Delete badge */}
-              {sel && !editing && (
-                <button
-                  className="absolute -top-1.5 -right-1.5 z-10 bg-red-500 hover:bg-red-400 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] transition"
-                  onMouseDown={e => e.stopPropagation()}
-                  onClick={e => { e.stopPropagation(); deleteAnnot(ann.id); }}
-                >×</button>
-              )}
-              {/* Inline text editor */}
+              {sel && !editing && deleteBtn(ann.id)}
               {editing ? (
                 <div
                   className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-40 pointer-events-auto"
@@ -358,20 +483,16 @@ export default function AnnotationLayer({
                     />
                     <div className="flex gap-1.5">
                       <button onClick={() => commitEdit(ann.id)} disabled={!editText.trim()}
-                        className="flex-1 rounded bg-yellow-400 hover:bg-yellow-300 py-1 text-xs font-semibold text-gray-800 disabled:opacity-40 transition">
-                        Save
-                      </button>
+                        className="flex-1 rounded bg-yellow-400 hover:bg-yellow-300 py-1 text-xs font-semibold text-gray-800 disabled:opacity-40 transition">Save</button>
                       <button onClick={cancelEdit}
-                        className="px-2 rounded bg-gray-200 hover:bg-gray-300 text-xs text-gray-600 transition">
-                        Cancel
-                      </button>
+                        className="px-2 rounded bg-gray-200 hover:bg-gray-300 text-xs text-gray-600 transition">Cancel</button>
                     </div>
                   </div>
                 </div>
               ) : (
-                /* Tooltip on hover */
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-30 pointer-events-none
                   bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg px-2 py-1.5 text-xs text-gray-800 max-w-52 whitespace-pre-wrap">
+                  {ann.author && <div className="text-[9px] text-gray-500 mb-0.5 font-medium">{ann.author}</div>}
                   {ann.text || <span className="italic text-gray-400">empty — double-click to edit</span>}
                 </div>
               )}
@@ -382,65 +503,55 @@ export default function AnnotationLayer({
         /* ── Highlight ── */
         if (ann.type === "highlight") {
           const c = highlightColors[ann.colorIdx] ?? highlightColors[0];
+          const rects = ann.rects ?? [{ x0: ann.x0, y0: ann.y0, x1: ann.x1, y1: ann.y1 }];
           return (
-            <div key={ann.id} data-annot="true"
-              className="absolute pointer-events-auto"
-              style={{
-                left: `${ann.x0 * 100}%`, top: `${ann.y0 * 100}%`,
-                width: `${(ann.x1 - ann.x0) * 100}%`, height: `${(ann.y1 - ann.y0) * 100}%`,
-                backgroundColor: c.bg,
-                border: sel ? `2px solid ${c.border}` : `1px solid ${c.border}40`,
-                zIndex: sel ? 25 : 15,
-                cursor: "move",
-              }}
-              onMouseDown={e => onAnnotMouseDown(e, ann)}
-              onDoubleClick={e => onAnnotDblClick(e, ann)}
-            >
-              {sel && (
-                <>
-                  {/* Delete badge */}
-                  <button
-                    className="absolute -top-1.5 -right-1.5 z-10 bg-red-500 hover:bg-red-400 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] transition"
-                    onMouseDown={e => e.stopPropagation()}
-                    onClick={e => { e.stopPropagation(); deleteAnnot(ann.id); }}
-                  >×</button>
-                  {/* Corner resize handles */}
-                  {CORNERS.map(corner => (
-                    <div key={corner}
-                      className="absolute w-3 h-3 bg-white border-2 rounded-sm z-10"
-                      style={{
-                        borderColor: c.border,
-                        cursor: `${corner}-resize`,
-                        top:    corner.startsWith("n") ? -4 : undefined,
-                        bottom: corner.startsWith("s") ? -4 : undefined,
-                        left:   corner.endsWith("w")   ? -4 : undefined,
-                        right:  corner.endsWith("e")   ? -4 : undefined,
-                      }}
-                      onMouseDown={e => onResizeMouseDown(e, ann, corner)}
-                    />
-                  ))}
-                  {/* Colour picker (double-click to open) */}
-                  {hlPicker === ann.id && (
-                    <div
-                      className="absolute top-full left-0 mt-1 flex gap-1 bg-gray-900 border border-gray-700 rounded-lg p-1.5 z-40 shadow-xl pointer-events-auto"
-                      onMouseDown={e => e.stopPropagation()}
-                    >
-                      {highlightColors.map((hc, i) => (
-                        <button key={i} onClick={e => {
-                          e.stopPropagation();
-                          updateAnnot({ ...ann, colorIdx: i, color: hc.rgb });
-                          setHlPicker(null);
-                        }}
-                          title={hc.label}
-                          className={cn("h-5 w-5 rounded-full border-2 transition",
-                            ann.colorIdx === i ? "border-white scale-125" : "border-transparent")}
-                          style={{ background: hc.bg }}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
+            <div key={ann.id} data-annot="true" className="absolute inset-0 pointer-events-none" style={{ zIndex: sel ? 25 : 15 }}>
+              {/* Bounding box — invisible, used only for drag/resize target */}
+              <div
+                className="absolute pointer-events-auto"
+                style={{
+                  left: `${ann.x0 * 100}%`, top: `${ann.y0 * 100}%`,
+                  width: `${(ann.x1 - ann.x0) * 100}%`, height: `${(ann.y1 - ann.y0) * 100}%`,
+                  cursor: "move",
+                }}
+                onMouseDown={e => onAnnotMouseDown(e, ann)}
+                onDoubleClick={e => onAnnotDblClick(e, ann)}
+              >
+                {sel && (
+                  <>
+                    {deleteBtn(ann.id)}
+                    {renderResizeHandles(ann, c.border)}
+                    {hlPicker === ann.id && (
+                      <div
+                        className="absolute top-full left-0 mt-1 flex gap-1 bg-gray-900 border border-gray-700 rounded-lg p-1.5 z-40 shadow-xl pointer-events-auto"
+                        onMouseDown={e => e.stopPropagation()}
+                      >
+                        {highlightColors.map((hc, i) => (
+                          <button key={i} onClick={e => {
+                            e.stopPropagation();
+                            updateAnnot({ ...ann, colorIdx: i, color: hc.rgb });
+                            setHlPicker(null);
+                          }}
+                            title={hc.label}
+                            className={cn("h-5 w-5 rounded-full border-2 transition",
+                              ann.colorIdx === i ? "border-white scale-125" : "border-transparent")}
+                            style={{ background: hc.bg }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              {/* Visible highlight rects (one per line for text-selection highlights) */}
+              {rects.map((r, i) => (
+                <div key={i} className="absolute pointer-events-none" style={{
+                  left: `${r.x0 * 100}%`, top: `${r.y0 * 100}%`,
+                  width: `${(r.x1 - r.x0) * 100}%`, height: `${(r.y1 - r.y0) * 100}%`,
+                  backgroundColor: c.bg,
+                  border: sel ? `1.5px solid ${c.border}` : `1px solid ${c.border}40`,
+                }} />
+              ))}
             </div>
           );
         }
@@ -478,33 +589,91 @@ export default function AnnotationLayer({
             )}
             {sel && !editing && (
               <>
-                <button
-                  className="absolute -top-1.5 -right-1.5 z-10 bg-red-500 hover:bg-red-400 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] transition"
-                  onMouseDown={e => e.stopPropagation()}
-                  onClick={e => { e.stopPropagation(); deleteAnnot(ann.id); }}
-                >×</button>
-                {CORNERS.map(corner => (
-                  <div key={corner}
-                    className="absolute w-3 h-3 bg-white border-2 border-amber-500 rounded-sm z-10"
-                    style={{
-                      cursor: `${corner}-resize`,
-                      top:    corner.startsWith("n") ? -4 : undefined,
-                      bottom: corner.startsWith("s") ? -4 : undefined,
-                      left:   corner.endsWith("w")   ? -4 : undefined,
-                      right:  corner.endsWith("e")   ? -4 : undefined,
-                    }}
-                    onMouseDown={e => onResizeMouseDown(e, ann, corner)}
-                  />
-                ))}
+                {deleteBtn(ann.id)}
+                {renderResizeHandles(ann, "#f59e0b")}
               </>
             )}
           </div>
         );
 
+        /* ── Underline ── */
+        if (ann.type === "underline") {
+          const rects = ann.rects ?? [{ x0: ann.x0, y0: ann.y0, x1: ann.x1, y1: ann.y1 }];
+          return (
+            <div key={ann.id} data-annot="true" className="absolute inset-0 pointer-events-none" style={{ zIndex: sel ? 25 : 15 }}>
+              {rects.map((r, i) => (
+                <div key={i} className="absolute pointer-events-none" style={{
+                  left: `${r.x0 * 100}%`, top: `${r.y0 * 100}%`,
+                  width: `${(r.x1 - r.x0) * 100}%`, height: `${(r.y1 - r.y0) * 100}%`,
+                  borderBottom: `2px solid ${sel ? "#3b82f6" : "rgba(59,130,246,0.7)"}`,
+                  backgroundColor: sel ? "rgba(59,130,246,0.05)" : "transparent",
+                }} />
+              ))}
+              {/* Hit-target + controls on bounding box */}
+              <div
+                className="absolute pointer-events-auto"
+                style={{
+                  left: `${ann.x0 * 100}%`, top: `${ann.y0 * 100}%`,
+                  width: `${(ann.x1 - ann.x0) * 100}%`, height: `${(ann.y1 - ann.y0) * 100}%`,
+                  cursor: "move",
+                }}
+                onMouseDown={e => onAnnotMouseDown(e, ann)}
+                onDoubleClick={e => onAnnotDblClick(e, ann)}
+              >
+                {sel && (
+                  <>
+                    {deleteBtn(ann.id)}
+                    {renderResizeHandles(ann, "#3b82f6")}
+                    {renderLineCommentEditor(ann)}
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        /* ── Strikethrough ── */
+        if (ann.type === "strikethrough") {
+          const rects = ann.rects ?? [{ x0: ann.x0, y0: ann.y0, x1: ann.x1, y1: ann.y1 }];
+          return (
+            <div key={ann.id} data-annot="true" className="absolute inset-0 pointer-events-none" style={{ zIndex: sel ? 25 : 15 }}>
+              {rects.map((r, i) => {
+                const midY = (r.y0 + r.y1) / 2;
+                const lineH = Math.max((r.y1 - r.y0) * 0.12, 0.003);
+                return (
+                  <div key={i} className="absolute pointer-events-none" style={{
+                    left: `${r.x0 * 100}%`, top: `${(midY - lineH / 2) * 100}%`,
+                    width: `${(r.x1 - r.x0) * 100}%`, height: `${lineH * 100}%`,
+                    backgroundColor: sel ? "#ef4444" : "rgba(239,68,68,0.7)",
+                  }} />
+                );
+              })}
+              <div
+                className="absolute pointer-events-auto"
+                style={{
+                  left: `${ann.x0 * 100}%`, top: `${ann.y0 * 100}%`,
+                  width: `${(ann.x1 - ann.x0) * 100}%`, height: `${(ann.y1 - ann.y0) * 100}%`,
+                  cursor: "move",
+                }}
+                onMouseDown={e => onAnnotMouseDown(e, ann)}
+                onDoubleClick={e => onAnnotDblClick(e, ann)}
+              >
+                {sel && (
+                  <>
+                    {deleteBtn(ann.id)}
+                    {renderResizeHandles(ann, "#ef4444")}
+                    {renderLineCommentEditor(ann)}
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        }
+
         return null;
       })}
 
-      {/* ── In-progress drag preview ────────────────────────────────────── */}
+      {/* ── In-progress drag preview ────────────────────────────────────────── */}
       {live && (live.x1 - live.x0 > 0.002 || live.y1 - live.y0 > 0.002) && (
         <div className="absolute pointer-events-none rounded-sm" style={{
           left: `${live.x0 * 100}%`, top: `${live.y0 * 100}%`,
@@ -516,3 +685,6 @@ export default function AnnotationLayer({
     </div>
   );
 }
+
+// ── Export helper (used by Viewer for bounding box of rects) ──────────────────
+export { boundingBox };

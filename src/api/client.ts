@@ -130,9 +130,16 @@ export async function redactPDF(file: File, regions: RedactRegion[]): Promise<Bl
 }
 
 export type Annotation =
-  | { type: "note";      page: number; x: number; y: number; text: string }
-  | { type: "highlight"; page: number; x0: number; y0: number; x1: number; y1: number; color: [number, number, number] }
-  | { type: "freetext";  page: number; x0: number; y0: number; x1: number; y1: number; text: string; fontsize?: number };
+  | { type: "note";          page: number; x: number; y: number; text: string }
+  | { type: "highlight";     page: number; x0: number; y0: number; x1: number; y1: number; color: [number, number, number];
+      rects?: Array<{ x0: number; y0: number; x1: number; y1: number }> }
+  | { type: "freetext";      page: number; x0: number; y0: number; x1: number; y1: number; text: string; fontsize?: number }
+  | { type: "underline";     page: number; x0: number; y0: number; x1: number; y1: number;
+      rects?: Array<{ x0: number; y0: number; x1: number; y1: number }>;
+      color?: [number, number, number]; text?: string }
+  | { type: "strikethrough"; page: number; x0: number; y0: number; x1: number; y1: number;
+      rects?: Array<{ x0: number; y0: number; x1: number; y1: number }>;
+      color?: [number, number, number]; text?: string };
 
 export async function annotatePDF(file: File, annotations: Annotation[]): Promise<Blob> {
   const form = new FormData();

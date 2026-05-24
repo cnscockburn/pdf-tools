@@ -6,10 +6,13 @@ import {
   compressPDF, watermarkPDF, encryptPDF, decryptPDF,
   pdfToImages, splitPDF, extractPages, rotatePages, deletePages,
 } from "../api/client";
+import AnnotationsListPanel from "./AnnotationsListPanel";
+import type { LocalAnnot, AnnotId, AnnotStatus } from "./AnnotationLayer";
 
 export type PanelTool =
   | "compress" | "watermark" | "split" | "extract"
   | "rotate-delete" | "security" | "pdf-to-images"
+  | "annotations"
   | null;
 
 interface Props {
@@ -19,6 +22,13 @@ interface Props {
   onClose: () => void;
   /** Called when a tool produces a modified document blob (updates working doc instead of downloading). */
   onApplied?: (blob: Blob) => void;
+  // ── Annotations panel ────────────────────────────────────────────────────
+  annotations?: LocalAnnot[];
+  currentPage?: number;
+  onGoToPage?: (page: number) => void;
+  onDeleteAnnot?: (id: AnnotId) => void;
+  onStatusChange?: (id: AnnotId, status: AnnotStatus) => void;
+  onExportReport?: () => void;
 }
 
 function PanelHeader({ title, onClose }: { title: string; onClose: () => void }) {
@@ -561,11 +571,37 @@ function PdfToImagesPanel({ file, onClose }: { file: File; onClose: () => void }
 // ---------------------------------------------------------------------------
 // Root export
 // ---------------------------------------------------------------------------
-export default function RightPanel({ tool, file, pageCount, onClose, onApplied }: Props) {
+export default function RightPanel({
+  tool, file, pageCount, onClose, onApplied,
+  annotations = [], currentPage = 1, onGoToPage, onDeleteAnnot, onStatusChange, onExportReport,
+}: Props) {
   if (!tool) return null;
 
   return (
     <div className="w-72 flex-shrink-0 flex flex-col bg-gray-900 border-l border-gray-700 overflow-hidden">
+      {tool === "annotations" && (
+        <>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 shrink-0">
+            <span className="text-sm font-semibold text-white">
+              Annotations
+              {annotations.length > 0 && (
+                <span className="ml-2 text-xs font-normal text-gray-500">{annotations.length}</span>
+              )}
+            </span>
+            <button onClick={onClose} className="text-gray-400 hover:text-white transition">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <AnnotationsListPanel
+            annotations={annotations}
+            currentPage={currentPage}
+            onGoTo={onGoToPage ?? (() => {})}
+            onDelete={onDeleteAnnot ?? (() => {})}
+            onStatusChange={onStatusChange ?? (() => {})}
+            onExportReport={onExportReport ?? (() => {})}
+          />
+        </>
+      )}
       {tool === "compress"      && <CompressPanel      file={file} onClose={onClose} onApplied={onApplied} />}
       {tool === "watermark"     && <WatermarkPanel     file={file} onClose={onClose} onApplied={onApplied} />}
       {tool === "split"         && <SplitPanel         file={file} pageCount={pageCount} onClose={onClose} onApplied={onApplied} />}
