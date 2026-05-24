@@ -1,25 +1,25 @@
 import json
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException
 from fastapi.responses import Response
 
 from services import pdf_engine
+
+from ._deps import content_disposition, read_pdf_upload, run_engine
 
 router = APIRouter()
 
 
 @router.post("/crop")
 async def crop_pdf(
-    file: UploadFile = File(...),
+    payload: tuple[bytes, str] = Depends(read_pdf_upload),
     x0: float = Form(...),
     y0: float = Form(...),
     x1: float = Form(...),
     y1: float = Form(...),
     pages: str = Form("all"),  # "all" or JSON array of 1-indexed page numbers
 ):
-    data = await file.read()
-    if not data.startswith(b"%PDF"):
-        raise HTTPException(status_code=400, detail="Not a valid PDF.")
+    data, filename = payload
 
     for val, name in ((x0, "x0"), (y0, "y0"), (x1, "x1"), (y1, "y1")):
         if not (0.0 <= val <= 1.0):
@@ -34,9 +34,9 @@ async def crop_pdf(
         except Exception:
             raise HTTPException(status_code=400, detail="pages must be 'all' or a JSON int array.")
 
-    result = pdf_engine.crop(data, x0=x0, y0=y0, x1=x1, y1=y1, pages=page_list)
+    result = run_engine(pdf_engine.crop, data, x0=x0, y0=y0, x1=x1, y1=y1, pages=page_list)
     return Response(
         content=result,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=cropped_{file.filename}"},
+        headers=content_disposition(f"cropped_{filename}"),
     )

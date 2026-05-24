@@ -3,6 +3,8 @@ from fastapi.responses import Response
 
 from services import pdf_engine
 
+from ._deps import content_disposition, read_multiple_uploads, run_engine
+
 router = APIRouter()
 
 
@@ -11,16 +13,16 @@ async def merge_pdfs(files: list[UploadFile] = File(...)):
     if len(files) < 2:
         raise HTTPException(status_code=400, detail="Provide at least 2 PDF files.")
 
-    file_bytes = []
-    for f in files:
-        data = await f.read()
+    pairs = await read_multiple_uploads(files)
+    file_bytes: list[bytes] = []
+    for data, f in pairs:
         if not data.startswith(b"%PDF"):
-            raise HTTPException(status_code=400, detail=f"{f.filename} is not a valid PDF.")
+            raise HTTPException(status_code=400, detail=f"{f.filename or 'file'} is not a valid PDF.")
         file_bytes.append(data)
 
-    result = pdf_engine.merge(file_bytes)
+    result = run_engine(pdf_engine.merge, file_bytes)
     return Response(
         content=result,
         media_type="application/pdf",
-        headers={"Content-Disposition": "attachment; filename=merged.pdf"},
+        headers=content_disposition("merged.pdf"),
     )

@@ -199,10 +199,15 @@ def watermark_text(
     font = fitz.Font("helv")
 
     for page in doc:
-        tw = fitz.TextWriter(page.rect)
+        r = page.rect
+        # Compute centre manually — PyMuPDF removed Rect.center in newer versions.
+        cx = (r.x0 + r.x1) / 2
+        cy = (r.y0 + r.y1) / 2
+        centre = fitz.Point(cx, cy)
+
+        tw = fitz.TextWriter(r)
         # Estimate text width to centre it before rotation
         text_len = font.text_length(text, fontsize=fontsize)
-        cx, cy = page.rect.center
         # Start point so the baseline midpoint sits at the page centre
         start = fitz.Point(cx - text_len / 2, cy + fontsize * 0.15)
         tw.append(start, text, font=font, fontsize=fontsize)
@@ -211,7 +216,7 @@ def watermark_text(
             page,
             opacity=opacity,
             color=color,
-            morph=(page.rect.center, fitz.Matrix(angle)),
+            morph=(centre, fitz.Matrix(angle)),
         )
 
     return _save(doc)
@@ -372,10 +377,11 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
             strokes = ann.get("strokes", [])
             if not strokes:
                 continue
+            # PyMuPDF expects a sequence of sequence of (x, y) float pairs (NOT Point objects).
             ink_list = []
             for stroke in strokes:
-                pts = [fitz.Point(pb.x0 + p["x"] * pb.width, pb.y0 + p["y"] * pb.height)
-                       for p in stroke]
+                pts = [(pb.x0 + float(p["x"]) * pb.width,
+                        pb.y0 + float(p["y"]) * pb.height) for p in stroke]
                 if pts:
                     ink_list.append(pts)
             if not ink_list:
@@ -384,7 +390,7 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
             color = ann.get("color", [0, 0, 0])
             a.set_colors(stroke=color)
             width = ann.get("strokeWidth", 2)
-            a.set_border(width=max(0.5, width * 0.5))  # PDF units are ~0.5× screen px
+            a.set_border(width=max(0.5, float(width) * 0.5))  # PDF units ≈ 0.5× screen px
             a.update()
 
         elif ann["type"] == "shape":

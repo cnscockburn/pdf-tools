@@ -1,9 +1,11 @@
 import json
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException
 from fastapi.responses import Response
 
 from services import pdf_engine
+
+from ._deps import content_disposition, read_pdf_upload, run_engine
 
 router = APIRouter()
 
@@ -11,87 +13,80 @@ router = APIRouter()
 def _read_page_list(raw: str, name: str = "pages") -> list[int]:
     try:
         pages = json.loads(raw)
+        if not isinstance(pages, list):
+            raise ValueError
         return [int(p) for p in pages]
-    except Exception:
+    except (ValueError, TypeError, json.JSONDecodeError):
         raise HTTPException(status_code=400, detail=f"{name} must be a JSON array of integers.")
 
 
 @router.post("/rotate")
 async def rotate_pages(
-    file: UploadFile = File(...),
-    pages: str = Form(...),   # JSON: [1, 3, 5]
-    angle: int = Form(...),   # 90 | 180 | 270
+    payload: tuple[bytes, str] = Depends(read_pdf_upload),
+    pages: str = Form(...),
+    angle: int = Form(...),
 ):
-    data = await file.read()
-    if not data.startswith(b"%PDF"):
-        raise HTTPException(status_code=400, detail="Not a valid PDF.")
+    data, filename = payload
     if angle not in (90, 180, 270):
         raise HTTPException(status_code=400, detail="angle must be 90, 180, or 270.")
 
     page_list = _read_page_list(pages)
-    result = pdf_engine.rotate(data, page_list, angle)
+    result = run_engine(pdf_engine.rotate, data, page_list, angle)
     return Response(
         content=result,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=rotated_{file.filename}"},
+        headers=content_disposition(f"rotated_{filename}"),
     )
 
 
 @router.post("/delete-pages")
 async def delete_pages(
-    file: UploadFile = File(...),
-    pages: str = Form(...),  # JSON: [2, 4, 7]
+    payload: tuple[bytes, str] = Depends(read_pdf_upload),
+    pages: str = Form(...),
 ):
-    data = await file.read()
-    if not data.startswith(b"%PDF"):
-        raise HTTPException(status_code=400, detail="Not a valid PDF.")
-
+    data, filename = payload
     page_list = _read_page_list(pages)
     if not page_list:
         raise HTTPException(status_code=400, detail="Provide at least one page to delete.")
 
-    result = pdf_engine.delete_pages(data, page_list)
+    result = run_engine(pdf_engine.delete_pages, data, page_list)
     return Response(
         content=result,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=deleted_{file.filename}"},
+        headers=content_disposition(f"deleted_{filename}"),
     )
 
 
 @router.post("/reorder")
 async def reorder_pages(
-    file: UploadFile = File(...),
-    order: str = Form(...),  # JSON: [3, 1, 2] (1-indexed new order)
+    payload: tuple[bytes, str] = Depends(read_pdf_upload),
+    order: str = Form(...),
 ):
-    data = await file.read()
-    if not data.startswith(b"%PDF"):
-        raise HTTPException(status_code=400, detail="Not a valid PDF.")
-
+    data, filename = payload
     order_list = _read_page_list(order, "order")
-    result = pdf_engine.reorder(data, order_list)
+    if not order_list:
+        raise HTTPException(status_code=400, detail="Provide at least one page in the order.")
+    result = run_engine(pdf_engine.reorder, data, order_list)
     return Response(
         content=result,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=reordered_{file.filename}"},
+        headers=content_disposition(f"reordered_{filename}"),
     )
 
 
 @router.post("/extract")
 async def extract_pages(
-    file: UploadFile = File(...),
-    pages: str = Form(...),  # JSON: [1, 3, 5]
+    payload: tuple[bytes, str] = Depends(read_pdf_upload),
+    pages: str = Form(...),
 ):
-    data = await file.read()
-    if not data.startswith(b"%PDF"):
-        raise HTTPException(status_code=400, detail="Not a valid PDF.")
-
+    data, filename = payload
     page_list = _read_page_list(pages)
     if not page_list:
         raise HTTPException(status_code=400, detail="Provide at least one page to extract.")
 
-    result = pdf_engine.extract(data, page_list)
+    result = run_engine(pdf_engine.extract, data, page_list)
     return Response(
         content=result,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=extracted_{file.filename}"},
+        headers=content_disposition(f"extracted_{filename}"),
     )

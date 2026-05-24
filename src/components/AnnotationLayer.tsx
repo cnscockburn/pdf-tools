@@ -140,18 +140,25 @@ function applyDrag(ann: LocalAnnot, dx: number, dy: number): LocalAnnot {
     return { ...ann, x: clamp(ann.x + dx), y: clamp(ann.y + dy) };
   }
   if (ann.type === "ink") {
+    // Clamp the *translation* so the bbox stays in bounds, then apply uniformly
+    // to every point. Per-point clamping would deform the stroke.
+    const w = ann.x1 - ann.x0, h = ann.y1 - ann.y0;
+    const cdx = clamp(ann.x0 + dx, 0, Math.max(0, 1 - w)) - ann.x0;
+    const cdy = clamp(ann.y0 + dy, 0, Math.max(0, 1 - h)) - ann.y0;
     return {
       ...ann,
-      x0: clamp(ann.x0 + dx), y0: clamp(ann.y0 + dy),
-      x1: clamp(ann.x1 + dx), y1: clamp(ann.y1 + dy),
-      strokes: ann.strokes.map(s => s.map(p => ({ x: clamp(p.x + dx), y: clamp(p.y + dy) }))),
+      x0: ann.x0 + cdx, y0: ann.y0 + cdy,
+      x1: ann.x1 + cdx, y1: ann.y1 + cdy,
+      strokes: ann.strokes.map(s => s.map(p => ({ x: p.x + cdx, y: p.y + cdy }))),
     };
   }
   const w = ann.x1 - ann.x0, h = ann.y1 - ann.y0;
-  const x0 = clamp(ann.x0 + dx, 0, 1 - w);
-  const y0 = clamp(ann.y0 + dy, 0, 1 - h);
+  const x0 = clamp(ann.x0 + dx, 0, Math.max(0, 1 - w));
+  const y0 = clamp(ann.y0 + dy, 0, Math.max(0, 1 - h));
+  const cdx = x0 - ann.x0;
+  const cdy = y0 - ann.y0;
   const rects = (ann as HighlightAnnot).rects?.map(r => ({
-    x0: r.x0 + dx, y0: r.y0 + dy, x1: r.x1 + dx, y1: r.y1 + dy,
+    x0: r.x0 + cdx, y0: r.y0 + cdy, x1: r.x1 + cdx, y1: r.y1 + cdy,
   }));
   return { ...ann, x0, y0, x1: x0 + w, y1: y0 + h, ...(rects ? { rects } : {}) };
 }
@@ -175,6 +182,71 @@ function boundingBox(rects: FracRect[]): FracRect {
     x0: Math.min(acc.x0, r.x0), y0: Math.min(acc.y0, r.y0),
     x1: Math.max(acc.x1, r.x1), y1: Math.max(acc.y1, r.y1),
   }), { x0: 1, y0: 1, x1: 0, y1: 0 });
+}
+
+// ── StampDiv: handles dynamic font sizing relative to its own box ────────────
+
+interface StampDivProps {
+  ann: StampAnnot;
+  sel: boolean;
+  onMouseDown: (e: React.MouseEvent, ann: LocalAnnot) => void;
+  deleteBtn: (id: AnnotId) => React.ReactNode;
+  renderResizeHandles: (
+    ann: HighlightAnnot | FreetextAnnot | UnderlineAnnot | StrikethroughAnnot | ShapeAnnot | StampAnnot,
+    color: string,
+  ) => React.ReactNode;
+}
+
+function StampDiv({ ann, sel, onMouseDown, deleteBtn, renderResizeHandles }: StampDivProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [fontPx, setFontPx] = useState(12);
+  const textColor = colorToCSS(ann.color);
+
+  // Observe element size and pick a font size that fits ~60 % of the box height.
+  useEffect(() => {
+    if (!ref.current) return;
+    const el = ref.current;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      // Aim for ~60 % of height, capped 8–28 px for readability.
+      const target = Math.max(8, Math.min(28, r.height * 0.55));
+      setFontPx(target);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} data-annot="true"
+      className="absolute pointer-events-auto"
+      style={{
+        left: `${ann.x0 * 100}%`, top: `${ann.y0 * 100}%`,
+        width: `${(ann.x1 - ann.x0) * 100}%`, height: `${(ann.y1 - ann.y0) * 100}%`,
+        border: `2px solid ${textColor}`,
+        backgroundColor: "rgba(255,255,255,0.92)",
+        zIndex: sel ? 25 : 16,
+        cursor: "move",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        borderRadius: 3,
+      }}
+      onMouseDown={e => onMouseDown(e, ann)}
+    >
+      <span
+        className="font-bold tracking-widest text-center select-none whitespace-nowrap"
+        style={{ color: textColor, fontSize: `${fontPx}px`, lineHeight: 1 }}
+      >
+        {ann.label}
+      </span>
+      {sel && (
+        <>
+          {deleteBtn(ann.id)}
+          {renderResizeHandles(ann, textColor)}
+        </>
+      )}
+    </div>
+  );
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -219,7 +291,6 @@ export default function AnnotationLayer({
   const [selectedIds, setSelectedIds] = useState<Set<AnnotId>>(new Set());
   const [editingId,   setEditingId]   = useState<AnnotId | null>(null);
   const [editText,    setEditText]    = useState("");
-  const [hlPicker,    setHlPicker]    = useState<AnnotId | null>(null);
   const [replyingId,  setReplyingId]  = useState<AnnotId | null>(null);
   const [replyText,   setReplyText]   = useState("");
   const [showReplies, setShowReplies] = useState<AnnotId | null>(null);
@@ -344,7 +415,7 @@ export default function AnnotationLayer({
   function onBgMouseDown(e: React.MouseEvent<HTMLDivElement>) {
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest("[data-annot]")) return;
-    setSelectedId(null); setHlPicker(null);
+    setSelectedId(null);
     setSelectedIds(new Set());
     onSelectedChange?.(null);
 
@@ -473,7 +544,7 @@ export default function AnnotationLayer({
       return;
     }
 
-    setSelectedId(ann.id); setHlPicker(null); onSelectedChange?.(ann.id);
+    setSelectedId(ann.id); onSelectedChange?.(ann.id);
     setSelectedIds(new Set());
 
     const startAnnot = { ...ann } as LocalAnnot;
@@ -499,7 +570,9 @@ export default function AnnotationLayer({
   function onAnnotDblClick(e: React.MouseEvent, ann: LocalAnnot) {
     e.stopPropagation();
     if (ann.type === "note" || ann.type === "freetext") startEdit(ann);
-    else if (ann.type === "highlight") setHlPicker(ann.id);
+    else if (ann.type === "highlight") {
+      setShowReplies(v => v === ann.id ? null : ann.id);
+    }
     else if (ann.type === "underline" || ann.type === "strikethrough") {
       setEditingId(ann.id); setEditText(ann.text ?? ""); setSelectedId(ann.id);
     }
@@ -906,30 +979,34 @@ export default function AnnotationLayer({
                   <>
                     {deleteBtn(ann.id)}
                     {renderResizeHandles(ann, c.border)}
-                    {hlPicker === ann.id && (
-                      <div
-                        className="absolute top-full left-0 mt-1 flex gap-1 bg-gray-900 border border-gray-700 rounded-lg p-1.5 z-40 shadow-xl pointer-events-auto"
-                        onMouseDown={e => e.stopPropagation()}
-                      >
+                    {/* Action row: colour picker toggle + reply toggle */}
+                    <div className="absolute top-full left-0 mt-1 z-40 pointer-events-auto flex flex-col gap-1"
+                      onMouseDown={e => e.stopPropagation()}
+                    >
+                      <div className="flex gap-1 items-center bg-gray-900 border border-gray-700 rounded-lg p-1.5 shadow-xl">
                         {highlightColors.map((hc, i) => (
                           <button key={i} onClick={e => {
                             e.stopPropagation();
                             updateAnnot({ ...ann, colorIdx: i, color: hc.rgb });
-                            setHlPicker(null);
                           }}
                             title={hc.label}
-                            className={cn("h-5 w-5 rounded-full border-2 transition",
-                              ann.colorIdx === i ? "border-white scale-125" : "border-transparent")}
+                            className={cn("h-4 w-4 rounded-full border-2 transition",
+                              ann.colorIdx === i ? "border-white scale-110" : "border-transparent")}
                             style={{ background: hc.bg }}
                           />
                         ))}
+                        <div className="w-px h-4 bg-gray-700" />
+                        <button
+                          onClick={e => { e.stopPropagation(); setShowReplies(v => v === ann.id ? null : ann.id); }}
+                          title="Replies"
+                          className={cn("text-[10px] px-1.5 py-0.5 rounded transition",
+                            showReplies === ann.id ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white")}
+                        >
+                          💬 {(ann.replies?.length ?? 0) || ""}
+                        </button>
                       </div>
-                    )}
-                    {/* Replies on highlight */}
-                    <div className="absolute top-full left-0 mt-1 z-40 pointer-events-auto">
                       {showReplies === ann.id && (
-                        <div className="bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg px-2 py-1.5 w-52"
-                          onMouseDown={e => e.stopPropagation()}>
+                        <div className="bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg px-2 py-1.5 w-52">
                           {ann.text && <p className="text-[10px] text-gray-700 mb-1">{ann.text}</p>}
                           {renderReplies(ann)}
                         </div>
@@ -1069,36 +1146,14 @@ export default function AnnotationLayer({
         }
 
         /* ── Stamp ── */
-        if (ann.type === "stamp") {
-          const textColor = colorToCSS(ann.color);
-          return (
-            <div key={ann.id} data-annot="true"
-              className="absolute pointer-events-auto"
-              style={{
-                left: `${ann.x0 * 100}%`, top: `${ann.y0 * 100}%`,
-                width: `${(ann.x1 - ann.x0) * 100}%`, height: `${(ann.y1 - ann.y0) * 100}%`,
-                border: `2px solid ${textColor}`,
-                backgroundColor: "rgba(255,255,255,0.9)",
-                zIndex: sel ? 25 : 16,
-                cursor: "move",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                borderRadius: 3,
-              }}
-              onMouseDown={e => onAnnotMouseDown(e, ann)}
-            >
-              <span className="font-bold tracking-widest text-center select-none"
-                style={{ color: textColor, fontSize: "clamp(7px, 1.2cqh, 14px)", lineHeight: 1 }}>
-                {ann.label}
-              </span>
-              {sel && (
-                <>
-                  {deleteBtn(ann.id)}
-                  {renderResizeHandles(ann, textColor)}
-                </>
-              )}
-            </div>
-          );
-        }
+        if (ann.type === "stamp") return (
+          <StampDiv
+            key={ann.id} ann={ann} sel={sel}
+            onMouseDown={onAnnotMouseDown}
+            deleteBtn={deleteBtn}
+            renderResizeHandles={renderResizeHandles}
+          />
+        );
 
         return null;
       })}
