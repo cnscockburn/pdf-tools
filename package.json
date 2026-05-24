@@ -17,6 +17,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@tauri-apps/api": "^2",
     "clsx": "^2.1.1",
+    "katex": "^0.17.0",
     "lucide-react": "^0.441.0",
     "pdfjs-dist": "^4.6.82",
     "react": "^18.3.1",
@@ -27,6 +28,7 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
+    "@types/katex": "^0.16.8",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",

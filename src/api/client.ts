@@ -139,7 +139,15 @@ export type Annotation =
       color?: [number, number, number]; text?: string }
   | { type: "strikethrough"; page: number; x0: number; y0: number; x1: number; y1: number;
       rects?: Array<{ x0: number; y0: number; x1: number; y1: number }>;
-      color?: [number, number, number]; text?: string };
+      color?: [number, number, number]; text?: string }
+  | { type: "ink";           page: number;
+      strokes: Array<Array<{ x: number; y: number }>>;
+      color?: [number, number, number]; strokeWidth?: number }
+  | { type: "shape";         page: number; x0: number; y0: number; x1: number; y1: number;
+      shape: "rect" | "ellipse" | "line" | "arrow";
+      color?: [number, number, number]; strokeWidth?: number; fill?: boolean; text?: string }
+  | { type: "stamp";         page: number; x0: number; y0: number; x1: number; y1: number;
+      label: string; color?: [number, number, number] };
 
 export async function annotatePDF(file: File, annotations: Annotation[]): Promise<Blob> {
   const form = new FormData();

@@ -6,13 +6,17 @@ import {
   compressPDF, watermarkPDF, encryptPDF, decryptPDF,
   pdfToImages, splitPDF, extractPages, rotatePages, deletePages,
 } from "../api/client";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import AnnotationsListPanel from "./AnnotationsListPanel";
+import OutlinePanel from "./OutlinePanel";
+import BookmarksPanel from "./BookmarksPanel";
 import type { LocalAnnot, AnnotId, AnnotStatus } from "./AnnotationLayer";
+import type { UserBookmark } from "../lib/storage";
 
 export type PanelTool =
   | "compress" | "watermark" | "split" | "extract"
   | "rotate-delete" | "security" | "pdf-to-images"
-  | "annotations"
+  | "annotations" | "outline" | "bookmarks"
   | null;
 
 interface Props {
@@ -29,6 +33,13 @@ interface Props {
   onDeleteAnnot?: (id: AnnotId) => void;
   onStatusChange?: (id: AnnotId, status: AnnotStatus) => void;
   onExportReport?: () => void;
+  // ── Outline panel ────────────────────────────────────────────────────────
+  pdf?: PDFDocumentProxy | null;
+  // ── Bookmarks panel ──────────────────────────────────────────────────────
+  bookmarks?: UserBookmark[];
+  onAddBookmark?: () => void;
+  onDeleteBookmark?: (id: string) => void;
+  onRenameBookmark?: (id: string, label: string) => void;
 }
 
 function PanelHeader({ title, onClose }: { title: string; onClose: () => void }) {
@@ -574,34 +585,64 @@ function PdfToImagesPanel({ file, onClose }: { file: File; onClose: () => void }
 export default function RightPanel({
   tool, file, pageCount, onClose, onApplied,
   annotations = [], currentPage = 1, onGoToPage, onDeleteAnnot, onStatusChange, onExportReport,
+  pdf, bookmarks = [], onAddBookmark, onDeleteBookmark, onRenameBookmark,
 }: Props) {
   if (!tool) return null;
 
+  const PANEL_TITLES: Partial<Record<NonNullable<PanelTool>, string>> = {
+    annotations: "Annotations",
+    outline: "Table of Contents",
+    bookmarks: "Bookmarks",
+  };
+  const title = PANEL_TITLES[tool];
+
   return (
     <div className="w-72 flex-shrink-0 flex flex-col bg-gray-900 border-l border-gray-700 overflow-hidden">
-      {tool === "annotations" && (
-        <>
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 shrink-0">
-            <span className="text-sm font-semibold text-white">
-              Annotations
-              {annotations.length > 0 && (
-                <span className="ml-2 text-xs font-normal text-gray-500">{annotations.length}</span>
-              )}
-            </span>
-            <button onClick={onClose} className="text-gray-400 hover:text-white transition">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          <AnnotationsListPanel
-            annotations={annotations}
-            currentPage={currentPage}
-            onGoTo={onGoToPage ?? (() => {})}
-            onDelete={onDeleteAnnot ?? (() => {})}
-            onStatusChange={onStatusChange ?? (() => {})}
-            onExportReport={onExportReport ?? (() => {})}
-          />
-        </>
+      {/* Generic header for navigation panels */}
+      {title && (
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 shrink-0">
+          <span className="text-sm font-semibold text-white">
+            {title}
+            {tool === "annotations" && annotations.length > 0 && (
+              <span className="ml-2 text-xs font-normal text-gray-500">{annotations.length}</span>
+            )}
+          </span>
+          <button onClick={onClose} className="text-gray-400 hover:text-white transition">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       )}
+
+      {tool === "annotations" && (
+        <AnnotationsListPanel
+          annotations={annotations}
+          currentPage={currentPage}
+          onGoTo={onGoToPage ?? (() => {})}
+          onDelete={onDeleteAnnot ?? (() => {})}
+          onStatusChange={onStatusChange ?? (() => {})}
+          onExportReport={onExportReport ?? (() => {})}
+        />
+      )}
+
+      {tool === "outline" && (
+        pdf
+          ? <OutlinePanel pdf={pdf} currentPage={currentPage} onGoTo={onGoToPage ?? (() => {})} />
+          : <div className="flex-1 flex items-center justify-center p-4">
+              <p className="text-xs text-gray-500">No PDF loaded.</p>
+            </div>
+      )}
+
+      {tool === "bookmarks" && (
+        <BookmarksPanel
+          bookmarks={bookmarks}
+          currentPage={currentPage}
+          onGoTo={onGoToPage ?? (() => {})}
+          onDelete={onDeleteBookmark ?? (() => {})}
+          onRename={onRenameBookmark ?? (() => {})}
+          onAddBookmark={onAddBookmark ?? (() => {})}
+        />
+      )}
+
       {tool === "compress"      && <CompressPanel      file={file} onClose={onClose} onApplied={onApplied} />}
       {tool === "watermark"     && <WatermarkPanel     file={file} onClose={onClose} onApplied={onApplied} />}
       {tool === "split"         && <SplitPanel         file={file} pageCount={pageCount} onClose={onClose} onApplied={onApplied} />}

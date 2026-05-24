@@ -9,20 +9,22 @@ import {
   Minimize2, Stamp, Scissors, FileOutput, RotateCw, Lock, FileImage,
   ExternalLink, Loader2, Highlighter, Type, Pencil, Check, X, Download,
   Underline, Strikethrough, Search, HelpCircle, List, User, FileText,
+  PenLine, Square, BookOpen, Bookmark, Command,
 } from "lucide-react";
 import { cn, downloadBlob } from "../lib/utils";
 import ThumbnailSidebar from "../components/ThumbnailSidebar";
 import RightPanel, { type PanelTool } from "../components/RightPanel";
 import AnnotationLayer, {
   type LocalAnnot, type HlColor, type CreateMode, type AnnotId, type AnnotStatus,
-  type FracRect, newId, boundingBox,
+  type FracRect, type ShapeSubType, newId, boundingBox, STAMP_LABELS,
 } from "../components/AnnotationLayer";
 import TextLayer from "../components/TextLayer";
 import QuickActionBar from "../components/QuickActionBar";
 import SearchBar, { type SearchResult } from "../components/SearchBar";
 import KeyboardCheatSheet from "../components/KeyboardCheatSheet";
+import CommandPalette, { type PaletteCommand } from "../components/CommandPalette";
 import { annotatePDF, redactPDF, cropPDF, checkHealth, type Annotation, type RedactRegion } from "../api/client";
-import { useSettings } from "../lib/storage";
+import { useSettings, useBookmarks } from "../lib/storage";
 import { downloadAnnotationReport } from "../lib/annotationReport";
 
 type CanvasMode = "view" | "annotate" | "redact" | "crop";
@@ -50,7 +52,20 @@ function toApiAnnotations(localAnns: LocalAnnot[]): Annotation[] {
     if (a.type === "strikethrough")
       return { type: "strikethrough", page: a.page, x0: a.x0, y0: a.y0, x1: a.x1, y1: a.y1,
                ...(a.rects ? { rects: a.rects } : {}), ...(a.text ? { text: a.text } : {}) };
-    // fallback — should never happen
+    if (a.type === "ink")
+      return { type: "ink", page: a.page, strokes: a.strokes,
+               ...(a.color ? { color: a.color } : {}),
+               ...(a.strokeWidth ? { strokeWidth: a.strokeWidth } : {}) };
+    if (a.type === "shape")
+      return { type: "shape", page: a.page, x0: a.x0, y0: a.y0, x1: a.x1, y1: a.y1,
+               shape: a.shape,
+               ...(a.color ? { color: a.color } : {}),
+               ...(a.strokeWidth ? { strokeWidth: a.strokeWidth } : {}),
+               ...(a.text ? { text: a.text } : {}) };
+    if (a.type === "stamp")
+      return { type: "stamp", page: a.page, x0: a.x0, y0: a.y0, x1: a.x1, y1: a.y1,
+               label: a.label, color: a.color };
+    // fallback
     return { type: "note", page: (a as LocalAnnot).page, x: 0, y: 0, text: "" };
   });
 }
@@ -70,8 +85,9 @@ interface PageText {
 }
 
 export default function Viewer() {
-  // ── Settings ───────────────────────────────────────────────────────────────
+  // ── Settings + bookmarks ──────────────────────────────────────────────────
   const { settings, updateSettings } = useSettings();
+  const { bookmarks, addBookmark, removeBookmark, renameBookmark } = useBookmarks();
   const [editingAuthor, setEditingAuthor] = useState(false);
   const [authorInput, setAuthorInput]     = useState("");
 
@@ -98,6 +114,12 @@ export default function Viewer() {
   const [canvasMode, setCanvasMode]           = useState<CanvasMode>("view");
   const [annotateSubMode, setAnnotateSubMode] = useState<CreateMode>("note");
   const [hlColor, setHlColor]                 = useState(0);
+  const [shapeSubType, setShapeSubType]       = useState<ShapeSubType>("rect");
+  const [stampLabel, setStampLabel]           = useState(STAMP_LABELS[0]);
+  const [inkStrokeWidth, setInkStrokeWidth]   = useState(2);
+
+  // ── Command palette ────────────────────────────────────────────────────────
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   // ── Annotations ────────────────────────────────────────────────────────────
   const [annotations, setAnnotations]         = useState<LocalAnnot[]>([]);
@@ -385,6 +407,11 @@ export default function Viewer() {
           setSearchOpen(v => !v);
           return;
         }
+        if ((e.key === "p" || e.key === "P") && e.shiftKey) {
+          e.preventDefault();
+          setPaletteOpen(v => !v);
+          return;
+        }
         if (e.key === "s" || e.key === "S") {
           e.preventDefault();
           if (workingBlob) downloadBlob(workingBlob, filename);
@@ -400,6 +427,7 @@ export default function Viewer() {
       }
 
       if (e.key === "Escape") {
+        if (paletteOpen)    { setPaletteOpen(false); return; }
         if (cheatSheetOpen) { setCheatSheetOpen(false); return; }
         if (searchOpen)     { setSearchOpen(false); return; }
         switchModeRef.current("view");
@@ -416,6 +444,7 @@ export default function Viewer() {
         if (e.key === "u" || e.key === "U") { e.preventDefault(); switchModeRef.current("annotate"); setAnnotateSubMode("underline"); return; }
         if (e.key === "s" || e.key === "S") { e.preventDefault(); switchModeRef.current("annotate"); setAnnotateSubMode("strikethrough"); return; }
         if (e.key === "t" || e.key === "T") { e.preventDefault(); switchModeRef.current("annotate"); setAnnotateSubMode("freetext"); return; }
+        if (e.key === "i" || e.key === "I") { e.preventDefault(); switchModeRef.current("annotate"); setAnnotateSubMode("ink"); return; }
         if (e.key === "r" || e.key === "R") { e.preventDefault(); switchModeRef.current("redact"); return; }
         if (e.key === "c" || e.key === "C") { e.preventDefault(); switchModeRef.current("crop"); return; }
         if (e.key === "+" || e.key === "=") { setScale(s => parseFloat(Math.min(s + 0.2, 4).toFixed(2))); return; }
@@ -900,6 +929,10 @@ export default function Viewer() {
                   onAnnotationsChange={setAnnotations}
                   textSelectActive={textSelectActive}
                   author={settings.author}
+                  shapeSubType={shapeSubType}
+                  inkStrokeWidth={inkStrokeWidth}
+                  stampLabel={stampLabel}
+                  snippets={settings.snippets}
                 />
               )}
 
@@ -990,8 +1023,12 @@ export default function Viewer() {
                     { m: "underline"     as CreateMode, icon: <Underline     className="h-3.5 w-3.5" />, label: "Underline", key: "U" },
                     { m: "strikethrough" as CreateMode, icon: <Strikethrough className="h-3.5 w-3.5" />, label: "Strike",  key: "S" },
                     { m: "freetext"      as CreateMode, icon: <Type          className="h-3.5 w-3.5" />, label: "Text",    key: "T" },
+                    { m: "ink"           as CreateMode, icon: <PenLine       className="h-3.5 w-3.5" />, label: "Draw",    key: "I" },
+                    { m: "shape"         as CreateMode, icon: <Square        className="h-3.5 w-3.5" />, label: "Shape",   key: "" },
+                    { m: "stamp"         as CreateMode, icon: <Stamp         className="h-3.5 w-3.5" />, label: "Stamp",   key: "" },
                   ]).map(({ m, icon, label, key }) => (
-                    <button key={m} onClick={() => { setAnnotateSubMode(m); setTextSelectActive(false); }} title={`${label} (${key})`}
+                    <button key={m} onClick={() => { setAnnotateSubMode(m); setTextSelectActive(false); }}
+                      title={`${label}${key ? ` (${key})` : ""}`}
                       className={cn("flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition",
                         annotateSubMode === m && !textSelectActive ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600")}>
                       {icon} {label}
@@ -1000,20 +1037,57 @@ export default function Viewer() {
                   {/* Text select toggle */}
                   <button
                     onClick={() => setTextSelectActive(v => !v)}
-                    title="Select text to highlight/underline/strike (X)"
+                    title="Select text to highlight/underline/strike"
                     className={cn("flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition",
                       textSelectActive ? "bg-purple-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600")}>
                     <Type className="h-3.5 w-3.5" /> Select
                   </button>
                 </div>
                 {/* Highlight colour swatches */}
-                {(annotateSubMode === "highlight") && !textSelectActive && (
+                {annotateSubMode === "highlight" && !textSelectActive && (
                   <div className="flex items-center gap-1">
                     {HIGHLIGHT_COLORS.map((c, i) => (
                       <button key={i} onClick={() => setHlColor(i)} title={`${c.label} (${i + 1})`}
                         className={cn("h-5 w-5 rounded-full border-2 transition",
                           hlColor === i ? "border-white scale-125" : "border-transparent")}
                         style={{ background: c.bg }} />
+                    ))}
+                  </div>
+                )}
+                {/* Shape sub-type */}
+                {annotateSubMode === "shape" && (
+                  <div className="flex items-center gap-1">
+                    {(["rect", "ellipse", "line", "arrow"] as ShapeSubType[]).map(s => (
+                      <button key={s} onClick={() => setShapeSubType(s)}
+                        className={cn("px-2 py-0.5 rounded text-[10px] font-medium transition",
+                          shapeSubType === s ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-400 hover:bg-gray-600")}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {/* Ink stroke width */}
+                {annotateSubMode === "ink" && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-gray-500">Width</span>
+                    {[1, 2, 4, 8].map(w => (
+                      <button key={w} onClick={() => setInkStrokeWidth(w)}
+                        className={cn("rounded border px-1.5 py-0.5 text-[10px] transition",
+                          inkStrokeWidth === w ? "border-blue-500 text-blue-300" : "border-gray-600 text-gray-400 hover:border-gray-500")}>
+                        {w}px
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {/* Stamp label */}
+                {annotateSubMode === "stamp" && (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {STAMP_LABELS.map(l => (
+                      <button key={l} onClick={() => setStampLabel(l)}
+                        className={cn("px-2 py-0.5 rounded text-[10px] font-bold tracking-wide transition",
+                          stampLabel === l ? "bg-red-800 text-red-200" : "bg-gray-700 text-gray-400 hover:bg-gray-600")}>
+                        {l}
+                      </button>
                     ))}
                   </div>
                 )}
@@ -1186,8 +1260,10 @@ export default function Viewer() {
                 <Search className="h-3.5 w-3.5" />
               </button>
 
-              {/* Annotations panel */}
-              {panelBtn("annotations", <List className="h-3.5 w-3.5" />, "Annotations")}
+              {/* Navigation panels */}
+              {panelBtn("annotations", <List     className="h-3.5 w-3.5" />, "Annotations")}
+              {panelBtn("outline",     <BookOpen className="h-3.5 w-3.5" />, "Outline")}
+              {panelBtn("bookmarks",   <Bookmark className="h-3.5 w-3.5" />, "Bookmarks")}
 
               <div className="w-px h-5 bg-gray-700 mx-0.5" />
 
@@ -1217,6 +1293,12 @@ export default function Viewer() {
                 <ExternalLink className="h-2.5 w-2.5 ml-0.5" />
               </Link>
 
+              {/* Command palette */}
+              <button onClick={() => setPaletteOpen(true)} title="Command palette (Ctrl+Shift+P)"
+                className="p-1.5 rounded-lg hover:bg-gray-700 transition text-gray-500 hover:text-gray-300">
+                <Command className="h-3.5 w-3.5" />
+              </button>
+
               {/* Keyboard cheat sheet */}
               <button onClick={() => setCheatSheetOpen(true)} title="Keyboard shortcuts (?)"
                 className="p-1.5 rounded-lg hover:bg-gray-700 transition text-gray-500 hover:text-gray-300">
@@ -1236,7 +1318,8 @@ export default function Viewer() {
             onClose={() => setPanelTool(null)}
             onApplied={async (blob) => {
               await applyBlob(blob);
-              if (panelTool !== "annotations") setPanelTool(null);
+              if (panelTool !== "annotations" && panelTool !== "outline" && panelTool !== "bookmarks")
+                setPanelTool(null);
             }}
             // Annotations panel props
             annotations={annotations}
@@ -1245,6 +1328,13 @@ export default function Viewer() {
             onDeleteAnnot={deleteAnnot}
             onStatusChange={changeAnnotStatus}
             onExportReport={() => downloadAnnotationReport(annotations, filename)}
+            // Outline panel
+            pdf={pdf}
+            // Bookmarks panel
+            bookmarks={bookmarks}
+            onAddBookmark={() => addBookmark(currentPage)}
+            onDeleteBookmark={removeBookmark}
+            onRenameBookmark={renameBookmark}
           />
         )}
 
@@ -1269,6 +1359,51 @@ export default function Viewer() {
       {cheatSheetOpen && (
         <KeyboardCheatSheet onClose={() => setCheatSheetOpen(false)} />
       )}
+
+      {/* ── Command palette ───────────────────────────────────────────────────── */}
+      {paletteOpen && pdf && (
+        <CommandPalette
+          commands={buildPaletteCommands()}
+          snippets={settings.snippets}
+          pageCount={pdf.numPages}
+          onGoToPage={p => { goTo(p); setPaletteOpen(false); }}
+          onClose={() => setPaletteOpen(false)}
+        />
+      )}
     </div>
   );
+
+  // ── Command palette command list ───────────────────────────────────────────
+  function buildPaletteCommands(): PaletteCommand[] {
+    const go = (m: CanvasMode, sub?: CreateMode) => () => {
+      switchMode(m);
+      if (sub) setAnnotateSubMode(sub);
+      setPaletteOpen(false);
+    };
+    return [
+      { id: "view",         label: "View mode",        description: "Read the document (V)",         category: "Modes",      action: go("view") },
+      { id: "annotate",     label: "Annotate mode",    description: "Mark up the document (A)",       category: "Modes",      action: go("annotate") },
+      { id: "redact",       label: "Redact mode",      description: "Black out content (R)",          category: "Modes",      action: go("redact") },
+      { id: "crop",         label: "Crop mode",        description: "Crop page area (C)",             category: "Modes",      action: go("crop") },
+      { id: "highlight",    label: "Highlight",        description: "Yellow text highlight (H)",      category: "Annotate",   action: go("annotate", "highlight") },
+      { id: "note",         label: "Note",             description: "Place a comment pin (A)",        category: "Annotate",   action: go("annotate", "note") },
+      { id: "underline",    label: "Underline",        description: "Underline text (U)",             category: "Annotate",   action: go("annotate", "underline") },
+      { id: "strikethrough",label: "Strikethrough",    description: "Strike through text (S)",        category: "Annotate",   action: go("annotate", "strikethrough") },
+      { id: "freetext",     label: "Text box",         description: "Drag to place a text box (T)",   category: "Annotate",   action: go("annotate", "freetext") },
+      { id: "ink",          label: "Draw / Ink",       description: "Freehand drawing (I)",           category: "Annotate",   action: go("annotate", "ink") },
+      { id: "shape",        label: "Shape",            description: "Draw rect / ellipse / arrow",    category: "Annotate",   action: go("annotate", "shape") },
+      { id: "stamp",        label: "Stamp",            description: "Place a stamp label",            category: "Annotate",   action: go("annotate", "stamp") },
+      { id: "search",       label: "Search text",      description: "Find text in document (Ctrl+F)", category: "Navigation", action: () => { setSearchOpen(true); setPaletteOpen(false); } },
+      { id: "cheatsheet",   label: "Keyboard shortcuts",description: "Show all key bindings (?)",     category: "Help",       action: () => { setCheatSheetOpen(true); setPaletteOpen(false); } },
+      { id: "outline",      label: "Table of contents",description: "Open the PDF outline panel",     category: "Navigation", action: () => { togglePanel("outline"); setPaletteOpen(false); } },
+      { id: "bookmarks",    label: "Bookmarks",        description: "Open the bookmarks panel",       category: "Navigation", action: () => { togglePanel("bookmarks"); setPaletteOpen(false); } },
+      { id: "annotations",  label: "Annotations panel",description: "Open the annotations sidebar",   category: "Navigation", action: () => { togglePanel("annotations"); setPaletteOpen(false); } },
+      { id: "bm-add",       label: "Bookmark this page",description: `Bookmark page ${currentPage}`,  category: "Bookmarks",  action: () => { addBookmark(currentPage); setPaletteOpen(false); } },
+      { id: "export",       label: "Export report",    description: "Download annotations as .md",    category: "Export",     action: () => { downloadAnnotationReport(annotations, filename); setPaletteOpen(false); } },
+      ...(workingBlob ? [{
+        id: "download", label: "Download PDF", description: "Save modified PDF (Ctrl+S)", category: "Export",
+        action: () => { downloadBlob(workingBlob, filename); setPaletteOpen(false); },
+      }] : []),
+    ];
+  }
 }

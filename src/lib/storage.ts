@@ -2,17 +2,31 @@ import { useState } from "react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+export interface Snippet {
+  id: string;
+  text: string;
+}
+
+export interface UserBookmark {
+  id: string;
+  page: number;
+  label: string;
+}
+
 export interface Settings {
   /** Display name stamped on new annotations. */
   author: string;
+  /** Saved comment snippets (reusable text). */
+  snippets: Snippet[];
 }
 
 // ── Persistence ──────────────────────────────────────────────────────────────
 
 const KEY = "pdf-tools-settings";
+const BOOKMARKS_KEY = "pdf-tools-bookmarks";
 
 function defaults(): Settings {
-  return { author: "" };
+  return { author: "", snippets: [] };
 }
 
 export function loadSettings(): Settings {
@@ -27,7 +41,19 @@ function persist(s: Settings) {
   try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* ignore */ }
 }
 
-// ── Hook ─────────────────────────────────────────────────────────────────────
+function loadBookmarksRaw(): UserBookmark[] {
+  try {
+    const raw = localStorage.getItem(BOOKMARKS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return [];
+}
+
+function persistBookmarks(b: UserBookmark[]) {
+  try { localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(b)); } catch { /* ignore */ }
+}
+
+// ── Hooks ─────────────────────────────────────────────────────────────────────
 
 export function useSettings() {
   const [settings, setSettings] = useState<Settings>(loadSettings);
@@ -41,4 +67,36 @@ export function useSettings() {
   }
 
   return { settings, updateSettings };
+}
+
+export function useBookmarks() {
+  const [bookmarks, setBookmarks] = useState<UserBookmark[]>(loadBookmarksRaw);
+
+  function addBookmark(page: number, label?: string) {
+    setBookmarks(prev => {
+      if (prev.some(b => b.page === page)) return prev;
+      const next = [...prev, { id: `bk${Date.now()}`, page, label: label ?? `Page ${page}` }]
+        .sort((a, b) => a.page - b.page);
+      persistBookmarks(next);
+      return next;
+    });
+  }
+
+  function removeBookmark(id: string) {
+    setBookmarks(prev => {
+      const next = prev.filter(b => b.id !== id);
+      persistBookmarks(next);
+      return next;
+    });
+  }
+
+  function renameBookmark(id: string, label: string) {
+    setBookmarks(prev => {
+      const next = prev.map(b => b.id === id ? { ...b, label } : b);
+      persistBookmarks(next);
+      return next;
+    });
+  }
+
+  return { bookmarks, addBookmark, removeBookmark, renameBookmark };
 }

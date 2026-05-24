@@ -368,6 +368,74 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
                 a.set_info(content=ann["text"])
             a.update()
 
+        elif ann["type"] == "ink":
+            strokes = ann.get("strokes", [])
+            if not strokes:
+                continue
+            ink_list = []
+            for stroke in strokes:
+                pts = [fitz.Point(pb.x0 + p["x"] * pb.width, pb.y0 + p["y"] * pb.height)
+                       for p in stroke]
+                if pts:
+                    ink_list.append(pts)
+            if not ink_list:
+                continue
+            a = page.add_ink_annot(ink_list)
+            color = ann.get("color", [0, 0, 0])
+            a.set_colors(stroke=color)
+            width = ann.get("strokeWidth", 2)
+            a.set_border(width=max(0.5, width * 0.5))  # PDF units are ~0.5× screen px
+            a.update()
+
+        elif ann["type"] == "shape":
+            x0 = pb.x0 + ann["x0"] * pb.width
+            y0 = pb.y0 + ann["y0"] * pb.height
+            x1 = pb.x0 + ann["x1"] * pb.width
+            y1 = pb.y0 + ann["y1"] * pb.height
+            rect = fitz.Rect(x0, y0, x1, y1)
+            color = ann.get("color", [0.1, 0.1, 0.8])
+            shape = ann.get("shape", "rect")
+            if shape == "rect":
+                a = page.add_rect_annot(rect)
+                a.set_colors(stroke=color)
+            elif shape == "ellipse":
+                a = page.add_circle_annot(rect)
+                a.set_colors(stroke=color)
+            elif shape in ("line", "arrow"):
+                p1 = fitz.Point(x0, y0)
+                p2 = fitz.Point(x1, y1)
+                a = page.add_line_annot(p1, p2)
+                a.set_colors(stroke=color)
+                if shape == "arrow":
+                    try:
+                        a.set_line_ends(fitz.PDF_ANNOT_LE_NONE, fitz.PDF_ANNOT_LE_OPEN_ARROW)
+                    except Exception:
+                        pass  # older PyMuPDF may use different API
+            else:
+                a = page.add_rect_annot(rect)
+                a.set_colors(stroke=color)
+            if ann.get("text"):
+                a.set_info(content=ann["text"])
+            a.update()
+
+        elif ann["type"] == "stamp":
+            x0 = pb.x0 + ann["x0"] * pb.width
+            y0 = pb.y0 + ann["y0"] * pb.height
+            x1 = pb.x0 + ann["x1"] * pb.width
+            y1 = pb.y0 + ann["y1"] * pb.height
+            rect = fitz.Rect(x0, y0, x1, y1)
+            label = ann.get("label", "DRAFT")
+            color = ann.get("color", [0.6, 0, 0])
+            fs = max(8, min(24, (y1 - y0) * 0.6))
+            a = page.add_freetext_annot(
+                rect, label,
+                fontsize=fs,
+                text_color=color,
+                fill_color=(1, 1, 1),
+                align=fitz.TEXT_ALIGN_CENTER,
+            )
+            a.update()
+
     return _save(doc)
 
 

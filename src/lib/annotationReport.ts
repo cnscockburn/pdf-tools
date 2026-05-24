@@ -5,11 +5,9 @@ import { downloadBlob } from "./utils";
 
 function typeLabel(type: string): string {
   const MAP: Record<string, string> = {
-    note: "Note",
-    highlight: "Highlight",
-    freetext: "Text Box",
-    underline: "Underline",
-    strikethrough: "Strikethrough",
+    note: "Note", highlight: "Highlight", freetext: "Text Box",
+    underline: "Underline", strikethrough: "Strikethrough",
+    ink: "Drawing", shape: "Shape", stamp: "Stamp",
   };
   return MAP[type] ?? type;
 }
@@ -55,8 +53,9 @@ export function generateMarkdownReport(annotations: LocalAnnot[], filename: stri
   for (const page of Array.from(byPage.keys()).sort((a, b) => a - b)) {
     lines.push(`## Page ${page}`, ``);
     for (const ann of byPage.get(page)!) {
-      const author = ann.author ? ` — *${ann.author}*` : "";
-      const status = statusLabel(ann.status);
+      const a = ann as { author?: string; status?: string };
+      const author = a.author ? ` — *${a.author}*` : "";
+      const status = statusLabel(a.status);
       const text = annotText(ann);
       lines.push(`- **${typeLabel(ann.type)}**${status}${author}`);
       if (text) {

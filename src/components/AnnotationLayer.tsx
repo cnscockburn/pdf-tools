@@ -4,44 +4,55 @@
  * Handles: create / select / drag-move / corner-resize / double-click-edit / delete.
  * All coordinates are fractional (0–1) relative to the canvas element.
  *
- * Annotation types: note, highlight (multi-rect), freetext, underline, strikethrough.
- * Every annotation carries optional status + author metadata.
+ * Annotation types: note, highlight (multi-rect), freetext, underline, strikethrough,
+ *                   ink, shape (rect/ellipse/line/arrow), stamp.
+ * Every annotation carries optional status, author, tags metadata.
+ * Notes and freetext support session-only reply threads.
  */
 import { useEffect, useRef, useState } from "react";
 import { cn } from "../lib/utils";
+import type { Snippet } from "../lib/storage";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export type AnnotId  = string;
+export type AnnotId     = string;
 export type AnnotStatus = "open" | "resolved" | "wontfix";
 
 let _seq = 0;
 export const newId = (): AnnotId => `a${++_seq}_${Date.now()}`;
 
 /** A fractional rectangle (0–1 relative to the page). */
-export interface FracRect {
-  x0: number; y0: number; x1: number; y1: number;
-}
+export interface FracRect { x0: number; y0: number; x1: number; y1: number; }
+/** A fractional point (0–1 relative to the page). */
+export interface FracPoint { x: number; y: number; }
+
+/** A reply in an annotation thread (session-only, not persisted to PDF). */
+export interface Reply { id: string; author: string; text: string; ts: number; }
 
 export interface NoteAnnot {
   id: AnnotId; type: "note"; page: number;
   x: number; y: number; text: string;
   author?: string; status?: AnnotStatus;
+  tags?: string[];
+  replies?: Reply[];
 }
 export interface HighlightAnnot {
   id: AnnotId; type: "highlight"; page: number;
   x0: number; y0: number; x1: number; y1: number;
-  /** Individual line rects for text-selection highlights; undefined = single rect */
   rects?: FracRect[];
   colorIdx: number; color: [number, number, number];
-  text?: string;   // optional comment
+  text?: string;
   author?: string; status?: AnnotStatus;
+  tags?: string[];
+  replies?: Reply[];
 }
 export interface FreetextAnnot {
   id: AnnotId; type: "freetext"; page: number;
   x0: number; y0: number; x1: number; y1: number;
   text: string;
   author?: string; status?: AnnotStatus;
+  tags?: string[];
+  replies?: Reply[];
 }
 export interface UnderlineAnnot {
   id: AnnotId; type: "underline"; page: number;
@@ -50,6 +61,7 @@ export interface UnderlineAnnot {
   color?: [number, number, number];
   text?: string;
   author?: string; status?: AnnotStatus;
+  tags?: string[];
 }
 export interface StrikethroughAnnot {
   id: AnnotId; type: "strikethrough"; page: number;
@@ -58,20 +70,53 @@ export interface StrikethroughAnnot {
   color?: [number, number, number];
   text?: string;
   author?: string; status?: AnnotStatus;
+  tags?: string[];
+}
+export interface InkAnnot {
+  id: AnnotId; type: "ink"; page: number;
+  /** Bounding box for hit-testing / drag */
+  x0: number; y0: number; x1: number; y1: number;
+  strokes: FracPoint[][];
+  color?: [number, number, number];
+  strokeWidth?: number;
+  tags?: string[];
+}
+export type ShapeSubType = "rect" | "ellipse" | "line" | "arrow";
+export interface ShapeAnnot {
+  id: AnnotId; type: "shape"; page: number;
+  x0: number; y0: number; x1: number; y1: number;
+  shape: ShapeSubType;
+  color?: [number, number, number];
+  strokeWidth?: number;
+  text?: string;
+  author?: string; status?: AnnotStatus;
+  tags?: string[];
+}
+export interface StampAnnot {
+  id: AnnotId; type: "stamp"; page: number;
+  x0: number; y0: number; x1: number; y1: number;
+  label: string;
+  color: [number, number, number];
+  author?: string; status?: AnnotStatus;
+  tags?: string[];
 }
 
 export type LocalAnnot =
-  | NoteAnnot
-  | HighlightAnnot
-  | FreetextAnnot
-  | UnderlineAnnot
-  | StrikethroughAnnot;
+  | NoteAnnot | HighlightAnnot | FreetextAnnot
+  | UnderlineAnnot | StrikethroughAnnot
+  | InkAnnot | ShapeAnnot | StampAnnot;
 
 export interface HlColor {
   label: string; rgb: [number, number, number]; bg: string; border: string;
 }
 
-export type CreateMode = "note" | "highlight" | "freetext" | "underline" | "strikethrough";
+export type CreateMode =
+  | "note" | "highlight" | "freetext"
+  | "underline" | "strikethrough"
+  | "ink" | "shape" | "stamp";
+
+const STAMP_LABELS = ["APPROVED", "DRAFT", "CONFIDENTIAL", "REVIEWED", "REVISE", "FYI"];
+export { STAMP_LABELS };
 
 // Corner resize handles
 const CORNERS = ["nw", "ne", "sw", "se"] as const;
@@ -86,14 +131,25 @@ function getFrac(el: HTMLElement, clientX: number, clientY: number) {
   return { x: clamp((clientX - r.left) / r.width), y: clamp((clientY - r.top) / r.height) };
 }
 
+function colorToCSS(c: [number, number, number]): string {
+  return `rgb(${Math.round(c[0]*255)},${Math.round(c[1]*255)},${Math.round(c[2]*255)})`;
+}
+
 function applyDrag(ann: LocalAnnot, dx: number, dy: number): LocalAnnot {
   if (ann.type === "note") {
     return { ...ann, x: clamp(ann.x + dx), y: clamp(ann.y + dy) };
   }
+  if (ann.type === "ink") {
+    return {
+      ...ann,
+      x0: clamp(ann.x0 + dx), y0: clamp(ann.y0 + dy),
+      x1: clamp(ann.x1 + dx), y1: clamp(ann.y1 + dy),
+      strokes: ann.strokes.map(s => s.map(p => ({ x: clamp(p.x + dx), y: clamp(p.y + dy) }))),
+    };
+  }
   const w = ann.x1 - ann.x0, h = ann.y1 - ann.y0;
   const x0 = clamp(ann.x0 + dx, 0, 1 - w);
   const y0 = clamp(ann.y0 + dy, 0, 1 - h);
-  // Move rects together with the bounding box
   const rects = (ann as HighlightAnnot).rects?.map(r => ({
     x0: r.x0 + dx, y0: r.y0 + dy, x1: r.x1 + dx, y1: r.y1 + dy,
   }));
@@ -101,7 +157,7 @@ function applyDrag(ann: LocalAnnot, dx: number, dy: number): LocalAnnot {
 }
 
 function applyResize(
-  ann: HighlightAnnot | FreetextAnnot | UnderlineAnnot | StrikethroughAnnot,
+  ann: HighlightAnnot | FreetextAnnot | UnderlineAnnot | StrikethroughAnnot | ShapeAnnot | StampAnnot,
   corner: Corner, dx: number, dy: number,
 ): typeof ann {
   let { x0, y0, x1, y1 } = ann;
@@ -113,13 +169,11 @@ function applyResize(
   return { ...ann, x0, y0, x1, y1 };
 }
 
-/** Expand line rects (underline/strikethrough) to a tight bounding box */
+/** Expand line rects to a tight bounding box */
 function boundingBox(rects: FracRect[]): FracRect {
   return rects.reduce((acc, r) => ({
-    x0: Math.min(acc.x0, r.x0),
-    y0: Math.min(acc.y0, r.y0),
-    x1: Math.max(acc.x1, r.x1),
-    y1: Math.max(acc.y1, r.y1),
+    x0: Math.min(acc.x0, r.x0), y0: Math.min(acc.y0, r.y0),
+    x1: Math.max(acc.x1, r.x1), y1: Math.max(acc.y1, r.y1),
   }), { x0: 1, y0: 1, x1: 0, y1: 0 });
 }
 
@@ -132,25 +186,47 @@ interface Props {
   hlColorIdx: number;
   highlightColors: HlColor[];
   onAnnotationsChange: (a: LocalAnnot[]) => void;
-  /** When true, background has pointer-events:none so text selection works through it */
+  /** When true, background is pointer-events:none so text selection works through it */
   textSelectActive?: boolean;
   /** Default author stamped on new annotations */
   author?: string;
   /** Notify parent of selected ID */
   onSelectedChange?: (id: AnnotId | null) => void;
+  /** For shape creation */
+  shapeSubType?: ShapeSubType;
+  /** Ink stroke color */
+  inkColor?: [number, number, number];
+  /** Ink stroke width (px) */
+  inkStrokeWidth?: number;
+  /** Stamp label */
+  stampLabel?: string;
+  /** Stamp color */
+  stampColor?: [number, number, number];
+  /** Available snippets for comment editors */
+  snippets?: Snippet[];
 }
 
 export default function AnnotationLayer({
   annotations, page, createMode, hlColorIdx, highlightColors,
   onAnnotationsChange, textSelectActive, author, onSelectedChange,
+  shapeSubType = "rect", inkColor = [0, 0, 0], inkStrokeWidth = 2,
+  stampLabel = "DRAFT", stampColor = [0.6, 0, 0],
+  snippets = [],
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [selectedId,  setSelectedId]  = useState<AnnotId | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<AnnotId>>(new Set());
   const [editingId,   setEditingId]   = useState<AnnotId | null>(null);
-  const [editText,    setEditText]     = useState("");
-  const [hlPicker,    setHlPicker]     = useState<AnnotId | null>(null);
+  const [editText,    setEditText]    = useState("");
+  const [hlPicker,    setHlPicker]    = useState<AnnotId | null>(null);
+  const [replyingId,  setReplyingId]  = useState<AnnotId | null>(null);
+  const [replyText,   setReplyText]   = useState("");
+  const [showReplies, setShowReplies] = useState<AnnotId | null>(null);
   const [, forceUpdate] = useState(0);
+
+  // Live ink stroke (current drawing, not yet committed)
+  const inkStrokeRef = useRef<FracPoint[]>([]);
 
   const dragRef = useRef<{
     kind: "create" | "move" | "resize";
@@ -163,22 +239,32 @@ export default function AnnotationLayer({
   } | null>(null);
 
   // Sync selection to parent
-  useEffect(() => { onSelectedChange?.(selectedId); }, [selectedId]);
+  useEffect(() => { onSelectedChange?.(selectedId); }, [selectedId]); // eslint-disable-line
 
   // Keyboard: delete / escape
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
-      if ((e.key === "Delete" || e.key === "Backspace") && selectedId && !editingId) {
-        e.preventDefault();
-        deleteAnnot(selectedId);
+      if ((e.key === "Delete" || e.key === "Backspace") && !editingId) {
+        if (selectedIds.size > 1) {
+          e.preventDefault();
+          const ids = new Set(selectedIds);
+          onAnnotationsChange(annotations.filter(a => !ids.has(a.id)));
+          setSelectedIds(new Set());
+          setSelectedId(null);
+          return;
+        }
+        if (selectedId) {
+          e.preventDefault();
+          deleteAnnot(selectedId);
+        }
       }
       if (e.key === "Escape" && editingId) { e.stopPropagation(); cancelEdit(); }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedId, editingId, annotations]);
+  }, [selectedId, selectedIds, editingId, annotations]); // eslint-disable-line
 
   // ── Annotation helpers ────────────────────────────────────────────────────
   const pageAnns = annotations.filter(a => a.page === page);
@@ -199,9 +285,8 @@ export default function AnnotationLayer({
 
   // ── Edit helpers ──────────────────────────────────────────────────────────
   function startEdit(ann: NoteAnnot | FreetextAnnot) {
-    setEditingId(ann.id);
-    setEditText(ann.text);
-    setSelectedId(ann.id);
+    setEditingId(ann.id); setEditText(ann.text);
+    setSelectedId(ann.id); setShowReplies(null);
   }
 
   function commitEdit(id: AnnotId) {
@@ -213,6 +298,38 @@ export default function AnnotationLayer({
   }
 
   function cancelEdit() { setEditingId(null); }
+
+  // ── Reply helpers ─────────────────────────────────────────────────────────
+  function addReply(ann: NoteAnnot | FreetextAnnot | HighlightAnnot) {
+    if (!replyText.trim()) return;
+    const reply: Reply = { id: `r${Date.now()}`, author: author || "Anonymous", text: replyText.trim(), ts: Date.now() };
+    updateAnnot({ ...ann, replies: [...(ann.replies ?? []), reply] } as LocalAnnot);
+    setReplyText(""); setReplyingId(null);
+  }
+
+  // ── Snippet helpers ───────────────────────────────────────────────────────
+  function SnippetDropdown({ onInsert }: { onInsert: (text: string) => void }) {
+    const [open, setOpen] = useState(false);
+    if (snippets.length === 0) return null;
+    return (
+      <div className="relative">
+        <button type="button" onClick={() => setOpen(v => !v)}
+          className="px-1.5 py-0.5 text-[10px] rounded bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white transition">
+          Snippets ▾
+        </button>
+        {open && (
+          <div className="absolute top-full left-0 mt-0.5 z-50 bg-gray-800 border border-gray-600 rounded-lg shadow-xl min-w-36 max-h-36 overflow-y-auto">
+            {snippets.map(s => (
+              <button key={s.id} onClick={() => { onInsert(s.text); setOpen(false); }}
+                className="w-full text-left px-2.5 py-1.5 text-[11px] text-gray-300 hover:bg-gray-700 truncate transition">
+                {s.text}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   // ── Mouse helpers ─────────────────────────────────────────────────────────
   function getContainerFrac(e: { clientX: number; clientY: number }) {
@@ -227,10 +344,43 @@ export default function AnnotationLayer({
   function onBgMouseDown(e: React.MouseEvent<HTMLDivElement>) {
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest("[data-annot]")) return;
-    setSelectedId(null); setHlPicker(null); onSelectedChange?.(null);
+    setSelectedId(null); setHlPicker(null);
+    setSelectedIds(new Set());
+    onSelectedChange?.(null);
 
-    if (createMode === "note") return; // handled in onClick
+    if (createMode === "note" || createMode === "stamp") return; // handled in onClick
 
+    // ── Ink mode: capture continuous stroke ──────────────────────────────
+    if (createMode === "ink") {
+      e.preventDefault();
+      const startFrac = getContainerFrac(e);
+      inkStrokeRef.current = [startFrac];
+      dragRef.current = { kind: "create", startMouse: { x: e.clientX, y: e.clientY }, startFrac, live: null };
+
+      const onMove = (me: MouseEvent) => {
+        const cur = getContainerFrac(me);
+        inkStrokeRef.current = [...inkStrokeRef.current, cur];
+        forceUpdate(n => n + 1);
+      };
+      const onUp = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        dragRef.current = null;
+        const stroke = inkStrokeRef.current;
+        inkStrokeRef.current = [];
+        if (stroke.length < 2) { forceUpdate(n => n + 1); return; }
+        const id = newId();
+        const bb = boundingBox(stroke.map(p => ({ x0: p.x, y0: p.y, x1: p.x, y1: p.y })));
+        addAnnot({ id, type: "ink", page, strokes: [stroke], color: inkColor, strokeWidth: inkStrokeWidth, ...bb });
+        setSelectedId(id); onSelectedChange?.(id);
+        forceUpdate(n => n + 1);
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+      return;
+    }
+
+    // ── Drag-to-create modes ─────────────────────────────────────────────
     e.preventDefault();
     const startFrac = getContainerFrac(e);
     dragRef.current = {
@@ -263,8 +413,7 @@ export default function AnnotationLayer({
       const id = newId();
       const base = { id, page, author: author || undefined };
       if (createMode === "highlight") {
-        addAnnot({ ...base, type: "highlight",
-          ...live, colorIdx: hlColorIdx, color: highlightColors[hlColorIdx].rgb });
+        addAnnot({ ...base, type: "highlight", ...live, colorIdx: hlColorIdx, color: highlightColors[hlColorIdx].rgb });
       } else if (createMode === "freetext") {
         addAnnot({ ...base, type: "freetext", ...live, text: "" });
         setEditingId(id); setEditText(""); setSelectedId(id); onSelectedChange?.(id);
@@ -272,6 +421,8 @@ export default function AnnotationLayer({
         addAnnot({ ...base, type: "underline", ...live });
       } else if (createMode === "strikethrough") {
         addAnnot({ ...base, type: "strikethrough", ...live });
+      } else if (createMode === "shape") {
+        addAnnot({ ...base, type: "shape", ...live, shape: shapeSubType, color: [0.1, 0.1, 0.8], strokeWidth: 2 });
       }
       setSelectedId(id); onSelectedChange?.(id);
       forceUpdate(n => n + 1);
@@ -290,6 +441,20 @@ export default function AnnotationLayer({
       addAnnot({ id, type: "note", page, x: pt.x, y: pt.y, text: "", author: author || undefined });
       setEditingId(id); setEditText(""); setSelectedId(id); onSelectedChange?.(id);
     }
+    if (createMode === "stamp") {
+      const pt = getContainerFrac(e);
+      const id = newId();
+      // Place a stamp box centred on the click, proportional
+      const w = 0.18, h = 0.05;
+      addAnnot({
+        id, type: "stamp", page,
+        x0: clamp(pt.x - w / 2), y0: clamp(pt.y - h / 2),
+        x1: clamp(pt.x + w / 2), y1: clamp(pt.y + h / 2),
+        label: stampLabel, color: stampColor,
+        author: author || undefined,
+      });
+      setSelectedId(id); onSelectedChange?.(id);
+    }
   }
 
   // ── Annotation drag / resize ──────────────────────────────────────────────
@@ -297,7 +462,19 @@ export default function AnnotationLayer({
     if (e.button !== 0) return;
     if (editingId === ann.id) return;
     e.preventDefault(); e.stopPropagation();
+
+    // Shift+click: multi-select toggle
+    if (e.shiftKey) {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.has(ann.id) ? next.delete(ann.id) : next.add(ann.id);
+        return next;
+      });
+      return;
+    }
+
     setSelectedId(ann.id); setHlPicker(null); onSelectedChange?.(ann.id);
+    setSelectedIds(new Set());
 
     const startAnnot = { ...ann } as LocalAnnot;
     const startMouse = { x: e.clientX, y: e.clientY };
@@ -324,16 +501,16 @@ export default function AnnotationLayer({
     if (ann.type === "note" || ann.type === "freetext") startEdit(ann);
     else if (ann.type === "highlight") setHlPicker(ann.id);
     else if (ann.type === "underline" || ann.type === "strikethrough") {
-      // Treat double-click as open note editor for comment
-      setEditingId(ann.id);
-      setEditText(ann.text ?? "");
-      setSelectedId(ann.id);
+      setEditingId(ann.id); setEditText(ann.text ?? ""); setSelectedId(ann.id);
+    }
+    else if (ann.type === "shape") {
+      setEditingId(ann.id); setEditText(ann.text ?? ""); setSelectedId(ann.id);
     }
   }
 
   function onResizeMouseDown(
     e: React.MouseEvent,
-    ann: HighlightAnnot | FreetextAnnot | UnderlineAnnot | StrikethroughAnnot,
+    ann: HighlightAnnot | FreetextAnnot | UnderlineAnnot | StrikethroughAnnot | ShapeAnnot | StampAnnot,
     corner: Corner,
   ) {
     e.preventDefault(); e.stopPropagation();
@@ -356,18 +533,19 @@ export default function AnnotationLayer({
   // ── Drag preview ──────────────────────────────────────────────────────────
   const live = dragRef.current?.kind === "create" ? dragRef.current.live : null;
   const dragColor = createMode === "highlight" ? highlightColors[hlColorIdx].border
-    : createMode === "underline" ? "#3b82f6"
+    : createMode === "underline"    ? "#3b82f6"
     : createMode === "strikethrough" ? "#ef4444"
     : "#3b82f6";
   const dragBg = createMode === "highlight" ? highlightColors[hlColorIdx].bg
     : "rgba(59,130,246,0.08)";
 
-  const cursorClass = createMode === "note" ? "cursor-cell"
+  const cursorClass = (createMode === "note" || createMode === "stamp") ? "cursor-cell"
+    : createMode === "ink" ? "cursor-crosshair"
     : selectedId ? "cursor-default"
     : "cursor-crosshair";
 
-  // ── Inline comment editor for underline/strikethrough ─────────────────────
-  function renderLineCommentEditor(ann: UnderlineAnnot | StrikethroughAnnot) {
+  // ── Inline comment editor (underline / strikethrough / shape) ─────────────
+  function renderLineCommentEditor(ann: UnderlineAnnot | StrikethroughAnnot | ShapeAnnot) {
     if (editingId !== ann.id) return null;
     return (
       <div
@@ -383,43 +561,76 @@ export default function AnnotationLayer({
               e.stopPropagation();
               if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
-                updateAnnot({ ...ann, text: editText.trim() });
+                updateAnnot({ ...ann, text: editText.trim() } as LocalAnnot);
                 setEditingId(null);
               }
               if (e.key === "Escape") { e.preventDefault(); setEditingId(null); }
             }}
-            onBlur={() => { updateAnnot({ ...ann, text: editText.trim() }); setEditingId(null); }}
+            onBlur={() => { updateAnnot({ ...ann, text: editText.trim() } as LocalAnnot); setEditingId(null); }}
             placeholder="Add comment…"
             className="w-full rounded border border-yellow-300 bg-white px-2 py-1 text-xs text-gray-800 resize-none focus:outline-none focus:ring-1 focus:ring-yellow-500"
           />
           <div className="flex gap-1">
-            <button
-              onClick={() => { updateAnnot({ ...ann, text: editText.trim() }); setEditingId(null); }}
-              className="flex-1 rounded bg-yellow-400 hover:bg-yellow-300 py-0.5 text-xs font-semibold text-gray-800 transition">
-              Save
-            </button>
-            <button
-              onClick={() => setEditingId(null)}
-              className="px-2 rounded bg-gray-200 hover:bg-gray-300 text-xs text-gray-600 transition">
-              Cancel
-            </button>
+            <button onClick={() => { updateAnnot({ ...ann, text: editText.trim() } as LocalAnnot); setEditingId(null); }}
+              className="flex-1 rounded bg-yellow-400 hover:bg-yellow-300 py-0.5 text-xs font-semibold text-gray-800 transition">Save</button>
+            <button onClick={() => setEditingId(null)}
+              className="px-2 rounded bg-gray-200 hover:bg-gray-300 text-xs text-gray-600 transition">Cancel</button>
           </div>
         </div>
       </div>
     );
   }
 
+  // ── Reply thread renderer ─────────────────────────────────────────────────
+  function renderReplies(ann: NoteAnnot | FreetextAnnot | HighlightAnnot) {
+    const replies = ann.replies ?? [];
+    if (replies.length === 0 && replyingId !== ann.id) return null;
+    return (
+      <div className="mt-1.5 border-t border-yellow-200 pt-1.5 space-y-1" onMouseDown={e => e.stopPropagation()}>
+        {replies.map(r => (
+          <div key={r.id} className="text-[10px] text-gray-700">
+            <span className="font-semibold text-gray-600">{r.author}</span>
+            {": "}
+            {r.text}
+          </div>
+        ))}
+        {replyingId === ann.id ? (
+          <div className="space-y-1">
+            <textarea autoFocus rows={2} value={replyText}
+              onChange={e => setReplyText(e.target.value)}
+              onKeyDown={e => {
+                e.stopPropagation();
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addReply(ann); }
+                if (e.key === "Escape") { setReplyingId(null); setReplyText(""); }
+              }}
+              placeholder="Reply… (Enter to send)"
+              className="w-full rounded border border-yellow-300 bg-white px-1.5 py-1 text-[10px] text-gray-800 resize-none focus:outline-none"
+            />
+            <div className="flex gap-1">
+              <button onClick={() => addReply(ann)}
+                className="flex-1 rounded bg-yellow-300 hover:bg-yellow-200 py-0.5 text-[10px] font-semibold text-gray-800 transition">Send</button>
+              <button onClick={() => { setReplyingId(null); setReplyText(""); }}
+                className="px-2 rounded bg-gray-100 text-[10px] text-gray-600 transition">Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setReplyingId(ann.id)}
+            className="text-[10px] text-blue-500 hover:underline">Reply…</button>
+        )}
+      </div>
+    );
+  }
+
   // ── Render helpers ────────────────────────────────────────────────────────
   function renderResizeHandles(
-    ann: HighlightAnnot | FreetextAnnot | UnderlineAnnot | StrikethroughAnnot,
+    ann: HighlightAnnot | FreetextAnnot | UnderlineAnnot | StrikethroughAnnot | ShapeAnnot | StampAnnot,
     borderColor: string,
   ) {
     return CORNERS.map(corner => (
       <div key={corner}
         className="absolute w-3 h-3 bg-white border-2 rounded-sm z-10"
         style={{
-          borderColor,
-          cursor: `${corner}-resize`,
+          borderColor, cursor: `${corner}-resize`,
           top:    corner.startsWith("n") ? -4 : undefined,
           bottom: corner.startsWith("s") ? -4 : undefined,
           left:   corner.endsWith("w")   ? -4 : undefined,
@@ -440,6 +651,43 @@ export default function AnnotationLayer({
     );
   }
 
+  function tagsDisplay(tags?: string[]) {
+    if (!tags || tags.length === 0) return null;
+    return (
+      <div className="flex flex-wrap gap-0.5 mt-0.5">
+        {tags.map(t => (
+          <span key={t} className="bg-blue-900/40 text-blue-300 text-[9px] rounded px-1 py-0">{t}</span>
+        ))}
+      </div>
+    );
+  }
+
+  // ── SVG colour helper ─────────────────────────────────────────────────────
+  function svgColor(c?: [number, number, number]): string {
+    return c ? colorToCSS(c) : "rgb(26,26,204)";
+  }
+
+  // ── Arrowhead polygon points (fractional coords) ──────────────────────────
+  function arrowheadPoints(x0: number, y0: number, x1: number, y1: number): string {
+    const dx = x1 - x0, dy = y1 - y0;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.005) return "";
+    const ux = dx / len, uy = dy / len;
+    const headLen  = Math.min(0.07, len * 0.3);
+    const headW    = headLen * 0.45;
+    const perpX = -uy, perpY = ux;
+    const bx = x1 - ux * headLen, by = y1 - uy * headLen;
+    return [
+      `${x1},${y1}`,
+      `${bx + perpX * headW},${by + perpY * headW}`,
+      `${bx - perpX * headW},${by - perpY * headW}`,
+    ].join(" ");
+  }
+
+  // ── Multi-select bulk bar ─────────────────────────────────────────────────
+  const multiselectActive = selectedIds.size > 1;
+
+  // ── Main render ───────────────────────────────────────────────────────────
   return (
     <div
       ref={containerRef}
@@ -448,9 +696,130 @@ export default function AnnotationLayer({
       onMouseDown={textSelectActive ? undefined : onBgMouseDown}
       onClick={textSelectActive ? undefined : onBgClick}
     >
-      {/* ── Existing annotations ────────────────────────────────────────────── */}
+
+      {/* ── SVG overlay for ink + shape ────────────────────────────────────── */}
+      <svg
+        className="absolute inset-0 pointer-events-none"
+        viewBox="0 0 1 1"
+        preserveAspectRatio="none"
+        style={{ zIndex: 12, width: "100%", height: "100%" }}
+      >
+        {pageAnns.map(ann => {
+          if (ann.type === "ink") {
+            const sel = ann.id === selectedId || selectedIds.has(ann.id);
+            return (
+              <g key={ann.id}>
+                {ann.strokes.map((stroke, si) => (
+                  <polyline
+                    key={si}
+                    points={stroke.map(p => `${p.x},${p.y}`).join(" ")}
+                    fill="none"
+                    stroke={svgColor(ann.color)}
+                    strokeWidth={ann.strokeWidth ?? 2}
+                    vectorEffect="non-scaling-stroke"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity={sel ? 1 : 0.85}
+                  />
+                ))}
+                {sel && (
+                  <rect
+                    x={ann.x0} y={ann.y0}
+                    width={ann.x1 - ann.x0} height={ann.y1 - ann.y0}
+                    fill="none" stroke="#3b82f6"
+                    strokeWidth={1} strokeDasharray="0.01,0.01"
+                    vectorEffect="non-scaling-stroke" opacity={0.5}
+                  />
+                )}
+              </g>
+            );
+          }
+          if (ann.type === "shape") {
+            const sel = ann.id === selectedId || selectedIds.has(ann.id);
+            const stroke = svgColor(ann.color);
+            const sw = ann.strokeWidth ?? 2;
+            const selProps = sel ? { strokeDasharray: "0.005,0.005" } : {};
+            const { x0, y0, x1, y1 } = ann;
+            const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+            const rx = Math.abs(x1 - x0) / 2, ry = Math.abs(y1 - y0) / 2;
+            switch (ann.shape) {
+              case "rect":
+                return <rect key={ann.id} x={Math.min(x0,x1)} y={Math.min(y0,y1)}
+                  width={Math.abs(x1-x0)} height={Math.abs(y1-y0)}
+                  fill="none" stroke={stroke} strokeWidth={sw}
+                  vectorEffect="non-scaling-stroke" {...selProps} />;
+              case "ellipse":
+                return <ellipse key={ann.id} cx={cx} cy={cy} rx={rx} ry={ry}
+                  fill="none" stroke={stroke} strokeWidth={sw}
+                  vectorEffect="non-scaling-stroke" {...selProps} />;
+              case "line":
+                return <line key={ann.id} x1={x0} y1={y0} x2={x1} y2={y1}
+                  stroke={stroke} strokeWidth={sw}
+                  vectorEffect="non-scaling-stroke" strokeLinecap="round" {...selProps} />;
+              case "arrow": {
+                const pts = arrowheadPoints(x0, y0, x1, y1);
+                return (
+                  <g key={ann.id}>
+                    <line x1={x0} y1={y0} x2={x1} y2={y1}
+                      stroke={stroke} strokeWidth={sw}
+                      vectorEffect="non-scaling-stroke" strokeLinecap="round" {...selProps} />
+                    {pts && (
+                      <polygon points={pts} fill={stroke} vectorEffect="non-scaling-stroke" />
+                    )}
+                  </g>
+                );
+              }
+              default: return null;
+            }
+          }
+          return null;
+        })}
+
+        {/* Live ink stroke during drawing */}
+        {createMode === "ink" && inkStrokeRef.current.length > 1 && (
+          <polyline
+            points={inkStrokeRef.current.map(p => `${p.x},${p.y}`).join(" ")}
+            fill="none"
+            stroke={svgColor(inkColor)}
+            strokeWidth={inkStrokeWidth}
+            vectorEffect="non-scaling-stroke"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        )}
+      </svg>
+
+      {/* ── Ink + Shape hit-targets (transparent divs for selection/drag) ───── */}
       {pageAnns.map(ann => {
-        const sel     = ann.id === selectedId;
+        if (ann.type !== "ink" && ann.type !== "shape") return null;
+        const sel = ann.id === selectedId || selectedIds.has(ann.id);
+        return (
+          <div key={ann.id} data-annot="true"
+            className="absolute pointer-events-auto"
+            style={{
+              left: `${ann.x0 * 100}%`, top: `${ann.y0 * 100}%`,
+              width: `${(ann.x1 - ann.x0) * 100}%`, height: `${(ann.y1 - ann.y0) * 100}%`,
+              zIndex: sel ? 25 : 13,
+              cursor: "move",
+            }}
+            onMouseDown={e => onAnnotMouseDown(e, ann)}
+            onDoubleClick={e => onAnnotDblClick(e, ann)}
+          >
+            {sel && ann.type !== "ink" && (
+              <>
+                {deleteBtn(ann.id)}
+                {ann.type === "shape" && renderResizeHandles(ann, svgColor(ann.color))}
+                {ann.type === "shape" && renderLineCommentEditor(ann)}
+              </>
+            )}
+            {sel && ann.type === "ink" && deleteBtn(ann.id)}
+          </div>
+        );
+      })}
+
+      {/* ── Existing annotations (div-based) ──────────────────────────────── */}
+      {pageAnns.map(ann => {
+        const sel     = ann.id === selectedId || selectedIds.has(ann.id);
         const editing = ann.id === editingId;
 
         /* ── Note ── */
@@ -481,7 +850,8 @@ export default function AnnotationLayer({
                       placeholder="Type note… (Ctrl+Enter to save)"
                       className="w-full rounded-lg border border-yellow-300 bg-white px-2 py-1.5 text-xs text-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1.5 items-center">
+                      <SnippetDropdown onInsert={text => setEditText(prev => prev + text)} />
                       <button onClick={() => commitEdit(ann.id)} disabled={!editText.trim()}
                         className="flex-1 rounded bg-yellow-400 hover:bg-yellow-300 py-1 text-xs font-semibold text-gray-800 disabled:opacity-40 transition">Save</button>
                       <button onClick={cancelEdit}
@@ -491,9 +861,25 @@ export default function AnnotationLayer({
                 </div>
               ) : (
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-30 pointer-events-none
-                  bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg px-2 py-1.5 text-xs text-gray-800 max-w-52 whitespace-pre-wrap">
+                  bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg px-2 py-1.5 text-xs text-gray-800 max-w-52 whitespace-pre-wrap"
+                  onMouseDown={e => { e.stopPropagation(); setShowReplies(v => v === ann.id ? null : ann.id); }}
+                >
                   {ann.author && <div className="text-[9px] text-gray-500 mb-0.5 font-medium">{ann.author}</div>}
                   {ann.text || <span className="italic text-gray-400">empty — double-click to edit</span>}
+                  {tagsDisplay(ann.tags)}
+                  {(ann.replies?.length ?? 0) > 0 && (
+                    <div className="text-[9px] text-blue-500 mt-0.5">{ann.replies!.length} reply{ann.replies!.length > 1 ? "s" : ""}</div>
+                  )}
+                </div>
+              )}
+              {/* Reply thread (shown when popover is visible + clicked) */}
+              {showReplies === ann.id && !editing && (
+                <div
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-40 pointer-events-auto bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg px-2 py-1.5 w-56"
+                  onMouseDown={e => e.stopPropagation()}
+                >
+                  {ann.text && <p className="text-xs text-gray-800 mb-1.5">{ann.text}</p>}
+                  {renderReplies(ann)}
                 </div>
               )}
             </div>
@@ -506,7 +892,6 @@ export default function AnnotationLayer({
           const rects = ann.rects ?? [{ x0: ann.x0, y0: ann.y0, x1: ann.x1, y1: ann.y1 }];
           return (
             <div key={ann.id} data-annot="true" className="absolute inset-0 pointer-events-none" style={{ zIndex: sel ? 25 : 15 }}>
-              {/* Bounding box — invisible, used only for drag/resize target */}
               <div
                 className="absolute pointer-events-auto"
                 style={{
@@ -540,10 +925,19 @@ export default function AnnotationLayer({
                         ))}
                       </div>
                     )}
+                    {/* Replies on highlight */}
+                    <div className="absolute top-full left-0 mt-1 z-40 pointer-events-auto">
+                      {showReplies === ann.id && (
+                        <div className="bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg px-2 py-1.5 w-52"
+                          onMouseDown={e => e.stopPropagation()}>
+                          {ann.text && <p className="text-[10px] text-gray-700 mb-1">{ann.text}</p>}
+                          {renderReplies(ann)}
+                        </div>
+                      )}
+                    </div>
                   </>
                 )}
               </div>
-              {/* Visible highlight rects (one per line for text-selection highlights) */}
               {rects.map((r, i) => (
                 <div key={i} className="absolute pointer-events-none" style={{
                   left: `${r.x0 * 100}%`, top: `${r.y0 * 100}%`,
@@ -559,7 +953,7 @@ export default function AnnotationLayer({
         /* ── Freetext ── */
         if (ann.type === "freetext") return (
           <div key={ann.id} data-annot="true"
-            className="absolute pointer-events-auto overflow-hidden"
+            className="absolute pointer-events-auto overflow-visible"
             style={{
               left: `${ann.x0 * 100}%`, top: `${ann.y0 * 100}%`,
               width: `${(ann.x1 - ann.x0) * 100}%`, height: `${(ann.y1 - ann.y0) * 100}%`,
@@ -573,19 +967,26 @@ export default function AnnotationLayer({
             onDoubleClick={e => onAnnotDblClick(e, ann)}
           >
             {editing ? (
-              <textarea autoFocus value={editText}
-                onChange={e => setEditText(e.target.value)}
-                onKeyDown={e => { e.stopPropagation(); if (e.key === "Escape") commitEdit(ann.id); }}
-                onBlur={() => commitEdit(ann.id)}
-                className="w-full h-full bg-transparent border-none px-1.5 py-1 text-xs text-gray-800 resize-none focus:outline-none"
-                style={{ lineHeight: 1.4 }}
-              />
+              <div className="w-full h-full flex flex-col" onMouseDown={e => e.stopPropagation()}>
+                <textarea autoFocus value={editText}
+                  onChange={e => setEditText(e.target.value)}
+                  onKeyDown={e => { e.stopPropagation(); if (e.key === "Escape") commitEdit(ann.id); }}
+                  onBlur={() => commitEdit(ann.id)}
+                  className="flex-1 bg-transparent border-none px-1.5 py-1 text-xs text-gray-800 resize-none focus:outline-none"
+                  style={{ lineHeight: 1.4 }}
+                />
+                <div className="px-1 pb-0.5">
+                  <SnippetDropdown onInsert={text => setEditText(prev => prev + text)} />
+                </div>
+              </div>
             ) : (
-              <p className="p-1.5 text-xs text-gray-800 leading-snug whitespace-pre-wrap overflow-hidden h-full">
-                {ann.text
-                  ? ann.text
-                  : <span className="italic text-gray-400">double-click to type…</span>}
-              </p>
+              <div>
+                <p className="p-1.5 text-xs text-gray-800 leading-snug whitespace-pre-wrap overflow-hidden"
+                  style={{ maxHeight: `${(ann.y1 - ann.y0) * 100}%` }}>
+                  {ann.text || <span className="italic text-gray-400">double-click to type…</span>}
+                </p>
+                {tagsDisplay(ann.tags)}
+              </div>
             )}
             {sel && !editing && (
               <>
@@ -609,9 +1010,7 @@ export default function AnnotationLayer({
                   backgroundColor: sel ? "rgba(59,130,246,0.05)" : "transparent",
                 }} />
               ))}
-              {/* Hit-target + controls on bounding box */}
-              <div
-                className="absolute pointer-events-auto"
+              <div className="absolute pointer-events-auto"
                 style={{
                   left: `${ann.x0 * 100}%`, top: `${ann.y0 * 100}%`,
                   width: `${(ann.x1 - ann.x0) * 100}%`, height: `${(ann.y1 - ann.y0) * 100}%`,
@@ -648,8 +1047,7 @@ export default function AnnotationLayer({
                   }} />
                 );
               })}
-              <div
-                className="absolute pointer-events-auto"
+              <div className="absolute pointer-events-auto"
                 style={{
                   left: `${ann.x0 * 100}%`, top: `${ann.y0 * 100}%`,
                   width: `${(ann.x1 - ann.x0) * 100}%`, height: `${(ann.y1 - ann.y0) * 100}%`,
@@ -670,21 +1068,81 @@ export default function AnnotationLayer({
           );
         }
 
+        /* ── Stamp ── */
+        if (ann.type === "stamp") {
+          const textColor = colorToCSS(ann.color);
+          return (
+            <div key={ann.id} data-annot="true"
+              className="absolute pointer-events-auto"
+              style={{
+                left: `${ann.x0 * 100}%`, top: `${ann.y0 * 100}%`,
+                width: `${(ann.x1 - ann.x0) * 100}%`, height: `${(ann.y1 - ann.y0) * 100}%`,
+                border: `2px solid ${textColor}`,
+                backgroundColor: "rgba(255,255,255,0.9)",
+                zIndex: sel ? 25 : 16,
+                cursor: "move",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                borderRadius: 3,
+              }}
+              onMouseDown={e => onAnnotMouseDown(e, ann)}
+            >
+              <span className="font-bold tracking-widest text-center select-none"
+                style={{ color: textColor, fontSize: "clamp(7px, 1.2cqh, 14px)", lineHeight: 1 }}>
+                {ann.label}
+              </span>
+              {sel && (
+                <>
+                  {deleteBtn(ann.id)}
+                  {renderResizeHandles(ann, textColor)}
+                </>
+              )}
+            </div>
+          );
+        }
+
         return null;
       })}
 
       {/* ── In-progress drag preview ────────────────────────────────────────── */}
-      {live && (live.x1 - live.x0 > 0.002 || live.y1 - live.y0 > 0.002) && (
+      {live && createMode !== "ink" && (live.x1 - live.x0 > 0.002 || live.y1 - live.y0 > 0.002) && (
         <div className="absolute pointer-events-none rounded-sm" style={{
           left: `${live.x0 * 100}%`, top: `${live.y0 * 100}%`,
           width: `${(live.x1 - live.x0) * 100}%`, height: `${(live.y1 - live.y0) * 100}%`,
           border: `2px dashed ${dragColor}`,
           backgroundColor: dragBg,
+          zIndex: 20,
         }} />
+      )}
+
+      {/* ── Multi-select bulk action bar ────────────────────────────────────── */}
+      {multiselectActive && (
+        <div
+          className="absolute bottom-0 left-1/2 -translate-x-1/2 mb-2 z-50 flex items-center gap-2 bg-gray-900 border border-gray-600 rounded-xl px-3 py-2 shadow-2xl pointer-events-auto"
+          onMouseDown={e => e.stopPropagation()}
+        >
+          <span className="text-xs text-gray-400">{selectedIds.size} selected</span>
+          <button
+            onClick={() => {
+              const ids = new Set(selectedIds);
+              onAnnotationsChange(annotations.filter(a => !ids.has(a.id)));
+              setSelectedIds(new Set()); setSelectedId(null); onSelectedChange?.(null);
+            }}
+            className="flex items-center gap-1 rounded-lg bg-red-700 hover:bg-red-600 px-2.5 py-1 text-xs text-white transition"
+          >
+            Delete all selected
+          </button>
+          <button
+            onClick={() => { setSelectedIds(new Set()); }}
+            className="text-xs text-gray-500 hover:text-gray-300 transition"
+          >
+            Deselect
+          </button>
+        </div>
       )}
     </div>
   );
 }
 
-// ── Export helper (used by Viewer for bounding box of rects) ──────────────────
+// ── Export helpers ────────────────────────────────────────────────────────────
 export { boundingBox };
+export { STAMP_LABELS as STAMPS };
