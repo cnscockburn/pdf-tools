@@ -6,11 +6,16 @@ dist-ssr/
 # Tauri
 src-tauri/target/
 src-tauri/gen/
+# Sidecar binaries are large — don't commit them; build with build-sidecar.ps1
+src-tauri/binaries/
 
 # Backend
 backend/__pycache__/
 backend/.venv/
 backend/temp/
+backend/dist/
+backend/build/
+backend/*.spec.bak
 *.pyc
 *.pyo
 .env

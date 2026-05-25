@@ -3,6 +3,8 @@ use std::process::{Child, Command};
 use std::sync::Mutex;
 use std::time::Duration;
 
+const BACKEND_PORT: u16 = 7342;
+
 struct BackendServer(Mutex<Option<Child>>);
 
 impl Drop for BackendServer {
@@ -27,20 +29,39 @@ fn wait_for_backend(port: u16, timeout_secs: u64) -> bool {
     false
 }
 
+/// Resolve the bundled sidecar path.
+/// Tauri names sidecars as `<name>-<target-triple>[.exe]` when bundling.
+/// At runtime we look for the exe next to the Tauri binary.
+fn sidecar_path() -> std::path::PathBuf {
+    let base = std::env::current_exe()
+        .expect("cannot resolve current exe")
+        .parent()
+        .expect("exe has no parent")
+        .to_path_buf();
+
+    // Tauri places sidecars alongside the main exe on Windows
+    let name = if cfg!(target_os = "windows") {
+        "pdftools-server.exe"
+    } else {
+        "pdftools-server"
+    };
+
+    base.join(name)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // In release mode, spawn the bundled Python server sidecar.
-    // In debug mode, the developer runs `uv run uvicorn main:app --port 7341` manually.
+    // In release mode, spawn the bundled Python sidecar server.
+    // In debug mode, the developer starts the backend manually:
+    //   cd backend && .venv\Scripts\uvicorn.exe main:app --port 7342 --reload
     let backend = if cfg!(not(debug_assertions)) {
-        let exe = std::env::current_exe()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("pdftools-server.exe");
-        let child = Command::new(exe)
+        let exe = sidecar_path();
+        let child = Command::new(&exe)
             .spawn()
-            .expect("failed to start PDF backend server");
-        wait_for_backend(7341, 15);
+            .unwrap_or_else(|e| panic!("failed to start backend sidecar {}: {e}", exe.display()));
+        if !wait_for_backend(BACKEND_PORT, 20) {
+            panic!("backend did not become ready on port {BACKEND_PORT} within 20 seconds");
+        }
         Some(child)
     } else {
         None
