@@ -20,7 +20,7 @@ Write-Host ""
 Write-Host "Ensuring PyInstaller is installed in backend venv..." -ForegroundColor Cyan
 $py = "$root\backend\.venv\Scripts\python.exe"
 if (-not (Test-Path $py)) {
-    Write-Host "Python venv not found at backend\.venv — run: python -m venv backend\.venv" -ForegroundColor Red
+    Write-Host "Python venv not found at backend\.venv - run: python -m venv backend\.venv" -ForegroundColor Red
     exit 1
 }
 & $py -m pip install pyinstaller --quiet
