@@ -75,7 +75,7 @@ export function useBookmarks() {
   function addBookmark(page: number, label?: string) {
     setBookmarks(prev => {
       if (prev.some(b => b.page === page)) return prev;
-      const next = [...prev, { id: `bk${Date.now()}`, page, label: label ?? `Page ${page}` }]
+      const next = [...prev, { id: `bk${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, page, label: label ?? `Page ${page}` }]
         .sort((a, b) => a.page - b.page);
       persistBookmarks(next);
       return next;
