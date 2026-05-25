@@ -7,7 +7,7 @@
 #
 # Prerequisites:
 #   - Python venv at backend\.venv (run `python -m venv backend\.venv` + pip install)
-#   - pyinstaller in the venv: backend\.venv\Scripts\pip install pyinstaller
+#   - Note: uses `python -m pip` rather than pip.exe (works with uv-created venvs)
 #
 # Usage:
 #   .\build-sidecar.ps1
@@ -18,13 +18,18 @@ $root = $PSScriptRoot
 # ── Step 1: install PyInstaller into the venv if not already present ──────────
 Write-Host ""
 Write-Host "Ensuring PyInstaller is installed in backend venv..." -ForegroundColor Cyan
-& "$root\backend\.venv\Scripts\pip.exe" install pyinstaller --quiet
+$py = "$root\backend\.venv\Scripts\python.exe"
+if (-not (Test-Path $py)) {
+    Write-Host "Python venv not found at backend\.venv — run: python -m venv backend\.venv" -ForegroundColor Red
+    exit 1
+}
+& $py -m pip install pyinstaller --quiet
 
 # ── Step 2: run PyInstaller from the backend directory ───────────────────────
 Write-Host ""
 Write-Host "Building backend sidecar with PyInstaller..." -ForegroundColor Cyan
 Set-Location "$root\backend"
-& "$root\backend\.venv\Scripts\pyinstaller.exe" pdftools_server.spec --clean --noconfirm
+& $py -m PyInstaller pdftools_server.spec --clean --noconfirm
 $code = $LASTEXITCODE
 Set-Location $root
 if ($code -ne 0) {
