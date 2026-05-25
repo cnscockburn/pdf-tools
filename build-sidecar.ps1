@@ -59,7 +59,14 @@ if (-not $triple) {
 }
 Write-Host "Rust target triple: $triple" -ForegroundColor Cyan
 
-# ── Step 4: copy exe to src-tauri\binaries\ with triple suffix ───────────────
+# ── Step 4: ensure cargo is on PATH for this session ─────────────────────────
+$cargoBin = "$env:USERPROFILE\.cargo\bin"
+if ($env:PATH -notlike "*$cargoBin*") {
+    $env:PATH = "$cargoBin;$env:PATH"
+    Write-Host "Added $cargoBin to PATH" -ForegroundColor Cyan
+}
+
+# ── Step 5: copy exe to src-tauri\binaries\ with triple suffix ───────────────
 $dest = "$root\src-tauri\binaries"
 if (-not (Test-Path $dest)) { New-Item -ItemType Directory -Path $dest | Out-Null }
 
@@ -69,5 +76,16 @@ Copy-Item -Path $src -Destination $out -Force
 
 Write-Host ""
 Write-Host "Sidecar copied to: $out" -ForegroundColor Green
+
+# ── Step 6: build the Tauri installer ────────────────────────────────────────
 Write-Host ""
-Write-Host "Next step: run   npm run tauri:build" -ForegroundColor Yellow
+Write-Host "Building Tauri installer..." -ForegroundColor Cyan
+npm run tauri:build
+$code = $LASTEXITCODE
+if ($code -ne 0) {
+    Write-Host "Tauri build FAILED (exit $code)" -ForegroundColor Red
+    exit $code
+}
+
+Write-Host ""
+Write-Host "Build complete. Installer is in src-tauri\target\release\bundle\" -ForegroundColor Green
