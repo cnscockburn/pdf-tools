@@ -1,12 +1,95 @@
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useDropzone } from "react-dropzone";
-import { UploadCloud, Merge, Image } from "lucide-react";
+import { Layers, Scissors, Minimize2, EyeOff, LayoutGrid, FileImage } from "lucide-react";
 import { cn } from "../lib/utils";
+
+// ── Stria brand mark ─────────────────────────────────────────────────────────
+// Two-panel geometric folio: square with X diagonals + open fold at top-right
+// + 1px anchor dot at centre.
+function StriaLogo({ size = 28 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      {/* Main folio square */}
+      <rect x="2" y="9" width="18" height="18" stroke="#d97706" strokeWidth="1.5" strokeLinejoin="round"/>
+      {/* X diagonals */}
+      <line x1="2"  y1="9"  x2="20" y2="27" stroke="#d97706" strokeWidth="1.5"/>
+      <line x1="20" y1="9"  x2="2"  y2="27" stroke="#d97706" strokeWidth="1.5"/>
+      {/* Open fold — top-right panel */}
+      <line x1="20" y1="9"  x2="30" y2="2"  stroke="#d97706" strokeWidth="1.5"/>
+      <line x1="30" y1="2"  x2="30" y2="13" stroke="#d97706" strokeWidth="1.5"/>
+      <line x1="20" y1="13" x2="30" y2="13" stroke="#d97706" strokeWidth="1.5"/>
+      {/* Fold interior diagonal */}
+      <line x1="20" y1="9"  x2="30" y2="13" stroke="#d97706" strokeWidth="1.5"/>
+      {/* 1px anchor dot */}
+      <circle cx="11" cy="18" r="1.5" fill="#d97706"/>
+    </svg>
+  );
+}
+
+// ── Tool definitions ──────────────────────────────────────────────────────────
+
+type ToolDef = {
+  id: string;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  href?: string;       // navigate directly
+  needsFile?: true;    // open file picker → viewer
+};
+
+const TOOLS: ToolDef[] = [
+  {
+    id: "merge",
+    title: "Merge",
+    description: "Combine multiple PDFs into one document",
+    icon: <Layers className="h-[18px] w-[18px]" />,
+    href: "/merge",
+  },
+  {
+    id: "split",
+    title: "Split",
+    description: "Divide a PDF into separate files by page range",
+    icon: <Scissors className="h-[18px] w-[18px]" />,
+    needsFile: true,
+  },
+  {
+    id: "compress",
+    title: "Compress",
+    description: "Reduce file size without visible quality loss",
+    icon: <Minimize2 className="h-[18px] w-[18px]" />,
+    needsFile: true,
+  },
+  {
+    id: "redact",
+    title: "Redact",
+    description: "Permanently remove sensitive content",
+    icon: <EyeOff className="h-[18px] w-[18px]" />,
+    needsFile: true,
+  },
+  {
+    id: "organize",
+    title: "Organize",
+    description: "Reorder, rotate, and remove pages",
+    icon: <LayoutGrid className="h-[18px] w-[18px]" />,
+    href: "/rearrange",
+  },
+  {
+    id: "convert",
+    title: "Convert",
+    description: "Turn images into a single PDF",
+    icon: <FileImage className="h-[18px] w-[18px]" />,
+    href: "/images-to-pdf",
+  },
+];
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Home() {
   const navigate = useNavigate();
+  const fileRef  = useRef<HTMLInputElement>(null);
 
+  // Drop zone — opens a PDF in the viewer
   const onDrop = useCallback((files: File[]) => {
     const f = files[0];
     if (f) navigate("/viewer", { state: { file: f } });
@@ -18,68 +101,104 @@ export default function Home() {
     multiple: false,
   });
 
+  // Tool cards that need a file open a shared file picker then go to viewer
+  function handleToolFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (f) navigate("/viewer", { state: { file: f } });
+    e.target.value = "";
+  }
+
   return (
-    <div className="min-h-screen bg-stone-50 flex flex-col">
-      <header className="bg-white border-b border-stone-200 px-8 py-5">
-        <h1 className="text-2xl font-bold text-stone-900">PDF Tools</h1>
-        <p className="mt-0.5 text-sm text-stone-500">Local toolkit — your files never leave your machine</p>
+    <div className="h-screen flex flex-col bg-stone-50 overflow-hidden">
+
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <header className="shrink-0 h-12 bg-white border-b border-stone-200 px-6 flex items-center gap-3">
+        <StriaLogo size={26} />
+        <div className="leading-none">
+          <p className="text-[16px] font-semibold text-stone-900 tracking-[-0.01em] leading-[1.25]">Stria</p>
+          <p className="text-[12px] text-stone-400 leading-[1.25] mt-0.5">Local precision. Private execution.</p>
+        </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-8 py-12 gap-8">
+      {/* ── Body ───────────────────────────────────────────────────────────── */}
+      <div className="flex-1 grid overflow-hidden" style={{ gridTemplateColumns: "5fr 7fr" }}>
 
-        {/* Primary action: open a file */}
-        <div className="w-full max-w-xl">
+        {/* Left — file intake ───────────────────────────────────────────── */}
+        <div className="bg-white border-r border-stone-200 flex flex-col p-8 gap-5 overflow-hidden">
+          <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-[0.08em]">Open a file</p>
+
+          {/* Drop zone */}
           <div
             {...getRootProps()}
             className={cn(
-              "border-2 border-dashed rounded-2xl p-14 text-center cursor-pointer transition-all",
+              "flex-1 flex flex-col items-center justify-center gap-4 rounded-xl",
+              "border-2 border-dashed transition-all duration-200 cursor-pointer",
               isDragActive
-                ? "border-brand-500 bg-brand-50 scale-[1.01]"
-                : "border-stone-300 bg-white hover:border-brand-400 hover:bg-brand-50/40"
+                ? "border-amber-400 bg-[#fffbeb] scale-[1.01]"
+                : "border-stone-300 bg-stone-50 hover:border-[#d4c5a0] hover:bg-white"
             )}
           >
             <input {...getInputProps()} />
-            <UploadCloud className={cn("mx-auto mb-4 h-12 w-12 transition-colors", isDragActive ? "text-brand-500" : "text-stone-400")} />
-            <p className="text-lg font-semibold text-stone-800">
-              {isDragActive ? "Drop it here" : "Open a PDF"}
-            </p>
-            <p className="mt-1 text-sm text-stone-500">
-              Drag & drop, or click to browse
-            </p>
-            <p className="mt-0.5 text-xs text-stone-400">
-              Opens in the viewer with all tools available
-            </p>
+            <svg
+              className={cn("h-12 w-12 transition-colors duration-200", isDragActive ? "text-amber-500" : "text-stone-300")}
+              viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5"
+              aria-hidden="true"
+            >
+              <path d="M10 38V18l10-12h18v32H10z" strokeLinejoin="round"/>
+              <path d="M20 6v12h18M22 28l6-6 6 6M28 22v10" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <div className="text-center px-4">
+              <p className="text-sm font-semibold text-stone-700">
+                {isDragActive ? "Drop the PDF here" : "Drop a PDF, or click to browse"}
+              </p>
+              <p className="mt-1 text-xs text-stone-400">Opens in the review workspace with all tools available</p>
+            </div>
           </div>
+
+          <p className="text-[11px] text-stone-400 leading-relaxed">
+            Files never leave your machine. All processing runs locally via the bundled backend.
+          </p>
         </div>
 
-        {/* Secondary: multi-file tools */}
-        <div className="w-full max-w-xl">
-          <p className="text-xs font-semibold text-stone-400 uppercase tracking-widest mb-3">Need multiple files?</p>
-          <div className="grid grid-cols-2 gap-3">
-            <Link to="/merge"
-              className="flex items-center gap-3.5 rounded-xl border border-stone-200 bg-white px-5 py-4 hover:border-brand-300 hover:shadow-md transition-all group">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-500 group-hover:bg-brand-600 transition shadow-sm">
-                <Merge className="h-5 w-5 text-white" />
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-stone-800 group-hover:text-brand-700 transition-colors">Merge PDFs</p>
-                <p className="text-xs text-stone-500">Combine multiple files into one</p>
-              </div>
-            </Link>
-            <Link to="/images-to-pdf"
-              className="flex items-center gap-3.5 rounded-xl border border-stone-200 bg-white px-5 py-4 hover:border-stone-300 hover:shadow-md transition-all group">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-stone-700 group-hover:bg-stone-800 transition shadow-sm">
-                <Image className="h-5 w-5 text-white" />
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-stone-800 group-hover:text-stone-900 transition-colors">Images to PDF</p>
-                <p className="text-xs text-stone-500">Convert JPEGs or PNGs into a PDF</p>
-              </div>
-            </Link>
+        {/* Right — tool grid ────────────────────────────────────────────── */}
+        <div className="overflow-auto p-8 flex flex-col gap-5">
+          <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-[0.08em]">Document tools</p>
+
+          <div className="grid grid-cols-3 gap-3">
+            {TOOLS.map(tool => {
+              const card = (
+                <div
+                  className={cn(
+                    "group bg-white rounded-2xl border border-stone-100 p-5",
+                    "shadow-sm hover:shadow-md hover:-translate-y-0.5",
+                    "transition-all duration-150 ease-out cursor-pointer",
+                  )}
+                >
+                  <div className="text-stone-400 group-hover:text-amber-600 transition-colors duration-150 mb-3">
+                    {tool.icon}
+                  </div>
+                  <p className="text-sm font-semibold text-stone-800 group-hover:text-amber-700 transition-colors duration-150 mb-1">
+                    {tool.title}
+                  </p>
+                  <p className="text-[11px] text-stone-500 leading-snug">{tool.description}</p>
+                </div>
+              );
+
+              if (tool.href) {
+                return <Link key={tool.id} to={tool.href}>{card}</Link>;
+              }
+              return (
+                <div key={tool.id} onClick={() => fileRef.current?.click()}>
+                  {card}
+                </div>
+              );
+            })}
           </div>
         </div>
+      </div>
 
-      </main>
+      {/* Hidden file input for tool cards that need a file */}
+      <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={handleToolFile} />
     </div>
   );
 }

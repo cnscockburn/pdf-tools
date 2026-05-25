@@ -57,8 +57,8 @@ function OutlineNode({ node, pdf, depth, onGoTo, currentPage }: NodeProps) {
     <div>
       <button
         onClick={handleClick}
-        className="w-full flex items-center gap-1.5 px-2 py-1 rounded text-left hover:bg-stone-800 transition group"
-        style={{ paddingLeft: `${8 + depth * 12}px` }}
+        className="w-full flex items-center gap-1.5 py-2 pr-3 text-left hover:bg-[#3c3836] transition group"
+        style={{ paddingLeft: `${12 + depth * 12}px` }}
       >
         <span className="shrink-0 text-stone-600">
           {hasChildren
@@ -130,7 +130,7 @@ export default function OutlinePanel({ pdf, currentPage, onGoTo }: Props) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-1">
+    <div className="flex-1 overflow-y-auto">
       {outline.map((node, i) => (
         <OutlineNode key={i} node={node} pdf={pdf} depth={0}
           onGoTo={onGoTo} currentPage={currentPage} />

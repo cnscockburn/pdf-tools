@@ -6,14 +6,14 @@ import { useDropzone } from "react-dropzone";
 import {
   ZoomIn, ZoomOut, ChevronLeft, ChevronRight, UploadCloud,
   Eye, MessageSquare, EyeOff, Crop, AlignLeft,
-  Minimize2, Stamp, Scissors, FileOutput, RotateCw, Lock, FileImage,
-  ExternalLink, Loader2, Highlighter, Type, Pencil, Check, X, Download,
-  Underline, Strikethrough, Search, HelpCircle, List, User, FileText,
-  PenLine, Square, BookOpen, Bookmark, Command, Quote,
+  Stamp, ExternalLink, Loader2, Highlighter, Type, Pencil, Check, X, Download,
+  Underline, Strikethrough, Search, HelpCircle, User, FileText,
+  PenLine, Square, Command,
 } from "lucide-react";
 import { cn, downloadBlob } from "../lib/utils";
 import ThumbnailSidebar from "../components/ThumbnailSidebar";
 import RightPanel, { type PanelTool } from "../components/RightPanel";
+import RightRail, { type RailTab } from "../components/RightRail";
 import AnnotationLayer, {
   type LocalAnnot, type HlColor, type CreateMode, type AnnotId, type AnnotStatus,
   type FracRect, type ShapeSubType, newId, boundingBox, STAMP_LABELS,
@@ -109,6 +109,7 @@ export default function Viewer() {
   // ── Layout ─────────────────────────────────────────────────────────────────
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [panelTool, setPanelTool] = useState<PanelTool>(null);
+  const [railTab, setRailTab] = useState<RailTab>("annotations");
 
   // ── Canvas modes ───────────────────────────────────────────────────────────
   const [canvasMode, setCanvasMode]           = useState<CanvasMode>("view");
@@ -786,17 +787,6 @@ export default function Viewer() {
     </button>
   );
 
-  const panelBtn = (t: NonNullable<PanelTool>, icon: React.ReactNode, label: string) => (
-    <button key={t} onClick={() => togglePanel(t)} title={label}
-      className={cn(
-        "flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition",
-        panelTool === t ? "bg-brand-600 text-white" : "text-stone-400 hover:text-white hover:bg-stone-700"
-      )}>
-      {icon}
-      <span className="hidden sm:inline ml-1">{label}</span>
-    </button>
-  );
-
   const sidebarFile = workingFile ?? file;
 
   return (
@@ -804,7 +794,17 @@ export default function Viewer() {
 
       {/* ── Top bar ───────────────────────────────────────────────────────────── */}
       <div className="bg-stone-900 border-b border-stone-700 px-4 py-2 flex items-center gap-3 shrink-0">
-        <Link to="/" className="shrink-0 text-stone-400 hover:text-white transition flex items-center gap-1 text-xs">
+        <Link to="/" className="shrink-0 flex items-center gap-1.5 text-stone-400 hover:text-white transition text-xs">
+          <svg width="16" height="16" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <rect x="2" y="9" width="18" height="18" stroke="#d97706" strokeWidth="1.5" strokeLinejoin="round"/>
+            <line x1="2"  y1="9"  x2="20" y2="27" stroke="#d97706" strokeWidth="1.5"/>
+            <line x1="20" y1="9"  x2="2"  y2="27" stroke="#d97706" strokeWidth="1.5"/>
+            <line x1="20" y1="9"  x2="30" y2="2"  stroke="#d97706" strokeWidth="1.5"/>
+            <line x1="30" y1="2"  x2="30" y2="13" stroke="#d97706" strokeWidth="1.5"/>
+            <line x1="20" y1="13" x2="30" y2="13" stroke="#d97706" strokeWidth="1.5"/>
+            <line x1="20" y1="9"  x2="30" y2="13" stroke="#d97706" strokeWidth="1.5"/>
+            <circle cx="11" cy="18" r="1.5" fill="#d97706"/>
+          </svg>
           <ChevronLeft className="h-3.5 w-3.5" /> Home
         </Link>
         <div className="w-px h-4 bg-stone-700" />
@@ -1281,23 +1281,6 @@ export default function Viewer() {
                 )}>^F</kbd>
               </button>
 
-              {/* Navigation panels */}
-              {panelBtn("annotations", <List     className="h-3.5 w-3.5" />, "Annotations")}
-              {panelBtn("outline",     <BookOpen className="h-3.5 w-3.5" />, "Outline")}
-              {panelBtn("bookmarks",   <Bookmark className="h-3.5 w-3.5" />, "Bookmarks")}
-              {panelBtn("snippets",    <Quote    className="h-3.5 w-3.5" />, "Snippets")}
-
-              <div className="w-px h-5 bg-stone-700 mx-0.5" />
-
-              {/* Panel tool buttons */}
-              {panelBtn("compress",      <Minimize2 className="h-3.5 w-3.5" />,  "Compress")}
-              {panelBtn("watermark",     <Stamp className="h-3.5 w-3.5" />,      "Watermark")}
-              {panelBtn("split",         <Scissors className="h-3.5 w-3.5" />,   "Split")}
-              {panelBtn("extract",       <FileOutput className="h-3.5 w-3.5" />, "Extract")}
-              {panelBtn("rotate-delete", <RotateCw className="h-3.5 w-3.5" />,   "Rotate/Del")}
-              {panelBtn("security",      <Lock className="h-3.5 w-3.5" />,       "Security")}
-              {panelBtn("pdf-to-images", <FileImage className="h-3.5 w-3.5" />,  "→ Images")}
-
               <div className="w-px h-5 bg-stone-700 mx-0.5" />
 
               {/* External links */}
@@ -1333,36 +1316,36 @@ export default function Viewer() {
 
         </div>
 
-        {/* Right: tool panel */}
-        {panelTool && (
+        {/* Right: utility panel (opened via palette) OR persistent navigation rail */}
+        {panelTool ? (
           <RightPanel
             tool={panelTool}
-            file={workingFile ?? file}
+            file={(workingFile ?? file)!}
             pageCount={pdf.numPages}
             onClose={() => setPanelTool(null)}
             onApplied={async (blob) => {
               await applyBlob(blob);
-              if (panelTool !== "annotations" && panelTool !== "outline" && panelTool !== "bookmarks" && panelTool !== "snippets")
-                setPanelTool(null);
+              if (panelTool !== "snippets") setPanelTool(null);
             }}
-            // Annotations panel props
+            snippets={settings.snippets}
+            onAddSnippet={addSnippet}
+            onRemoveSnippet={removeSnippet}
+          />
+        ) : (
+          <RightRail
             annotations={annotations}
             currentPage={currentPage}
             onGoToPage={goTo}
             onDeleteAnnot={deleteAnnot}
             onStatusChange={changeAnnotStatus}
             onExportReport={() => downloadAnnotationReport(annotations, filename)}
-            // Outline panel
             pdf={pdf}
-            // Bookmarks panel
             bookmarks={bookmarks}
             onAddBookmark={() => addBookmark(currentPage)}
             onDeleteBookmark={removeBookmark}
             onRenameBookmark={renameBookmark}
-            // Snippets panel
-            snippets={settings.snippets}
-            onAddSnippet={addSnippet}
-            onRemoveSnippet={removeSnippet}
+            activeTab={railTab}
+            onTabChange={setRailTab}
           />
         )}
 
@@ -1421,14 +1404,21 @@ export default function Viewer() {
       { id: "ink",          label: "Draw / Ink",       description: "Freehand drawing (I)",           category: "Annotate",   action: go("annotate", "ink") },
       { id: "shape",        label: "Shape",            description: "Draw rect / ellipse / arrow",    category: "Annotate",   action: go("annotate", "shape") },
       { id: "stamp",        label: "Stamp",            description: "Place a stamp label",            category: "Annotate",   action: go("annotate", "stamp") },
-      { id: "search",       label: "Search text",      description: "Find text in document (Ctrl+F)", category: "Navigation", action: () => { setSearchOpen(true); setPaletteOpen(false); } },
+      { id: "search",       label: "Search text",       description: "Find text in document (Ctrl+F)", category: "Navigation", action: () => { setSearchOpen(true); setPaletteOpen(false); } },
       { id: "cheatsheet",   label: "Keyboard shortcuts",description: "Show all key bindings (?)",     category: "Help",       action: () => { setCheatSheetOpen(true); setPaletteOpen(false); } },
-      { id: "outline",      label: "Table of contents",description: "Open the PDF outline panel",     category: "Navigation", action: () => { togglePanel("outline"); setPaletteOpen(false); } },
-      { id: "bookmarks",    label: "Bookmarks",        description: "Open the bookmarks panel",       category: "Navigation", action: () => { togglePanel("bookmarks"); setPaletteOpen(false); } },
-      { id: "annotations",  label: "Annotations panel",description: "Open the annotations sidebar",   category: "Navigation", action: () => { togglePanel("annotations"); setPaletteOpen(false); } },
+      { id: "annotations",  label: "Annotations panel", description: "View all annotations",          category: "Navigation", action: () => { setRailTab("annotations"); setPaletteOpen(false); } },
+      { id: "outline",      label: "Table of contents", description: "PDF outline / bookmarks tree",  category: "Navigation", action: () => { setRailTab("outline"); setPaletteOpen(false); } },
+      { id: "bookmarks",    label: "Bookmarks",         description: "Jump to user-created bookmarks",category: "Navigation", action: () => { setRailTab("bookmarks"); setPaletteOpen(false); } },
       { id: "bm-add",       label: "Bookmark this page",description: `Bookmark page ${currentPage}`,  category: "Bookmarks",  action: () => { addBookmark(currentPage); setPaletteOpen(false); } },
-      { id: "snippets",     label: "Comment snippets", description: "Manage reusable comment text",  category: "Navigation", action: () => { togglePanel("snippets"); setPaletteOpen(false); } },
-      { id: "export",       label: "Export report",    description: "Download annotations as .md",    category: "Export",     action: () => { downloadAnnotationReport(annotations, filename); setPaletteOpen(false); } },
+      { id: "snippets",     label: "Comment snippets",  description: "Manage reusable comment text",  category: "Tools",      action: () => { togglePanel("snippets"); setPaletteOpen(false); } },
+      { id: "compress",     label: "Compress PDF",      description: "Reduce file size",              category: "Tools",      action: () => { togglePanel("compress"); setPaletteOpen(false); } },
+      { id: "watermark",    label: "Add Watermark",     description: "Add text watermark to pages",   category: "Tools",      action: () => { togglePanel("watermark"); setPaletteOpen(false); } },
+      { id: "split-pdf",    label: "Split PDF",         description: "Split into multiple files",     category: "Tools",      action: () => { togglePanel("split"); setPaletteOpen(false); } },
+      { id: "extract-pages",label: "Extract Pages",     description: "Extract a page range to PDF",   category: "Tools",      action: () => { togglePanel("extract"); setPaletteOpen(false); } },
+      { id: "rotate-del",   label: "Rotate / Delete",   description: "Rotate or delete pages",        category: "Tools",      action: () => { togglePanel("rotate-delete"); setPaletteOpen(false); } },
+      { id: "security",     label: "Security / Encrypt",description: "Encrypt or decrypt the PDF",    category: "Tools",      action: () => { togglePanel("security"); setPaletteOpen(false); } },
+      { id: "to-images",    label: "Export to Images",  description: "Convert pages to PNG / JPEG",   category: "Tools",      action: () => { togglePanel("pdf-to-images"); setPaletteOpen(false); } },
+      { id: "export",       label: "Export report",     description: "Download annotations as .md",   category: "Export",     action: () => { downloadAnnotationReport(annotations, filename); setPaletteOpen(false); } },
       ...(workingBlob ? [{
         id: "download", label: "Download PDF", description: "Save modified PDF (Ctrl+S)", category: "Export",
         action: () => { downloadBlob(workingBlob, filename); setPaletteOpen(false); },

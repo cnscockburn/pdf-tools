@@ -217,8 +217,11 @@ export default function AnnotationsListPanel({
                 onClick={() => { togglePage(page); onGoTo(page); }}
                 className={cn(
                   "w-full flex items-center gap-1.5 px-3 py-1.5 text-left text-xs font-semibold transition sticky top-0 z-10",
-                  isCurrent ? "bg-brand-950/60 text-brand-300" : "bg-stone-900 text-stone-400 hover:bg-stone-800",
+                  isCurrent ? "text-[#d97706]" : "text-stone-400 hover:bg-[#3c3836]",
                 )}
+                style={isCurrent
+                  ? { backgroundColor: "#3c3836", borderLeft: "2px solid #d97706" }
+                  : { backgroundColor: "#292524", borderLeft: "2px solid transparent" }}
               >
                 {isCollapsed
                   ? <ChevronRight className="h-3 w-3 shrink-0" />
@@ -234,7 +237,7 @@ export default function AnnotationsListPanel({
                 const nReply = replyCount(ann);
                 return (
                   <div key={ann.id}
-                    className="group flex items-start gap-2 px-3 py-2 border-b border-stone-800 hover:bg-stone-800/50 transition cursor-pointer"
+                    className="group flex items-start gap-2 px-3 py-2 hover:bg-[#3c3836] transition cursor-pointer"
                     onClick={() => onGoTo(page)}
                   >
                     {/* Type icon */}

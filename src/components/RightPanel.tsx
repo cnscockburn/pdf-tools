@@ -6,17 +6,12 @@ import {
   compressPDF, watermarkPDF, encryptPDF, decryptPDF,
   pdfToImages, splitPDF, extractPages, rotatePages, deletePages,
 } from "../api/client";
-import type { PDFDocumentProxy } from "pdfjs-dist";
-import AnnotationsListPanel from "./AnnotationsListPanel";
-import OutlinePanel from "./OutlinePanel";
-import BookmarksPanel from "./BookmarksPanel";
-import type { LocalAnnot, AnnotId, AnnotStatus } from "./AnnotationLayer";
-import type { UserBookmark, Snippet } from "../lib/storage";
+import type { Snippet } from "../lib/storage";
 
 export type PanelTool =
   | "compress" | "watermark" | "split" | "extract"
   | "rotate-delete" | "security" | "pdf-to-images"
-  | "annotations" | "outline" | "bookmarks" | "snippets"
+  | "snippets"
   | null;
 
 interface Props {
@@ -26,20 +21,6 @@ interface Props {
   onClose: () => void;
   /** Called when a tool produces a modified document blob (updates working doc instead of downloading). */
   onApplied?: (blob: Blob) => void;
-  // ── Annotations panel ────────────────────────────────────────────────────
-  annotations?: LocalAnnot[];
-  currentPage?: number;
-  onGoToPage?: (page: number) => void;
-  onDeleteAnnot?: (id: AnnotId) => void;
-  onStatusChange?: (id: AnnotId, status: AnnotStatus) => void;
-  onExportReport?: () => void;
-  // ── Outline panel ────────────────────────────────────────────────────────
-  pdf?: PDFDocumentProxy | null;
-  // ── Bookmarks panel ──────────────────────────────────────────────────────
-  bookmarks?: UserBookmark[];
-  onAddBookmark?: () => void;
-  onDeleteBookmark?: (id: string) => void;
-  onRenameBookmark?: (id: string, label: string) => void;
   // ── Snippets panel ───────────────────────────────────────────────────────
   snippets?: Snippet[];
   onAddSnippet?: (text: string) => void;
@@ -648,65 +629,25 @@ function SnippetsPanel({ snippets, onAdd, onRemove }: {
 // ---------------------------------------------------------------------------
 export default function RightPanel({
   tool, file, pageCount, onClose, onApplied,
-  annotations = [], currentPage = 1, onGoToPage, onDeleteAnnot, onStatusChange, onExportReport,
-  pdf, bookmarks = [], onAddBookmark, onDeleteBookmark, onRenameBookmark,
   snippets = [], onAddSnippet, onRemoveSnippet,
 }: Props) {
   if (!tool) return null;
 
   const PANEL_TITLES: Partial<Record<NonNullable<PanelTool>, string>> = {
-    annotations: "Annotations",
-    outline: "Table of Contents",
-    bookmarks: "Bookmarks",
     snippets: "Comment Snippets",
   };
   const title = PANEL_TITLES[tool];
 
   return (
     <div className="w-72 flex-shrink-0 flex flex-col bg-stone-900 border-l border-stone-700 overflow-hidden">
-      {/* Generic header for navigation panels */}
+      {/* Generic header for snippets panel */}
       {title && (
         <div className="flex items-center justify-between px-4 py-3 border-b border-stone-700 shrink-0">
-          <span className="text-sm font-semibold text-white">
-            {title}
-            {tool === "annotations" && annotations.length > 0 && (
-              <span className="ml-2 text-xs font-normal text-stone-500">{annotations.length}</span>
-            )}
-          </span>
+          <span className="text-sm font-semibold text-white">{title}</span>
           <button onClick={onClose} className="text-stone-400 hover:text-white transition">
             <X className="h-4 w-4" />
           </button>
         </div>
-      )}
-
-      {tool === "annotations" && (
-        <AnnotationsListPanel
-          annotations={annotations}
-          currentPage={currentPage}
-          onGoTo={onGoToPage ?? (() => {})}
-          onDelete={onDeleteAnnot ?? (() => {})}
-          onStatusChange={onStatusChange ?? (() => {})}
-          onExportReport={onExportReport ?? (() => {})}
-        />
-      )}
-
-      {tool === "outline" && (
-        pdf
-          ? <OutlinePanel pdf={pdf} currentPage={currentPage} onGoTo={onGoToPage ?? (() => {})} />
-          : <div className="flex-1 flex items-center justify-center p-4">
-              <p className="text-xs text-stone-500">No PDF loaded.</p>
-            </div>
-      )}
-
-      {tool === "bookmarks" && (
-        <BookmarksPanel
-          bookmarks={bookmarks}
-          currentPage={currentPage}
-          onGoTo={onGoToPage ?? (() => {})}
-          onDelete={onDeleteBookmark ?? (() => {})}
-          onRename={onRenameBookmark ?? (() => {})}
-          onAddBookmark={onAddBookmark ?? (() => {})}
-        />
       )}
 
       {tool === "snippets" && (
