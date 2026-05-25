@@ -385,14 +385,14 @@ export default function AnnotationLayer({
     return (
       <div className="relative">
         <button type="button" onClick={() => setOpen(v => !v)}
-          className="px-1.5 py-0.5 text-[10px] rounded bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white transition">
+          className="px-1.5 py-0.5 text-[10px] rounded bg-stone-700 text-stone-400 hover:bg-stone-600 hover:text-white transition">
           Snippets ▾
         </button>
         {open && (
-          <div className="absolute top-full left-0 mt-0.5 z-50 bg-gray-800 border border-gray-600 rounded-lg shadow-xl min-w-36 max-h-36 overflow-y-auto">
+          <div className="absolute top-full left-0 mt-0.5 z-50 bg-stone-800 border border-stone-600 rounded-lg shadow-xl min-w-36 max-h-36 overflow-y-auto">
             {snippets.map(s => (
               <button key={s.id} onClick={() => { onInsert(s.text); setOpen(false); }}
-                className="w-full text-left px-2.5 py-1.5 text-[11px] text-gray-300 hover:bg-gray-700 truncate transition">
+                className="w-full text-left px-2.5 py-1.5 text-[11px] text-stone-300 hover:bg-stone-700 truncate transition">
                 {s.text}
               </button>
             ))}
@@ -641,13 +641,13 @@ export default function AnnotationLayer({
             }}
             onBlur={() => { updateAnnot({ ...ann, text: editText.trim() } as LocalAnnot); setEditingId(null); }}
             placeholder="Add comment…"
-            className="w-full rounded border border-yellow-300 bg-white px-2 py-1 text-xs text-gray-800 resize-none focus:outline-none focus:ring-1 focus:ring-yellow-500"
+            className="w-full rounded border border-yellow-300 bg-white px-2 py-1 text-xs text-stone-800 resize-none focus:outline-none focus:ring-1 focus:ring-yellow-500"
           />
           <div className="flex gap-1">
             <button onClick={() => { updateAnnot({ ...ann, text: editText.trim() } as LocalAnnot); setEditingId(null); }}
-              className="flex-1 rounded bg-yellow-400 hover:bg-yellow-300 py-0.5 text-xs font-semibold text-gray-800 transition">Save</button>
+              className="flex-1 rounded bg-yellow-400 hover:bg-yellow-300 py-0.5 text-xs font-semibold text-stone-800 transition">Save</button>
             <button onClick={() => setEditingId(null)}
-              className="px-2 rounded bg-gray-200 hover:bg-gray-300 text-xs text-gray-600 transition">Cancel</button>
+              className="px-2 rounded bg-stone-200 hover:bg-stone-300 text-xs text-stone-600 transition">Cancel</button>
           </div>
         </div>
       </div>
@@ -661,8 +661,8 @@ export default function AnnotationLayer({
     return (
       <div className="mt-1.5 border-t border-yellow-200 pt-1.5 space-y-1" onMouseDown={e => e.stopPropagation()}>
         {replies.map(r => (
-          <div key={r.id} className="text-[10px] text-gray-700">
-            <span className="font-semibold text-gray-600">{r.author}</span>
+          <div key={r.id} className="text-[10px] text-stone-700">
+            <span className="font-semibold text-stone-600">{r.author}</span>
             {": "}
             {r.text}
           </div>
@@ -677,18 +677,18 @@ export default function AnnotationLayer({
                 if (e.key === "Escape") { setReplyingId(null); setReplyText(""); }
               }}
               placeholder="Reply… (Enter to send)"
-              className="w-full rounded border border-yellow-300 bg-white px-1.5 py-1 text-[10px] text-gray-800 resize-none focus:outline-none"
+              className="w-full rounded border border-yellow-300 bg-white px-1.5 py-1 text-[10px] text-stone-800 resize-none focus:outline-none"
             />
             <div className="flex gap-1">
               <button onClick={() => addReply(ann)}
-                className="flex-1 rounded bg-yellow-300 hover:bg-yellow-200 py-0.5 text-[10px] font-semibold text-gray-800 transition">Send</button>
+                className="flex-1 rounded bg-yellow-300 hover:bg-yellow-200 py-0.5 text-[10px] font-semibold text-stone-800 transition">Send</button>
               <button onClick={() => { setReplyingId(null); setReplyText(""); }}
-                className="px-2 rounded bg-gray-100 text-[10px] text-gray-600 transition">Cancel</button>
+                className="px-2 rounded bg-stone-100 text-[10px] text-stone-600 transition">Cancel</button>
             </div>
           </div>
         ) : (
           <button onClick={() => setReplyingId(ann.id)}
-            className="text-[10px] text-blue-500 hover:underline">Reply…</button>
+            className="text-[10px] text-brand-500 hover:underline">Reply…</button>
         )}
       </div>
     );
@@ -729,7 +729,7 @@ export default function AnnotationLayer({
     return (
       <div className="flex flex-wrap gap-0.5 mt-0.5">
         {tags.map(t => (
-          <span key={t} className="bg-blue-900/40 text-blue-300 text-[9px] rounded px-1 py-0">{t}</span>
+          <span key={t} className="bg-brand-900/40 text-brand-300 text-[9px] rounded px-1 py-0">{t}</span>
         ))}
       </div>
     );
@@ -921,27 +921,27 @@ export default function AnnotationLayer({
                       }}
                       onBlur={() => commitEdit(ann.id)}
                       placeholder="Type note… (Ctrl+Enter to save)"
-                      className="w-full rounded-lg border border-yellow-300 bg-white px-2 py-1.5 text-xs text-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                      className="w-full rounded-lg border border-yellow-300 bg-white px-2 py-1.5 text-xs text-stone-800 resize-none focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
                     <div className="flex gap-1.5 items-center">
                       <SnippetDropdown onInsert={text => setEditText(prev => prev + text)} />
                       <button onClick={() => commitEdit(ann.id)} disabled={!editText.trim()}
-                        className="flex-1 rounded bg-yellow-400 hover:bg-yellow-300 py-1 text-xs font-semibold text-gray-800 disabled:opacity-40 transition">Save</button>
+                        className="flex-1 rounded bg-yellow-400 hover:bg-yellow-300 py-1 text-xs font-semibold text-stone-800 disabled:opacity-40 transition">Save</button>
                       <button onClick={cancelEdit}
-                        className="px-2 rounded bg-gray-200 hover:bg-gray-300 text-xs text-gray-600 transition">Cancel</button>
+                        className="px-2 rounded bg-stone-200 hover:bg-stone-300 text-xs text-stone-600 transition">Cancel</button>
                     </div>
                   </div>
                 </div>
               ) : (
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-30 pointer-events-none
-                  bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg px-2 py-1.5 text-xs text-gray-800 max-w-52 whitespace-pre-wrap"
+                  bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg px-2 py-1.5 text-xs text-stone-800 max-w-52 whitespace-pre-wrap"
                   onMouseDown={e => { e.stopPropagation(); setShowReplies(v => v === ann.id ? null : ann.id); }}
                 >
-                  {ann.author && <div className="text-[9px] text-gray-500 mb-0.5 font-medium">{ann.author}</div>}
-                  {ann.text || <span className="italic text-gray-400">empty — double-click to edit</span>}
+                  {ann.author && <div className="text-[9px] text-stone-500 mb-0.5 font-medium">{ann.author}</div>}
+                  {ann.text || <span className="italic text-stone-400">empty — double-click to edit</span>}
                   {tagsDisplay(ann.tags)}
                   {(ann.replies?.length ?? 0) > 0 && (
-                    <div className="text-[9px] text-blue-500 mt-0.5">{ann.replies!.length} reply{ann.replies!.length > 1 ? "s" : ""}</div>
+                    <div className="text-[9px] text-brand-500 mt-0.5">{ann.replies!.length} reply{ann.replies!.length > 1 ? "s" : ""}</div>
                   )}
                 </div>
               )}
@@ -951,7 +951,7 @@ export default function AnnotationLayer({
                   className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-40 pointer-events-auto bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg px-2 py-1.5 w-56"
                   onMouseDown={e => e.stopPropagation()}
                 >
-                  {ann.text && <p className="text-xs text-gray-800 mb-1.5">{ann.text}</p>}
+                  {ann.text && <p className="text-xs text-stone-800 mb-1.5">{ann.text}</p>}
                   {renderReplies(ann)}
                 </div>
               )}
@@ -983,7 +983,7 @@ export default function AnnotationLayer({
                     <div className="absolute top-full left-0 mt-1 z-40 pointer-events-auto flex flex-col gap-1"
                       onMouseDown={e => e.stopPropagation()}
                     >
-                      <div className="flex gap-1 items-center bg-gray-900 border border-gray-700 rounded-lg p-1.5 shadow-xl">
+                      <div className="flex gap-1 items-center bg-stone-900 border border-stone-700 rounded-lg p-1.5 shadow-xl">
                         {highlightColors.map((hc, i) => (
                           <button key={i} onClick={e => {
                             e.stopPropagation();
@@ -995,19 +995,19 @@ export default function AnnotationLayer({
                             style={{ background: hc.bg }}
                           />
                         ))}
-                        <div className="w-px h-4 bg-gray-700" />
+                        <div className="w-px h-4 bg-stone-700" />
                         <button
                           onClick={e => { e.stopPropagation(); setShowReplies(v => v === ann.id ? null : ann.id); }}
                           title="Replies"
                           className={cn("text-[10px] px-1.5 py-0.5 rounded transition",
-                            showReplies === ann.id ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white")}
+                            showReplies === ann.id ? "bg-brand-600 text-white" : "text-stone-400 hover:text-white")}
                         >
                           💬 {(ann.replies?.length ?? 0) || ""}
                         </button>
                       </div>
                       {showReplies === ann.id && (
                         <div className="bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg px-2 py-1.5 w-52">
-                          {ann.text && <p className="text-[10px] text-gray-700 mb-1">{ann.text}</p>}
+                          {ann.text && <p className="text-[10px] text-stone-700 mb-1">{ann.text}</p>}
                           {renderReplies(ann)}
                         </div>
                       )}
@@ -1049,7 +1049,7 @@ export default function AnnotationLayer({
                   onChange={e => setEditText(e.target.value)}
                   onKeyDown={e => { e.stopPropagation(); if (e.key === "Escape") commitEdit(ann.id); }}
                   onBlur={() => commitEdit(ann.id)}
-                  className="flex-1 bg-transparent border-none px-1.5 py-1 text-xs text-gray-800 resize-none focus:outline-none"
+                  className="flex-1 bg-transparent border-none px-1.5 py-1 text-xs text-stone-800 resize-none focus:outline-none"
                   style={{ lineHeight: 1.4 }}
                 />
                 <div className="px-1 pb-0.5">
@@ -1058,9 +1058,9 @@ export default function AnnotationLayer({
               </div>
             ) : (
               <div>
-                <p className="p-1.5 text-xs text-gray-800 leading-snug whitespace-pre-wrap overflow-hidden"
+                <p className="p-1.5 text-xs text-stone-800 leading-snug whitespace-pre-wrap overflow-hidden"
                   style={{ maxHeight: `${(ann.y1 - ann.y0) * 100}%` }}>
-                  {ann.text || <span className="italic text-gray-400">double-click to type…</span>}
+                  {ann.text || <span className="italic text-stone-400">double-click to type…</span>}
                 </p>
                 {tagsDisplay(ann.tags)}
               </div>
@@ -1172,10 +1172,10 @@ export default function AnnotationLayer({
       {/* ── Multi-select bulk action bar ────────────────────────────────────── */}
       {multiselectActive && (
         <div
-          className="absolute bottom-0 left-1/2 -translate-x-1/2 mb-2 z-50 flex items-center gap-2 bg-gray-900 border border-gray-600 rounded-xl px-3 py-2 shadow-2xl pointer-events-auto"
+          className="absolute bottom-0 left-1/2 -translate-x-1/2 mb-2 z-50 flex items-center gap-2 bg-stone-900 border border-stone-600 rounded-xl px-3 py-2 shadow-2xl pointer-events-auto"
           onMouseDown={e => e.stopPropagation()}
         >
-          <span className="text-xs text-gray-400">{selectedIds.size} selected</span>
+          <span className="text-xs text-stone-400">{selectedIds.size} selected</span>
           <button
             onClick={() => {
               const ids = new Set(selectedIds);
@@ -1188,7 +1188,7 @@ export default function AnnotationLayer({
           </button>
           <button
             onClick={() => { setSelectedIds(new Set()); }}
-            className="text-xs text-gray-500 hover:text-gray-300 transition"
+            className="text-xs text-stone-500 hover:text-stone-300 transition"
           >
             Deselect
           </button>

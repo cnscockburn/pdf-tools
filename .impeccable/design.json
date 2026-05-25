@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-25T00:00:00Z",
+  "title": "Design System: PDF Tools",
+  "extensions": {
+    "colorMeta": {
+      "amber-warm":         { "role": "primary",  "displayName": "Warm Amber",         "canonical": "oklch(72% 0.14 65)",   "tonalRamp": ["#451a03","#78350f","#92400e","#b45309","#d97706","#f59e0b","#fcd34d","#fde68a"] },
+      "amber-deep":         { "role": "primary",  "displayName": "Amber Deep",          "canonical": "oklch(62% 0.16 62)",   "tonalRamp": ["#451a03","#78350f","#92400e","#b45309","#c2640a","#d97706","#f59e0b","#fcd34d"] },
+      "amber-tint":         { "role": "secondary","displayName": "Amber Tint",          "canonical": "oklch(97% 0.025 68)",  "tonalRamp": ["#d97706","#f59e0b","#fcd34d","#fde68a","#fef3c7","#fffbeb","#fffdf7","#ffffff"] },
+      "surface-light":      { "role": "neutral",  "displayName": "Warm White Surface",  "canonical": "oklch(98% 0.003 70)",  "tonalRamp": ["#1c1917","#292524","#44403c","#78716c","#a8a29e","#e7e5e4","#f5f5f4","#fafaf9"] },
+      "surface-white":      { "role": "neutral",  "displayName": "Surface White",       "canonical": "oklch(100% 0 0)",      "tonalRamp": ["#1c1917","#292524","#44403c","#78716c","#a8a29e","#e7e5e4","#f5f5f4","#ffffff"] },
+      "border-light":       { "role": "neutral",  "displayName": "Warm Light Border",   "canonical": "oklch(91% 0.006 70)",  "tonalRamp": ["#1c1917","#292524","#44403c","#78716c","#a8a29e","#d6d3d1","#e7e5e4","#f5f5f4"] },
+      "text-strong":        { "role": "neutral",  "displayName": "Near-Black Warm",     "canonical": "oklch(18% 0.01 70)",   "tonalRamp": ["#0c0a09","#1c1917","#292524","#44403c","#57534e","#78716c","#a8a29e","#e7e5e4"] },
+      "text-base":          { "role": "neutral",  "displayName": "Warm Stone Text",     "canonical": "oklch(38% 0.010 70)",  "tonalRamp": ["#1c1917","#292524","#3c3836","#44403c","#57534e","#78716c","#a8a29e","#e7e5e4"] },
+      "text-muted":         { "role": "neutral",  "displayName": "Stone Muted",         "canonical": "oklch(52% 0.008 70)",  "tonalRamp": ["#292524","#44403c","#57534e","#78716c","#a8a29e","#d6d3d1","#e7e5e4","#f5f5f4"] },
+      "text-faint":         { "role": "neutral",  "displayName": "Stone Faint",         "canonical": "oklch(65% 0.006 70)",  "tonalRamp": ["#44403c","#57534e","#78716c","#a8a29e","#d6d3d1","#e7e5e4","#f5f5f4","#fafaf9"] },
+      "canvas-dark":        { "role": "neutral",  "displayName": "Dark Canvas",         "canonical": "oklch(14% 0.008 70)",  "tonalRamp": ["#0c0a09","#1c1917","#292524","#3c3836","#57534e","#78716c","#a8a29e","#e7e5e4"] },
+      "surface-dark":       { "role": "neutral",  "displayName": "Dark Panel Surface",  "canonical": "oklch(18% 0.01 70)",   "tonalRamp": ["#0c0a09","#1c1917","#292524","#3c3836","#44403c","#57534e","#78716c","#a8a29e"] },
+      "surface-dark-raised":{ "role": "neutral",  "displayName": "Dark Raised Layer",   "canonical": "oklch(22% 0.010 70)",  "tonalRamp": ["#0c0a09","#1c1917","#292524","#3c3836","#44403c","#57534e","#78716c","#a8a29e"] },
+      "border-dark":        { "role": "neutral",  "displayName": "Dark Warm Border",    "canonical": "oklch(30% 0.012 70)",  "tonalRamp": ["#1c1917","#292524","#3c3836","#44403c","#57534e","#78716c","#a8a29e","#d6d3d1"] },
+      "text-on-dark":       { "role": "neutral",  "displayName": "Warm White on Dark",  "canonical": "oklch(96% 0.003 70)",  "tonalRamp": ["#1c1917","#292524","#57534e","#78716c","#a8a29e","#d6d3d1","#f5f5f4","#fafaf9"] },
+      "text-on-dark-muted": { "role": "neutral",  "displayName": "Stone Muted on Dark", "canonical": "oklch(65% 0.006 70)",  "tonalRamp": ["#292524","#44403c","#57534e","#78716c","#a8a29e","#d6d3d1","#e7e5e4","#f5f5f4"] }
+    },
+    "typographyMeta": {
+      "title":  { "displayName": "Title",  "purpose": "Panel headers, section headings, dialog titles." },
+      "body":   { "displayName": "Body",   "purpose": "Descriptions, annotation text, file names. 14px workhorse." },
+      "label":  { "displayName": "Label",  "purpose": "Buttons, nav items, sidebar row text. 12px dominant size." },
+      "micro":  { "displayName": "Micro",  "purpose": "Badges, timestamps, match counts, page numbers. 10px." }
+    },
+    "shadows": [
+      { "name": "resting-card",    "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)",                                                        "purpose": "ToolCards and file list items at rest." },
+      { "name": "hover-lift",      "value": "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",                    "purpose": "ToolCards on hover, paired with translateY(-2px)." },
+      { "name": "floating-panel",  "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",                  "purpose": "Annotation popovers, inline dropdowns." },
+      { "name": "overlay",         "value": "0 25px 50px -12px rgb(0 0 0 / 0.25)",                                                   "purpose": "Command palette, modal dialogs. Significant interruptions only." }
+    ],
+    "motion": [
+      { "name": "ease-standard",  "value": "cubic-bezier(0, 0, 0.2, 1)",  "purpose": "Default state transitions (color, background, opacity). 150ms." },
+      { "name": "ease-lift",      "value": "cubic-bezier(0, 0, 0.2, 1)",  "purpose": "Card hover lift (transform + shadow). 150ms." },
+      { "name": "ease-appear",    "value": "cubic-bezier(0, 0, 0.2, 1)",  "purpose": "Overlay and popover entry (opacity + scale). 120ms." }
+    ],
+    "breakpoints": [
+      { "name": "sm",  "value": "640px"  },
+      { "name": "md",  "value": "768px"  },
+      { "name": "lg",  "value": "1024px" },
+      { "name": "xl",  "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single main action per surface. Amber background, white text.",
+      "html": "<button class=\"ds-btn-primary\">Process</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 8px; background: #d97706; color: #ffffff; padding: 8px 16px; border-radius: 8px; font-size: 0.75rem; font-weight: 600; font-family: system-ui, -apple-system, sans-serif; letter-spacing: 0.01em; border: none; cursor: pointer; transition: background 150ms cubic-bezier(0,0,0.2,1); } .ds-btn-primary:hover { background: #b45309; } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px #d97706, 0 0 0 4px rgba(217,119,6,0.3); } .ds-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Ghost Button (Dark)",
+      "kind": "button",
+      "refersTo": "button-ghost-dark",
+      "description": "Toolbar and panel icon/text buttons inside the dark viewer.",
+      "html": "<button class=\"ds-btn-ghost-dark\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.35-4.35\"/></svg> Search</button>",
+      "css": ".ds-btn-ghost-dark { display: inline-flex; align-items: center; gap: 6px; background: transparent; color: #a8a29e; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 500; font-family: system-ui, -apple-system, sans-serif; border: none; cursor: pointer; transition: background 150ms cubic-bezier(0,0,0.2,1), color 150ms cubic-bezier(0,0,0.2,1); } .ds-btn-ghost-dark:hover { background: #3c3836; color: #fafaf9; } .ds-btn-ghost-dark:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(217,119,6,0.5); }"
+    },
+    {
+      "name": "Tool Card",
+      "kind": "card",
+      "refersTo": "tool-card",
+      "description": "Home screen tool grid entries. Rises on hover.",
+      "html": "<button class=\"ds-tool-card\"><div class=\"ds-tool-card-icon\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z\"/><polyline points=\"14 2 14 8 20 8\"/></svg></div><div><p class=\"ds-tool-card-title\">PDF Viewer</p><p class=\"ds-tool-card-desc\">Open and review any PDF</p></div></button>",
+      "css": ".ds-tool-card { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; background: #ffffff; border: 1px solid #e7e5e4; border-radius: 16px; padding: 20px; cursor: pointer; text-align: left; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); transition: box-shadow 150ms cubic-bezier(0,0,0.2,1), transform 150ms cubic-bezier(0,0,0.2,1), border-color 150ms cubic-bezier(0,0,0.2,1); } .ds-tool-card:hover { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); transform: translateY(-2px); border-color: #d6d3d1; } .ds-tool-card:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(217,119,6,0.5); } .ds-tool-card-icon { background: #d97706; border-radius: 12px; padding: 12px; color: #ffffff; } .ds-tool-card-title { font-family: system-ui, -apple-system, sans-serif; font-size: 0.875rem; font-weight: 600; color: #1c1917; letter-spacing: -0.01em; transition: color 150ms; } .ds-tool-card:hover .ds-tool-card-title { color: #d97706; } .ds-tool-card-desc { font-family: system-ui, -apple-system, sans-serif; font-size: 0.75rem; font-weight: 400; color: #78716c; margin-top: 2px; }"
+    },
+    {
+      "name": "Search Bar (Dark)",
+      "kind": "input",
+      "refersTo": "input-dark",
+      "description": "Ctrl+F inline search bar in the dark viewer. Compact pill form.",
+      "html": "<div class=\"ds-searchbar\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"color:#a8a29e;flex-shrink:0\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.35-4.35\"/></svg><input class=\"ds-searchbar-input\" placeholder=\"Search in document…\" /><span class=\"ds-searchbar-count\">3 / 12</span></div>",
+      "css": ".ds-searchbar { display: flex; align-items: center; gap: 6px; background: #1c1917; border: 1px solid #57534e; border-radius: 12px; padding: 6px 10px; max-width: 320px; } .ds-searchbar:focus-within { border-color: #d97706; box-shadow: 0 0 0 1px rgba(217,119,6,0.3); } .ds-searchbar-input { background: transparent; border: none; color: #fafaf9; font-family: system-ui, -apple-system, sans-serif; font-size: 0.75rem; flex: 1; min-width: 0; outline: none; } .ds-searchbar-input::placeholder { color: #57534e; } .ds-searchbar-count { color: #a8a29e; font-size: 0.625rem; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; letter-spacing: 0.02em; }"
+    },
+    {
+      "name": "Panel Row (Dark)",
+      "kind": "nav",
+      "refersTo": null,
+      "description": "Annotation, bookmark, and outline panel list rows.",
+      "html": "<div class=\"ds-panel-row\"><span class=\"ds-panel-row-type\">Highlight</span><span class=\"ds-panel-row-text\">The shift signals mode change</span><span class=\"ds-panel-row-meta\">p. 3</span></div>",
+      "css": ".ds-panel-row { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 6px; cursor: pointer; transition: background 100ms cubic-bezier(0,0,0.2,1); } .ds-panel-row:hover { background: #3c3836; } .ds-panel-row-type { font-family: system-ui, -apple-system, sans-serif; font-size: 0.625rem; font-weight: 500; color: #d97706; text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; } .ds-panel-row-text { font-family: system-ui, -apple-system, sans-serif; font-size: 0.75rem; color: #a8a29e; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .ds-panel-row-meta { font-family: system-ui, -apple-system, sans-serif; font-size: 0.625rem; color: #57534e; white-space: nowrap; font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Command Palette",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Ctrl+Shift+P fuzzy launcher. Dark overlay centered on screen.",
+      "html": "<div class=\"ds-palette\"><div class=\"ds-palette-input-wrap\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"color:#57534e;flex-shrink:0\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.35-4.35\"/></svg><input class=\"ds-palette-input\" placeholder=\"Type a command or page number…\" /></div><div class=\"ds-palette-result ds-palette-result--active\"><span class=\"ds-palette-result-cat\">Annotate</span><span class=\"ds-palette-result-label\">Highlight selection</span><span class=\"ds-palette-result-kb\">H</span></div><div class=\"ds-palette-result\"><span class=\"ds-palette-result-cat\">View</span><span class=\"ds-palette-result-label\">Toggle annotations panel</span><span class=\"ds-palette-result-kb\">⌃/</span></div></div>",
+      "css": ".ds-palette { background: rgba(28,25,23,0.96); border: 1px solid #3c3836; border-radius: 16px; box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.5); width: 100%; max-width: 480px; overflow: hidden; backdrop-filter: blur(8px); } .ds-palette-input-wrap { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #3c3836; } .ds-palette-input { background: transparent; border: none; color: #fafaf9; font-family: system-ui, -apple-system, sans-serif; font-size: 0.875rem; flex: 1; outline: none; } .ds-palette-input::placeholder { color: #57534e; } .ds-palette-result { display: flex; align-items: center; gap: 8px; padding: 8px 16px; cursor: pointer; transition: background 80ms; } .ds-palette-result:hover, .ds-palette-result--active { background: #3c3836; } .ds-palette-result-cat { font-family: system-ui, -apple-system, sans-serif; font-size: 0.625rem; font-weight: 500; color: #d97706; text-transform: uppercase; letter-spacing: 0.08em; width: 72px; flex-shrink: 0; } .ds-palette-result-label { font-family: system-ui, -apple-system, sans-serif; font-size: 0.75rem; color: #fafaf9; flex: 1; } .ds-palette-result-kb { font-family: ui-monospace, 'Cascadia Code', monospace; font-size: 0.625rem; color: #a8a29e; background: #292524; border: 1px solid #57534e; border-radius: 4px; padding: 1px 5px; white-space: nowrap; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Instrument",
+    "overview": "This system is precision-built to be used, not admired. Every surface serves a function. When the user is working, the UI should be invisible; when they look closely, there is quiet craft.\n\nThe design operates in two intentional modes: light toolbox (home screen, tool pages, utilities) and dark viewer (document review, annotation, search). The shift between them is not inconsistency, it is mode-signaling. Light means: choose a tool, organize, prepare. Dark means: you are inside the document now.\n\nThe warm stone palette replaces the legacy blue-tinted Tailwind gray scale. The shift is subtle but perceptible: warmer dark surfaces feel more like a reading environment than a terminal, and warmer light surfaces feel like paper rather than a browser. The amber accent echoes annotation ink, highlighter yellow, and the warmth of physical document work.",
+    "keyCharacteristics": [
+      "Two-mode contrast: light toolbox + dark deep-work viewer",
+      "Dense, information-first type scale centered on 12-14px",
+      "Warm stone palette, amber accent, no blue-tinted neutrals",
+      "Restrained shadows — flat at rest, depth only on state",
+      "Tight, purposeful spacing; no padding for its own sake",
+      "WCAG 2.1 AA across both modes"
+    ],
+    "rules": [
+      { "name": "The Amber Reserve Rule",     "body": "The amber accent covers less than 10% of any screen surface. Its presence signals interactivity or the currently active state. If it appears everywhere, it signals nothing.",                                                     "section": "colors" },
+      { "name": "The Warm-Not-Blue Rule",     "body": "Every neutral value is tinted warm (hue ~65-70 OKLCH, chroma 0.003-0.012). No pure grays, no blue-gray Tailwind defaults (gray-900 is #111827, forbidden). Any new neutral must pass a warmth check.",                     "section": "colors" },
+      { "name": "The Flat-at-Rest Rule",      "body": "Surfaces are flat at rest. Shadows appear only as a response to state (hover, float, focus). A shadow on a static element is a design error.",                                                                             "section": "elevation" },
+      { "name": "The No-Dark-Shadow Rule",    "body": "Dark surfaces do not use shadows for depth. Layering is tonal: lighter L% value = higher layer. Shadow-on-dark obscures content and creates a muddy feel.",                                                               "section": "elevation" },
+      { "name": "The Document Deference Rule","body": "The UI type scale stops at 16px. Anything larger is reserved for the document itself. The UI must never visually compete with the content it serves.",                                                                     "section": "typography" },
+      { "name": "The Label-Dominant Rule",    "body": "12px is the primary working size. Design for 12px first. Never design for 16px and scale down.",                                                                                                                          "section": "typography" }
+    ],
+    "dos": [
+      "Do use amber-warm (#d97706) as the sole accent, sparingly.",
+      "Do use warm stone neutrals for all dark values. The warmth is the system's character.",
+      "Do keep the two-mode contrast: light toolbox, dark viewer.",
+      "Do use resting-card shadow only on cards on a light background.",
+      "Do keep interactive hit areas at minimum 28px height.",
+      "Do honor prefers-reduced-motion: reduce with duration-0 transitions.",
+      "Do test every focus state at ring-2 ring-amber-warm/50."
+    ],
+    "donts": [
+      "Don't use gray-900 (#111827) or any blue-tinted Tailwind gray as a dark surface.",
+      "Don't make the interface look like SmallPDF or iLovePDF.",
+      "Don't produce an AI-generated-looking interface: no identical card grids, no gradient text, no glassmorphism-as-default.",
+      "Don't use border-left or border-right as colored accent stripes, except the one 2px left edge on selected navigation rows.",
+      "Don't add shadows to dark surface elements that aren't floating.",
+      "Don't use font-bold in running UI text. font-semibold is the maximum.",
+      "Don't add padding for breathing room without a specific reason.",
+      "Don't reach for a modal as a first thought."
+    ]
+  }
+}

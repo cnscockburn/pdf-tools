@@ -44,9 +44,9 @@ interface Props {
 
 function PanelHeader({ title, onClose }: { title: string; onClose: () => void }) {
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 shrink-0">
+    <div className="flex items-center justify-between px-4 py-3 border-b border-stone-700 shrink-0">
       <span className="text-sm font-semibold text-white">{title}</span>
-      <button onClick={onClose} className="text-gray-400 hover:text-white transition">
+      <button onClick={onClose} className="text-stone-400 hover:text-white transition">
         <X className="h-4 w-4" />
       </button>
     </div>
@@ -60,7 +60,7 @@ function ProcessBtn({ onClick, loading, disabled, label }: {
     <button
       onClick={onClick}
       disabled={disabled || loading}
-      className="w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-40 transition"
+      className="w-full flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-40 transition"
     >
       {loading && <Loader2 className="h-4 w-4 animate-spin" />}
       {label}
@@ -105,13 +105,13 @@ function CompressPanel({ file, onClose, onApplied }: { file: File; onClose: () =
           {QUALITIES.map((q) => (
             <label key={q.value} className={cn(
               "flex items-center gap-3 rounded-lg border-2 p-3 cursor-pointer transition",
-              quality === q.value ? "border-blue-500 bg-blue-900/30" : "border-gray-700 hover:border-gray-600"
+              quality === q.value ? "border-brand-500 bg-brand-900/30" : "border-stone-700 hover:border-stone-600"
             )}>
               <input type="radio" name="quality" value={q.value} checked={quality === q.value}
-                onChange={() => setQuality(q.value)} className="accent-blue-500" />
+                onChange={() => setQuality(q.value)} className="accent-brand-500" />
               <div>
                 <p className="text-sm font-medium text-white">{q.label}</p>
-                <p className="text-xs text-gray-400">{q.desc}</p>
+                <p className="text-xs text-stone-400">{q.desc}</p>
               </div>
             </label>
           ))}
@@ -158,12 +158,12 @@ function WatermarkPanel({ file, onClose, onApplied }: { file: File; onClose: () 
       <PanelHeader title="Watermark" onClose={onClose} />
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Text</label>
+          <label className="block text-xs font-medium text-stone-400 mb-1">Text</label>
           <input value={text} onChange={(e) => setText(e.target.value)}
-            className="w-full rounded-lg bg-gray-800 border border-gray-600 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            className="w-full rounded-lg bg-stone-800 border border-stone-600 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Color</label>
+          <label className="block text-xs font-medium text-stone-400 mb-1">Color</label>
           <div className="flex gap-2">
             {COLORS.map((c, i) => (
               <button key={i} onClick={() => setColorIdx(i)} title={c.label}
@@ -173,26 +173,26 @@ function WatermarkPanel({ file, onClose, onApplied }: { file: File; onClose: () 
           </div>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Opacity — {Math.round(opacity * 100)}%</label>
+          <label className="block text-xs font-medium text-stone-400 mb-1">Opacity — {Math.round(opacity * 100)}%</label>
           <input type="range" min={5} max={80} value={Math.round(opacity * 100)}
             onChange={(e) => setOpacity(Number(e.target.value) / 100)}
-            className="w-full accent-blue-500" />
+            className="w-full accent-brand-500" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Angle — {angle}°</label>
+          <label className="block text-xs font-medium text-stone-400 mb-1">Angle — {angle}°</label>
           <input type="range" min={-90} max={90} value={angle}
             onChange={(e) => setAngle(Number(e.target.value))}
-            className="w-full accent-blue-500" />
+            className="w-full accent-brand-500" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Font size — {fontsize}pt</label>
+          <label className="block text-xs font-medium text-stone-400 mb-1">Font size — {fontsize}pt</label>
           <input type="range" min={20} max={120} value={fontsize}
             onChange={(e) => setFontsize(Number(e.target.value))}
-            className="w-full accent-blue-500" />
+            className="w-full accent-brand-500" />
         </div>
         {/* Live CSS preview */}
-        <div className="rounded-lg bg-gray-800 border border-gray-700 h-20 flex items-center justify-center overflow-hidden relative">
-          <span className="absolute text-gray-300 text-[10px]">Preview</span>
+        <div className="rounded-lg bg-stone-800 border border-stone-700 h-20 flex items-center justify-center overflow-hidden relative">
+          <span className="absolute text-stone-300 text-[10px]">Preview</span>
           {text && (
             <span className="absolute font-bold whitespace-nowrap pointer-events-none select-none"
               style={{
@@ -267,17 +267,17 @@ function SplitPanel({ file, pageCount, onClose, onApplied }: {
     <>
       <PanelHeader title="Split PDF" onClose={onClose} />
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-stone-400">
           Single range: keeps those pages as the working document.
           Multiple ranges: downloads a ZIP with one PDF per range.
         </p>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">
-            Ranges (e.g. <code className="text-gray-300">1-3, 5, 7-10</code>)
+          <label className="block text-xs font-medium text-stone-400 mb-1">
+            Ranges (e.g. <code className="text-stone-300">1-3, 5, 7-10</code>)
           </label>
           <input value={ranges} onChange={(e) => setRanges(e.target.value)}
             placeholder={`1-${pageCount}`}
-            className="w-full rounded-lg bg-gray-800 border border-gray-600 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            className="w-full rounded-lg bg-stone-800 border border-stone-600 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500" />
         </div>
         <Err msg={error} />
         <ProcessBtn onClick={run} loading={loading} disabled={!ranges.trim()}
@@ -311,14 +311,14 @@ function ExtractPanel({ file, pageCount, onClose, onApplied }: { file: File; pag
     <>
       <PanelHeader title="Extract Pages" onClose={onClose} />
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        <p className="text-xs text-gray-400">Pull out specific pages into a new PDF.</p>
+        <p className="text-xs text-stone-400">Pull out specific pages into a new PDF.</p>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">
-            Pages (e.g. <code className="text-gray-300">1, 3-5, 8</code>)
+          <label className="block text-xs font-medium text-stone-400 mb-1">
+            Pages (e.g. <code className="text-stone-300">1, 3-5, 8</code>)
           </label>
           <input value={pages} onChange={(e) => setPages(e.target.value)}
             placeholder="1, 2, 3"
-            className="w-full rounded-lg bg-gray-800 border border-gray-600 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            className="w-full rounded-lg bg-stone-800 border border-stone-600 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500" />
         </div>
         <Err msg={error} />
         <ProcessBtn onClick={run} loading={loading} disabled={!pages.trim()} label={onApplied ? "Extract Pages" : "Extract & Download"} />
@@ -376,9 +376,9 @@ function RotateDeletePanel({ file, pageCount, onClose, onApplied }: { file: File
       <PanelHeader title="Rotate / Delete Pages" onClose={onClose} />
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <div className="flex gap-2">
-          <button onClick={selectAll} className="text-xs text-blue-400 hover:underline">All</button>
-          <button onClick={clearAll}  className="text-xs text-gray-400 hover:underline">None</button>
-          <span className="text-xs text-gray-500 ml-auto">{selected.size} selected</span>
+          <button onClick={selectAll} className="text-xs text-brand-400 hover:underline">All</button>
+          <button onClick={clearAll}  className="text-xs text-stone-400 hover:underline">None</button>
+          <span className="text-xs text-stone-500 ml-auto">{selected.size} selected</span>
         </div>
         <div className="grid grid-cols-5 gap-1 max-h-48 overflow-y-auto">
           {pages.map((p) => (
@@ -386,20 +386,20 @@ function RotateDeletePanel({ file, pageCount, onClose, onApplied }: { file: File
               className={cn(
                 "rounded text-xs py-1 border transition",
                 selected.has(p)
-                  ? "bg-blue-600 border-blue-500 text-white"
-                  : "bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-500"
+                  ? "bg-brand-600 border-brand-500 text-white"
+                  : "bg-stone-800 border-stone-700 text-stone-300 hover:border-stone-500"
               )}>
               {p}
             </button>
           ))}
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-2">Rotate angle</label>
+          <label className="block text-xs font-medium text-stone-400 mb-2">Rotate angle</label>
           <div className="flex gap-2">
             {[90, 180, 270].map((a) => (
               <button key={a} onClick={() => setAngle(a)}
                 className={cn("flex-1 rounded-lg border py-1.5 text-xs transition",
-                  angle === a ? "bg-blue-600 border-blue-500 text-white" : "border-gray-700 text-gray-300 hover:border-gray-500"
+                  angle === a ? "bg-brand-600 border-brand-500 text-white" : "border-stone-700 text-stone-300 hover:border-stone-500"
                 )}>
                 {a}°
               </button>
@@ -460,42 +460,42 @@ function SecurityPanel({ file, onClose, onApplied }: {
     <>
       <PanelHeader title="Encrypt / Decrypt" onClose={onClose} />
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        <div className="flex rounded-lg bg-gray-800 p-0.5 gap-0.5">
+        <div className="flex rounded-lg bg-stone-800 p-0.5 gap-0.5">
           {(["encrypt", "decrypt"] as const).map((t) => (
             <button key={t} onClick={() => switchTab(t)}
               className={cn("flex-1 rounded-md py-1.5 text-xs font-medium transition",
-                tab === t ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white")}>
+                tab === t ? "bg-brand-600 text-white" : "text-stone-400 hover:text-white")}>
               {t === "encrypt" ? "Encrypt" : "Decrypt"}
             </button>
           ))}
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">
+          <label className="block text-xs font-medium text-stone-400 mb-1">
             {tab === "encrypt" ? "User password" : "Current password"}
           </label>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
             placeholder={tab === "encrypt" ? "Required to open PDF" : "Password to remove"}
-            className="w-full rounded-lg bg-gray-800 border border-gray-600 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            className="w-full rounded-lg bg-stone-800 border border-stone-600 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500" />
         </div>
         {tab === "encrypt" && (
           <>
             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Confirm password</label>
+              <label className="block text-xs font-medium text-stone-400 mb-1">Confirm password</label>
               <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)}
                 placeholder="Repeat password"
-                className={cn("w-full rounded-lg border px-3 py-2 text-sm text-white bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500",
-                  confirm && password !== confirm ? "border-red-500" : "border-gray-600")} />
+                className={cn("w-full rounded-lg border px-3 py-2 text-sm text-white bg-stone-800 focus:outline-none focus:ring-2 focus:ring-brand-500",
+                  confirm && password !== confirm ? "border-red-500" : "border-stone-600")} />
               {confirm && password !== confirm && <p className="mt-1 text-xs text-red-400">Passwords don't match</p>}
             </div>
-            <button onClick={() => setShowOwner(!showOwner)} className="text-xs text-blue-400 hover:underline">
+            <button onClick={() => setShowOwner(!showOwner)} className="text-xs text-brand-400 hover:underline">
               {showOwner ? "Hide" : "Set owner password (optional)"}
             </button>
             {showOwner && (
               <input type="password" value={ownerPwd} onChange={(e) => setOwnerPwd(e.target.value)}
                 placeholder="Owner password (controls permissions)"
-                className="w-full rounded-lg bg-gray-800 border border-gray-600 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full rounded-lg bg-stone-800 border border-stone-600 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500" />
             )}
-            <p className="text-xs text-gray-500">AES-256 encryption (PDF 2.0)</p>
+            <p className="text-xs text-stone-500">AES-256 encryption (PDF 2.0)</p>
           </>
         )}
         <Err msg={error} />
@@ -544,30 +544,30 @@ function PdfToImagesPanel({ file, onClose }: { file: File; onClose: () => void }
       <PanelHeader title="PDF to Images" onClose={onClose} />
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-2">Format</label>
+          <label className="block text-xs font-medium text-stone-400 mb-2">Format</label>
           <div className="flex gap-2">
             {(["png", "jpg"] as const).map((f) => (
               <label key={f} className={cn("flex items-center gap-2 flex-1 rounded-lg border-2 px-3 py-2 cursor-pointer transition",
-                fmt === f ? "border-blue-500 bg-blue-900/30" : "border-gray-700 hover:border-gray-600")}>
-                <input type="radio" name="fmt" value={f} checked={fmt === f} onChange={() => setFmt(f)} className="accent-blue-500" />
+                fmt === f ? "border-brand-500 bg-brand-900/30" : "border-stone-700 hover:border-stone-600")}>
+                <input type="radio" name="fmt" value={f} checked={fmt === f} onChange={() => setFmt(f)} className="accent-brand-500" />
                 <div>
                   <p className="text-xs font-semibold text-white uppercase">{f}</p>
-                  <p className="text-[10px] text-gray-400">{f === "png" ? "Lossless" : "Smaller"}</p>
+                  <p className="text-[10px] text-stone-400">{f === "png" ? "Lossless" : "Smaller"}</p>
                 </div>
               </label>
             ))}
           </div>
         </div>
         <div className="space-y-2">
-          <label className="block text-xs font-medium text-gray-400">Resolution</label>
+          <label className="block text-xs font-medium text-stone-400">Resolution</label>
           {DPIS.map((d) => (
             <label key={d.value} className={cn("flex items-center gap-3 rounded-lg border-2 p-2.5 cursor-pointer transition",
-              dpi === d.value ? "border-blue-500 bg-blue-900/30" : "border-gray-700 hover:border-gray-600")}>
+              dpi === d.value ? "border-brand-500 bg-brand-900/30" : "border-stone-700 hover:border-stone-600")}>
               <input type="radio" name="dpi" value={d.value} checked={dpi === d.value}
-                onChange={() => setDpi(d.value)} className="accent-blue-500" />
+                onChange={() => setDpi(d.value)} className="accent-brand-500" />
               <div>
                 <p className="text-xs font-medium text-white">{d.label}</p>
-                <p className="text-[10px] text-gray-400">{d.desc}</p>
+                <p className="text-[10px] text-stone-400">{d.desc}</p>
               </div>
             </label>
           ))}
@@ -597,17 +597,17 @@ export default function RightPanel({
   const title = PANEL_TITLES[tool];
 
   return (
-    <div className="w-72 flex-shrink-0 flex flex-col bg-gray-900 border-l border-gray-700 overflow-hidden">
+    <div className="w-72 flex-shrink-0 flex flex-col bg-stone-900 border-l border-stone-700 overflow-hidden">
       {/* Generic header for navigation panels */}
       {title && (
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-stone-700 shrink-0">
           <span className="text-sm font-semibold text-white">
             {title}
             {tool === "annotations" && annotations.length > 0 && (
-              <span className="ml-2 text-xs font-normal text-gray-500">{annotations.length}</span>
+              <span className="ml-2 text-xs font-normal text-stone-500">{annotations.length}</span>
             )}
           </span>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition">
+          <button onClick={onClose} className="text-stone-400 hover:text-white transition">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -628,7 +628,7 @@ export default function RightPanel({
         pdf
           ? <OutlinePanel pdf={pdf} currentPage={currentPage} onGoTo={onGoToPage ?? (() => {})} />
           : <div className="flex-1 flex items-center justify-center p-4">
-              <p className="text-xs text-gray-500">No PDF loaded.</p>
+              <p className="text-xs text-stone-500">No PDF loaded.</p>
             </div>
       )}
 

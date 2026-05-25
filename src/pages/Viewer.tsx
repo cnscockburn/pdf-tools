@@ -738,21 +738,21 @@ export default function Viewer() {
   // ── Empty state ────────────────────────────────────────────────────────────
   if (!pdf || !file) {
     return (
-      <div className="min-h-screen bg-gray-800 flex flex-col">
-        <div className="bg-gray-900 border-b border-gray-700 px-4 py-3 flex items-center gap-3">
-          <Link to="/" className="text-xs text-gray-400 hover:text-white flex items-center gap-1 transition">
+      <div className="min-h-screen bg-stone-800 flex flex-col">
+        <div className="bg-stone-900 border-b border-stone-700 px-4 py-3 flex items-center gap-3">
+          <Link to="/" className="text-xs text-stone-400 hover:text-white flex items-center gap-1 transition">
             <ChevronLeft className="h-4 w-4" /> All tools
           </Link>
         </div>
         <div className="flex-1 flex items-center justify-center p-8">
           <div {...getRootProps()} className={cn(
             "border-2 border-dashed rounded-2xl p-16 text-center cursor-pointer transition-all max-w-sm w-full",
-            isDragActive ? "border-blue-400 bg-gray-700" : "border-gray-500 hover:border-blue-400 hover:bg-gray-700"
+            isDragActive ? "border-brand-400 bg-stone-700" : "border-stone-500 hover:border-brand-400 hover:bg-stone-700"
           )}>
             <input {...getInputProps()} />
-            <UploadCloud className="mx-auto mb-3 h-12 w-12 text-gray-400" />
-            <p className="font-medium text-gray-300">{isDragActive ? "Drop PDF here" : "Open a PDF to get started"}</p>
-            <p className="mt-1 text-sm text-gray-500">Click or drag and drop</p>
+            <UploadCloud className="mx-auto mb-3 h-12 w-12 text-stone-400" />
+            <p className="font-medium text-stone-300">{isDragActive ? "Drop PDF here" : "Open a PDF to get started"}</p>
+            <p className="mt-1 text-sm text-stone-500">Click or drag and drop</p>
           </div>
         </div>
       </div>
@@ -764,7 +764,7 @@ export default function Viewer() {
     <button key={m} onClick={() => switchMode(m)} title={`${label} (${key})`}
       className={cn(
         "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition",
-        canvasMode === m ? "bg-blue-600 text-white shadow" : "text-gray-300 hover:bg-gray-700"
+        canvasMode === m ? "bg-brand-600 text-white shadow" : "text-stone-300 hover:bg-stone-700"
       )}>
       {icon} {label}
     </button>
@@ -774,7 +774,7 @@ export default function Viewer() {
     <button key={t} onClick={() => togglePanel(t)} title={label}
       className={cn(
         "flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition",
-        panelTool === t ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white hover:bg-gray-700"
+        panelTool === t ? "bg-brand-600 text-white" : "text-stone-400 hover:text-white hover:bg-stone-700"
       )}>
       {icon}
       <span className="hidden sm:inline ml-1">{label}</span>
@@ -784,14 +784,14 @@ export default function Viewer() {
   const sidebarFile = workingFile ?? file;
 
   return (
-    <div className="h-screen flex flex-col bg-gray-800 overflow-hidden">
+    <div className="h-screen flex flex-col bg-stone-800 overflow-hidden">
 
       {/* ── Top bar ───────────────────────────────────────────────────────────── */}
-      <div className="bg-gray-900 border-b border-gray-700 px-4 py-2 flex items-center gap-3 shrink-0">
-        <Link to="/" className="shrink-0 text-gray-400 hover:text-white transition flex items-center gap-1 text-xs">
+      <div className="bg-stone-900 border-b border-stone-700 px-4 py-2 flex items-center gap-3 shrink-0">
+        <Link to="/" className="shrink-0 text-stone-400 hover:text-white transition flex items-center gap-1 text-xs">
           <ChevronLeft className="h-3.5 w-3.5" /> Home
         </Link>
-        <div className="w-px h-4 bg-gray-700" />
+        <div className="w-px h-4 bg-stone-700" />
 
         {/* Editable filename */}
         {editingFilename ? (
@@ -800,16 +800,16 @@ export default function Viewer() {
               onChange={e => setFilenameInput(e.target.value)}
               onBlur={commitFilename}
               onKeyDown={e => { if (e.key === "Enter") commitFilename(); if (e.key === "Escape") setEditingFilename(false); }}
-              className="flex-1 min-w-0 bg-gray-800 border border-blue-500 rounded px-2 py-0.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="flex-1 min-w-0 bg-stone-800 border border-brand-500 rounded px-2 py-0.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
             />
             <button onClick={commitFilename} className="shrink-0 text-green-400 hover:text-green-300 transition"><Check className="h-4 w-4" /></button>
-            <button onClick={() => setEditingFilename(false)} className="shrink-0 text-gray-400 hover:text-white transition"><X className="h-4 w-4" /></button>
+            <button onClick={() => setEditingFilename(false)} className="shrink-0 text-stone-400 hover:text-white transition"><X className="h-4 w-4" /></button>
           </div>
         ) : (
           <button onClick={() => { setFilenameInput(filename); setEditingFilename(true); }} title="Click to rename"
             className="flex items-center gap-1.5 group min-w-0 flex-1 text-left">
-            <span className="text-sm text-gray-200 truncate group-hover:text-white transition">{filename}</span>
-            <Pencil className="h-3 w-3 text-gray-600 group-hover:text-gray-300 shrink-0 transition" />
+            <span className="text-sm text-stone-200 truncate group-hover:text-white transition">{filename}</span>
+            <Pencil className="h-3 w-3 text-stone-600 group-hover:text-stone-300 shrink-0 transition" />
           </button>
         )}
 
@@ -827,14 +827,14 @@ export default function Viewer() {
                   if (e.key === "Escape") setEditingAuthor(false);
                 }}
                 placeholder="Your name"
-                className="w-28 bg-gray-800 border border-blue-500 rounded px-2 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-28 bg-stone-800 border border-brand-500 rounded px-2 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
             </div>
           ) : (
             <button
               onClick={() => { setAuthorInput(settings.author); setEditingAuthor(true); }}
               title="Set your name for annotations"
-              className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-300 transition"
+              className="flex items-center gap-1 text-[10px] text-stone-500 hover:text-stone-300 transition"
             >
               <User className="h-3 w-3" />
               <span className="hidden sm:inline">{settings.author || "Set name"}</span>
@@ -850,12 +850,12 @@ export default function Viewer() {
             }
             className={cn(
               "w-2 h-2 rounded-full shrink-0 transition-colors",
-              backendOk === null  ? "bg-gray-600" :
+              backendOk === null  ? "bg-stone-600" :
               backendOk           ? "bg-green-500" :
               "bg-red-500 animate-pulse"
             )}
           />
-          {rendering && <span className="text-[10px] text-gray-500 animate-pulse">Rendering…</span>}
+          {rendering && <span className="text-[10px] text-stone-500 animate-pulse">Rendering…</span>}
 
           {/* Download button */}
           {workingBlob && (
@@ -873,7 +873,7 @@ export default function Viewer() {
             <button
               onClick={() => downloadAnnotationReport(annotations, filename)}
               title="Export review report as Markdown"
-              className="flex items-center gap-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 px-2.5 py-1.5 text-xs text-gray-300 hover:text-white transition"
+              className="flex items-center gap-1.5 rounded-lg bg-stone-700 hover:bg-stone-600 px-2.5 py-1.5 text-xs text-stone-300 hover:text-white transition"
             >
               <FileText className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Report</span>
@@ -882,7 +882,7 @@ export default function Viewer() {
 
           <div {...getRootProps()} className="cursor-pointer">
             <input {...getInputProps()} />
-            <button className="text-xs px-2.5 py-1.5 rounded bg-gray-700 hover:bg-gray-600 transition text-gray-300">Open…</button>
+            <button className="text-xs px-2.5 py-1.5 rounded bg-stone-700 hover:bg-stone-600 transition text-stone-300">Open…</button>
           </div>
         </div>
       </div>
@@ -959,7 +959,7 @@ export default function Viewer() {
                 >
                   {pageRedactBoxes.map(box => (
                     <div key={box.id} data-rbox="true"
-                      className={cn("absolute pointer-events-auto", selectedRedact === box.id && "ring-2 ring-offset-0 ring-blue-400")}
+                      className={cn("absolute pointer-events-auto", selectedRedact === box.id && "ring-2 ring-offset-0 ring-brand-400")}
                       style={{
                         left: `${box.x0 * 100}%`, top: `${box.y0 * 100}%`,
                         width: `${(box.x1 - box.x0) * 100}%`, height: `${(box.y1 - box.y0) * 100}%`,
@@ -1014,7 +1014,7 @@ export default function Viewer() {
 
           {canvasMode === "annotate" && (
             <div className="shrink-0 px-4 pb-2 flex justify-center">
-              <div className="flex flex-wrap items-center gap-2 bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 shadow-lg w-full max-w-3xl">
+              <div className="flex flex-wrap items-center gap-2 bg-stone-900 border border-stone-700 rounded-xl px-3 py-2 shadow-lg w-full max-w-3xl">
                 {/* Sub-mode */}
                 <div className="flex gap-1 flex-wrap">
                   {([
@@ -1030,7 +1030,7 @@ export default function Viewer() {
                     <button key={m} onClick={() => { setAnnotateSubMode(m); setTextSelectActive(false); }}
                       title={`${label}${key ? ` (${key})` : ""}`}
                       className={cn("flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition",
-                        annotateSubMode === m && !textSelectActive ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600")}>
+                        annotateSubMode === m && !textSelectActive ? "bg-brand-600 text-white" : "bg-stone-700 text-stone-300 hover:bg-stone-600")}>
                       {icon} {label}
                     </button>
                   ))}
@@ -1039,7 +1039,7 @@ export default function Viewer() {
                     onClick={() => setTextSelectActive(v => !v)}
                     title="Select text to highlight/underline/strike"
                     className={cn("flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition",
-                      textSelectActive ? "bg-purple-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600")}>
+                      textSelectActive ? "bg-purple-600 text-white" : "bg-stone-700 text-stone-300 hover:bg-stone-600")}>
                     <Type className="h-3.5 w-3.5" /> Select
                   </button>
                 </div>
@@ -1060,7 +1060,7 @@ export default function Viewer() {
                     {(["rect", "ellipse", "line", "arrow"] as ShapeSubType[]).map(s => (
                       <button key={s} onClick={() => setShapeSubType(s)}
                         className={cn("px-2 py-0.5 rounded text-[10px] font-medium transition",
-                          shapeSubType === s ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-400 hover:bg-gray-600")}>
+                          shapeSubType === s ? "bg-brand-600 text-white" : "bg-stone-700 text-stone-400 hover:bg-stone-600")}>
                         {s}
                       </button>
                     ))}
@@ -1069,11 +1069,11 @@ export default function Viewer() {
                 {/* Ink stroke width */}
                 {annotateSubMode === "ink" && (
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-gray-500">Width</span>
+                    <span className="text-[10px] text-stone-500">Width</span>
                     {[1, 2, 4, 8].map(w => (
                       <button key={w} onClick={() => setInkStrokeWidth(w)}
                         className={cn("rounded border px-1.5 py-0.5 text-[10px] transition",
-                          inkStrokeWidth === w ? "border-blue-500 text-blue-300" : "border-gray-600 text-gray-400 hover:border-gray-500")}>
+                          inkStrokeWidth === w ? "border-brand-500 text-brand-300" : "border-stone-600 text-stone-400 hover:border-stone-500")}>
                         {w}px
                       </button>
                     ))}
@@ -1085,7 +1085,7 @@ export default function Viewer() {
                     {STAMP_LABELS.map(l => (
                       <button key={l} onClick={() => setStampLabel(l)}
                         className={cn("px-2 py-0.5 rounded text-[10px] font-bold tracking-wide transition",
-                          stampLabel === l ? "bg-red-800 text-red-200" : "bg-gray-700 text-gray-400 hover:bg-gray-600")}>
+                          stampLabel === l ? "bg-red-800 text-red-200" : "bg-stone-700 text-stone-400 hover:bg-stone-600")}>
                         {l}
                       </button>
                     ))}
@@ -1094,13 +1094,13 @@ export default function Viewer() {
                 {/* Controls */}
                 <div className="flex items-center gap-2 ml-auto">
                   {autoSaving ? (
-                    <span className="flex items-center gap-1 text-xs text-blue-400">
+                    <span className="flex items-center gap-1 text-xs text-brand-400">
                       <Loader2 className="h-3 w-3 animate-spin" /> Saving…
                     </span>
                   ) : (
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-stone-500">
                       {annotations.length} annotation{annotations.length !== 1 ? "s" : ""}
-                      {annotations.length > 0 && <span className="text-gray-600 ml-1">· auto-saves on exit</span>}
+                      {annotations.length > 0 && <span className="text-stone-600 ml-1">· auto-saves on exit</span>}
                     </span>
                   )}
                   {annotateError && (
@@ -1109,14 +1109,14 @@ export default function Viewer() {
                   {annotations.length > 0 && !autoSaving && (
                     <>
                       <button onClick={() => setAnnotations(prev => prev.slice(0, -1))} title="Undo last (Ctrl+Z)"
-                        className="text-xs text-gray-500 hover:text-gray-300 transition">Undo</button>
+                        className="text-xs text-stone-500 hover:text-stone-300 transition">Undo</button>
                       <button onClick={() => setAnnotations([])}
-                        className="text-xs text-gray-500 hover:text-gray-300 transition">Clear all</button>
+                        className="text-xs text-stone-500 hover:text-stone-300 transition">Clear all</button>
                     </>
                   )}
                   {annotateError && annotations.length > 0 && (
                     <button onClick={() => autoSaveAnnotations("view")} disabled={autoSaving}
-                      className="flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-50 transition">
+                      className="flex items-center gap-1 rounded-lg bg-brand-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-50 transition">
                       <Check className="h-3 w-3" /> Retry Save
                     </button>
                   )}
@@ -1150,22 +1150,22 @@ export default function Viewer() {
 
           {canvasMode === "crop" && (
             <div className="shrink-0 px-4 pb-2 flex justify-center">
-              <div className="flex flex-wrap items-center gap-3 bg-blue-950/40 border border-blue-900/40 rounded-xl px-3 py-2 shadow-lg w-full max-w-3xl">
-                <Crop className="h-3.5 w-3.5 text-blue-400 shrink-0" />
-                <span className="text-xs text-blue-300">
+              <div className="flex flex-wrap items-center gap-3 bg-brand-950/40 border border-brand-900/40 rounded-xl px-3 py-2 shadow-lg w-full max-w-3xl">
+                <Crop className="h-3.5 w-3.5 text-brand-400 shrink-0" />
+                <span className="text-xs text-brand-300">
                   {cropSelection ? "Selection drawn — apply or redraw." : "Drag to select the area to keep."}
                 </span>
-                <label className="flex items-center gap-1.5 text-xs text-blue-300 cursor-pointer">
-                  <input type="checkbox" checked={applyToAll} onChange={e => setApplyToAll(e.target.checked)} className="accent-blue-500" />
+                <label className="flex items-center gap-1.5 text-xs text-brand-300 cursor-pointer">
+                  <input type="checkbox" checked={applyToAll} onChange={e => setApplyToAll(e.target.checked)} className="accent-brand-500" />
                   All pages
                 </label>
                 {cropError && <span className="text-xs text-red-400">{cropError}</span>}
                 <div className="flex items-center gap-2 ml-auto">
                   {cropSelection && (
                     <>
-                      <button onClick={() => setCropSelection(null)} className="text-xs text-blue-400 hover:text-blue-300 transition">Clear</button>
+                      <button onClick={() => setCropSelection(null)} className="text-xs text-brand-400 hover:text-brand-300 transition">Clear</button>
                       <button onClick={applyCrop} disabled={cropLoading}
-                        className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-50 transition">
+                        className="flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-50 transition">
                         {cropLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Crop className="h-3.5 w-3.5" />}
                         Apply Crop
                       </button>
@@ -1194,23 +1194,23 @@ export default function Viewer() {
 
           {/* ── Bottom toolbar ──────────────────────────────────────────────── */}
           <div className="shrink-0 px-4 pb-4 flex justify-center">
-            <div className="flex items-center gap-1 bg-gray-900 border border-gray-700 rounded-2xl px-3 py-2 shadow-xl flex-wrap">
+            <div className="flex items-center gap-1 bg-stone-900 border border-stone-700 rounded-2xl px-3 py-2 shadow-xl flex-wrap">
 
               {modeBtn("view",     <Eye className="h-3.5 w-3.5" />,          "View",     "V")}
               {modeBtn("annotate", <MessageSquare className="h-3.5 w-3.5" />, "Annotate", "A")}
               {modeBtn("redact",   <EyeOff className="h-3.5 w-3.5" />,       "Redact",   "R")}
               {modeBtn("crop",     <Crop className="h-3.5 w-3.5" />,          "Crop",     "C")}
 
-              <div className="w-px h-5 bg-gray-700 mx-0.5" />
+              <div className="w-px h-5 bg-stone-700 mx-0.5" />
 
               {/* Zoom */}
               <button onClick={() => setScale(s => parseFloat(Math.max(s - 0.2, 0.5).toFixed(2)))}
-                title="Zoom out (−)" className="p-1.5 rounded-lg hover:bg-gray-700 transition text-gray-300">
+                title="Zoom out (−)" className="p-1.5 rounded-lg hover:bg-stone-700 transition text-stone-300">
                 <ZoomOut className="h-4 w-4" />
               </button>
-              <span className="text-xs text-gray-300 tabular-nums w-10 text-center">{Math.round(scale * 100)}%</span>
+              <span className="text-xs text-stone-300 tabular-nums w-10 text-center">{Math.round(scale * 100)}%</span>
               <button onClick={() => setScale(s => parseFloat(Math.min(s + 0.2, 4).toFixed(2)))}
-                title="Zoom in (+)" className="p-1.5 rounded-lg hover:bg-gray-700 transition text-gray-300">
+                title="Zoom in (+)" className="p-1.5 rounded-lg hover:bg-stone-700 transition text-stone-300">
                 <ZoomIn className="h-4 w-4" />
               </button>
               <button onClick={() => {
@@ -1218,15 +1218,15 @@ export default function Viewer() {
                 const w = canvasAreaRef.current.clientWidth - 64;
                 const pw = canvasRef.current.width / scale;
                 setScale(parseFloat(Math.max(0.5, Math.min(w / pw, 4)).toFixed(2)));
-              }} title="Fit width" className="px-2 py-1 rounded-lg text-[11px] text-gray-400 hover:text-white hover:bg-gray-700 transition">
+              }} title="Fit width" className="px-2 py-1 rounded-lg text-[11px] text-stone-400 hover:text-white hover:bg-stone-700 transition">
                 Fit W
               </button>
 
-              <div className="w-px h-5 bg-gray-700 mx-0.5" />
+              <div className="w-px h-5 bg-stone-700 mx-0.5" />
 
               {/* Page navigation */}
               <button onClick={() => goTo(currentPage - 1)} disabled={currentPage <= 1}
-                className="p-1.5 rounded-lg hover:bg-gray-700 transition disabled:opacity-30 text-gray-300">
+                className="p-1.5 rounded-lg hover:bg-stone-700 transition disabled:opacity-30 text-stone-300">
                 <ChevronLeft className="h-4 w-4" />
               </button>
               {editingPage ? (
@@ -1237,26 +1237,26 @@ export default function Viewer() {
                     if (e.key === "Enter") commitPageInput();
                     if (e.key === "Escape") { setEditingPage(false); setPageInput(String(currentPage)); }
                   }}
-                  className="w-12 rounded bg-gray-700 border border-gray-600 text-center text-xs text-white py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-12 rounded bg-stone-700 border border-stone-600 text-center text-xs text-white py-0.5 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 />
               ) : (
                 <button onClick={() => { setEditingPage(true); setPageInput(String(currentPage)); }}
                   title="Click to jump to page"
-                  className="text-xs tabular-nums text-gray-300 hover:text-white transition px-1 rounded hover:bg-gray-700 min-w-[4.5rem] text-center">
+                  className="text-xs tabular-nums text-stone-300 hover:text-white transition px-1 rounded hover:bg-stone-700 min-w-[4.5rem] text-center">
                   {currentPage} / {pdf.numPages}
                 </button>
               )}
               <button onClick={() => goTo(currentPage + 1)} disabled={currentPage >= pdf.numPages}
-                className="p-1.5 rounded-lg hover:bg-gray-700 transition disabled:opacity-30 text-gray-300">
+                className="p-1.5 rounded-lg hover:bg-stone-700 transition disabled:opacity-30 text-stone-300">
                 <ChevronRight className="h-4 w-4" />
               </button>
 
-              <div className="w-px h-5 bg-gray-700 mx-0.5" />
+              <div className="w-px h-5 bg-stone-700 mx-0.5" />
 
               {/* Search */}
               <button onClick={() => setSearchOpen(v => !v)} title="Search (Ctrl+F)"
-                className={cn("p-1.5 rounded-lg transition text-gray-400 hover:text-white hover:bg-gray-700",
-                  searchOpen && "bg-blue-600 text-white")}>
+                className={cn("p-1.5 rounded-lg transition text-stone-400 hover:text-white hover:bg-stone-700",
+                  searchOpen && "bg-brand-600 text-white")}>
                 <Search className="h-3.5 w-3.5" />
               </button>
 
@@ -1265,7 +1265,7 @@ export default function Viewer() {
               {panelBtn("outline",     <BookOpen className="h-3.5 w-3.5" />, "Outline")}
               {panelBtn("bookmarks",   <Bookmark className="h-3.5 w-3.5" />, "Bookmarks")}
 
-              <div className="w-px h-5 bg-gray-700 mx-0.5" />
+              <div className="w-px h-5 bg-stone-700 mx-0.5" />
 
               {/* Panel tool buttons */}
               {panelBtn("compress",      <Minimize2 className="h-3.5 w-3.5" />,  "Compress")}
@@ -1276,32 +1276,32 @@ export default function Viewer() {
               {panelBtn("security",      <Lock className="h-3.5 w-3.5" />,       "Security")}
               {panelBtn("pdf-to-images", <FileImage className="h-3.5 w-3.5" />,  "→ Images")}
 
-              <div className="w-px h-5 bg-gray-700 mx-0.5" />
+              <div className="w-px h-5 bg-stone-700 mx-0.5" />
 
               {/* External links */}
               <Link to="/rearrange" state={{ file: workingFile ?? file }}
                 title="Rearrange pages"
-                className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700 transition">
+                className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-stone-400 hover:text-white hover:bg-stone-700 transition">
                 <AlignLeft className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Rearrange</span>
                 <ExternalLink className="h-2.5 w-2.5 ml-0.5" />
               </Link>
               <Link to="/merge" state={{ file: workingFile ?? file }}
                 title="Merge with other PDFs"
-                className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700 transition">
+                className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-stone-400 hover:text-white hover:bg-stone-700 transition">
                 <span className="hidden sm:inline">Merge</span>
                 <ExternalLink className="h-2.5 w-2.5 ml-0.5" />
               </Link>
 
               {/* Command palette */}
               <button onClick={() => setPaletteOpen(true)} title="Command palette (Ctrl+Shift+P)"
-                className="p-1.5 rounded-lg hover:bg-gray-700 transition text-gray-500 hover:text-gray-300">
+                className="p-1.5 rounded-lg hover:bg-stone-700 transition text-stone-500 hover:text-stone-300">
                 <Command className="h-3.5 w-3.5" />
               </button>
 
               {/* Keyboard cheat sheet */}
               <button onClick={() => setCheatSheetOpen(true)} title="Keyboard shortcuts (?)"
-                className="p-1.5 rounded-lg hover:bg-gray-700 transition text-gray-500 hover:text-gray-300">
+                className="p-1.5 rounded-lg hover:bg-stone-700 transition text-stone-500 hover:text-stone-300">
                 <HelpCircle className="h-3.5 w-3.5" />
               </button>
             </div>

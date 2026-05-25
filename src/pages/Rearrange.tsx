@@ -33,15 +33,15 @@ function SortablePage({ id, thumb, label }: { id: string; thumb?: string; label:
       {...attributes}
       {...listeners}
       className={`flex flex-col items-center gap-1 rounded-lg border-2 p-1 bg-white cursor-grab active:cursor-grabbing select-none transition ${
-        isDragging ? "border-brand-500 opacity-50 scale-105 shadow-lg" : "border-gray-200 hover:border-gray-300"
+        isDragging ? "border-brand-500 opacity-50 scale-105 shadow-lg" : "border-stone-200 hover:border-stone-300"
       }`}
     >
       {thumb ? (
         <img src={thumb} alt={label} className="w-full rounded shadow-sm" />
       ) : (
-        <div className="w-full aspect-[3/4] bg-gray-100 rounded animate-pulse" />
+        <div className="w-full aspect-[3/4] bg-stone-100 rounded animate-pulse" />
       )}
-      <span className="text-[10px] text-gray-500">{label}</span>
+      <span className="text-[10px] text-stone-500">{label}</span>
     </div>
   );
 }

@@ -40,21 +40,21 @@ export default function ImagesToPDF() {
         />
 
         {files.length > 0 && (
-          <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-            <div className="px-4 py-3 bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wide">
+          <div className="rounded-xl border border-stone-200 bg-white overflow-hidden">
+            <div className="px-4 py-3 bg-stone-50 text-xs font-medium text-stone-500 uppercase tracking-wide">
               {files.length} image(s) — each becomes one PDF page in order
             </div>
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-stone-100">
               {files.map((f, i) => (
                 <div key={i} className="flex items-center gap-3 px-4 py-3">
                   <img
                     src={URL.createObjectURL(f)}
                     alt={f.name}
-                    className="h-12 w-10 object-cover rounded border border-gray-200"
+                    className="h-12 w-10 object-cover rounded border border-stone-200"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm truncate text-gray-800">{f.name}</p>
-                    <p className="text-xs text-gray-400">{formatBytes(f.size)}</p>
+                    <p className="text-sm truncate text-stone-800">{f.name}</p>
+                    <p className="text-xs text-stone-400">{formatBytes(f.size)}</p>
                   </div>
                   <button
                     onClick={() => removeFile(i)}

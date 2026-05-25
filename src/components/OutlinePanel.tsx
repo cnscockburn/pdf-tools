@@ -57,10 +57,10 @@ function OutlineNode({ node, pdf, depth, onGoTo, currentPage }: NodeProps) {
     <div>
       <button
         onClick={handleClick}
-        className="w-full flex items-center gap-1.5 px-2 py-1 rounded text-left hover:bg-gray-800 transition group"
+        className="w-full flex items-center gap-1.5 px-2 py-1 rounded text-left hover:bg-stone-800 transition group"
         style={{ paddingLeft: `${8 + depth * 12}px` }}
       >
-        <span className="shrink-0 text-gray-600">
+        <span className="shrink-0 text-stone-600">
           {hasChildren
             ? (open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />)
             : <span className="w-3 inline-block" />}
@@ -69,7 +69,7 @@ function OutlineNode({ node, pdf, depth, onGoTo, currentPage }: NodeProps) {
           "text-xs truncate flex-1",
           node.bold ? "font-semibold" : "font-normal",
           node.italic ? "italic" : "",
-          "text-gray-300 group-hover:text-white"
+          "text-stone-300 group-hover:text-white"
         )}>
           {node.title || "Untitled"}
         </span>
@@ -115,7 +115,7 @@ export default function OutlinePanel({ pdf, currentPage, onGoTo }: Props) {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center p-4">
-        <span className="text-xs text-gray-500 animate-pulse">Loading outline…</span>
+        <span className="text-xs text-stone-500 animate-pulse">Loading outline…</span>
       </div>
     );
   }
@@ -123,8 +123,8 @@ export default function OutlinePanel({ pdf, currentPage, onGoTo }: Props) {
   if (!outline || outline.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-2 p-6 text-center">
-        <BookOpen className="h-7 w-7 text-gray-600" />
-        <p className="text-xs text-gray-500">This PDF has no bookmarks / table of contents.</p>
+        <BookOpen className="h-7 w-7 text-stone-600" />
+        <p className="text-xs text-stone-500">This PDF has no bookmarks / table of contents.</p>
       </div>
     );
   }

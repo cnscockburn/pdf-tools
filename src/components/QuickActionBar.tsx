@@ -16,12 +16,12 @@ interface Props {
   onCopy:          () => void;
 }
 
-const BTN = "flex items-center justify-center p-1.5 rounded hover:bg-gray-700 transition";
+const BTN = "flex items-center justify-center p-1.5 rounded hover:bg-stone-700 transition";
 
 export default function QuickActionBar({ x, y, onHighlight, onUnderline, onStrikethrough, onComment, onCopy }: Props) {
   return (
     <div
-      className="fixed z-50 flex items-center gap-0.5 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl px-1.5 py-1"
+      className="fixed z-50 flex items-center gap-0.5 bg-stone-900 border border-stone-700 rounded-xl shadow-2xl px-1.5 py-1"
       style={{ left: x, top: y - 46, transform: "translateX(-50%)" }}
       onMouseDown={e => e.stopPropagation()}
       onPointerDown={e => e.stopPropagation()}
@@ -30,17 +30,17 @@ export default function QuickActionBar({ x, y, onHighlight, onUnderline, onStrik
         <Highlighter className="h-3.5 w-3.5 text-yellow-400" />
       </button>
       <button className={BTN} title="Underline (U)" onClick={onUnderline}>
-        <Underline className="h-3.5 w-3.5 text-blue-400" />
+        <Underline className="h-3.5 w-3.5 text-sky-400" />
       </button>
       <button className={BTN} title="Strikethrough (S)" onClick={onStrikethrough}>
         <Strikethrough className="h-3.5 w-3.5 text-red-400" />
       </button>
-      <div className="w-px h-3.5 bg-gray-700 mx-0.5" />
+      <div className="w-px h-3.5 bg-stone-700 mx-0.5" />
       <button className={BTN} title="Add note" onClick={onComment}>
-        <MessageSquare className="h-3.5 w-3.5 text-gray-300" />
+        <MessageSquare className="h-3.5 w-3.5 text-stone-300" />
       </button>
       <button className={BTN} title="Copy text" onClick={onCopy}>
-        <Copy className="h-3.5 w-3.5 text-gray-300" />
+        <Copy className="h-3.5 w-3.5 text-stone-300" />
       </button>
     </div>
   );

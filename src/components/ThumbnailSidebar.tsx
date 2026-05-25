@@ -27,7 +27,7 @@ export default function ThumbnailSidebar({ file, currentPage, onSelect, collapse
   return (
     <div
       className={cn(
-        "relative flex-shrink-0 flex flex-col bg-gray-900 border-r border-gray-700 transition-all duration-200",
+        "relative flex-shrink-0 flex flex-col bg-stone-900 border-r border-stone-700 transition-all duration-200",
         collapsed ? "w-8" : "w-40"
       )}
     >
@@ -35,7 +35,7 @@ export default function ThumbnailSidebar({ file, currentPage, onSelect, collapse
       <button
         onClick={onToggle}
         title={collapsed ? "Show thumbnails" : "Hide thumbnails"}
-        className="absolute -right-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-gray-700 border border-gray-600 text-gray-300 hover:bg-gray-600 transition"
+        className="absolute -right-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-stone-700 border border-stone-600 text-stone-300 hover:bg-stone-600 transition"
       >
         {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
       </button>
@@ -51,8 +51,8 @@ export default function ThumbnailSidebar({ file, currentPage, onSelect, collapse
                 className={cn(
                   "w-full flex flex-col items-center gap-0.5 rounded p-1 transition relative",
                   p === currentPage
-                    ? "ring-2 ring-blue-500 bg-gray-800"
-                    : "hover:bg-gray-800"
+                    ? "ring-2 ring-brand-500 bg-stone-800"
+                    : "hover:bg-stone-800"
                 )}
               >
                 <div className="relative w-full">
@@ -63,19 +63,19 @@ export default function ThumbnailSidebar({ file, currentPage, onSelect, collapse
                       className="w-full rounded shadow"
                     />
                   ) : (
-                    <div className="w-full aspect-[3/4] bg-gray-700 rounded animate-pulse" />
+                    <div className="w-full aspect-[3/4] bg-stone-700 rounded animate-pulse" />
                   )}
                   {/* Annotation count badge */}
                   {count > 0 && (
                     <div
                       title={`${count} annotation${count !== 1 ? "s" : ""} on this page`}
-                      className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-[3px] rounded-full bg-blue-500 text-white text-[8px] font-bold flex items-center justify-center shadow leading-none"
+                      className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-[3px] rounded-full bg-brand-500 text-white text-[8px] font-bold flex items-center justify-center shadow leading-none"
                     >
                       {count > 9 ? "9+" : count}
                     </div>
                   )}
                 </div>
-                <span className="text-[9px] text-gray-400">{p}</span>
+                <span className="text-[9px] text-stone-400">{p}</span>
               </button>
             );
           })}

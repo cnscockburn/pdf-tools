@@ -136,26 +136,26 @@ export default function CommandPalette({
       className="fixed inset-0 z-50 flex items-start justify-center pt-20"
       onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-gray-900 border border-gray-600 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div className="bg-stone-900 border border-stone-600 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
 
         {/* Search input */}
-        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-700">
-          <Search className="h-4 w-4 text-gray-500 shrink-0" />
+        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-stone-700">
+          <Search className="h-4 w-4 text-stone-500 shrink-0" />
           <input
             ref={inputRef}
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
             placeholder="Type a command, snippet, or page number…"
-            className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 focus:outline-none"
+            className="flex-1 bg-transparent text-sm text-white placeholder-stone-500 focus:outline-none"
           />
-          <kbd className="text-[10px] text-gray-600 bg-gray-800 border border-gray-700 rounded px-1.5 py-0.5">Esc</kbd>
+          <kbd className="text-[10px] text-stone-600 bg-stone-800 border border-stone-700 rounded px-1.5 py-0.5">Esc</kbd>
         </div>
 
         {/* Results */}
         <div ref={listRef} className="max-h-80 overflow-y-auto py-1">
           {filtered.length === 0 ? (
-            <p className="px-4 py-8 text-center text-xs text-gray-500">
+            <p className="px-4 py-8 text-center text-xs text-stone-500">
               No commands match <em>"{query}"</em>
             </p>
           ) : (
@@ -166,18 +166,18 @@ export default function CommandPalette({
                 onClick={() => execute(i)}
                 className={cn(
                   "w-full flex items-center gap-3 px-4 py-2.5 text-left transition",
-                  i === activeIdx ? "bg-blue-600/20" : "hover:bg-gray-800",
+                  i === activeIdx ? "bg-brand-600/20" : "hover:bg-stone-800",
                 )}
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-white truncate">{item.label}</p>
                   {item.description && (
-                    <p className="text-[11px] text-gray-500 truncate">{item.description}</p>
+                    <p className="text-[11px] text-stone-500 truncate">{item.description}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[10px] text-gray-600">{item.category}</span>
-                  {i === activeIdx && <ChevronRight className="h-3 w-3 text-gray-500" />}
+                  <span className="text-[10px] text-stone-600">{item.category}</span>
+                  {i === activeIdx && <ChevronRight className="h-3 w-3 text-stone-500" />}
                 </div>
               </button>
             ))
@@ -185,12 +185,12 @@ export default function CommandPalette({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-800 px-4 py-2 flex items-center gap-3 text-[10px] text-gray-600">
-          <span><kbd className="bg-gray-800 border border-gray-700 rounded px-1">↑↓</kbd> navigate</span>
-          <span><kbd className="bg-gray-800 border border-gray-700 rounded px-1">↵</kbd> run</span>
-          <span><kbd className="bg-gray-800 border border-gray-700 rounded px-1">Esc</kbd> close</span>
+        <div className="border-t border-stone-800 px-4 py-2 flex items-center gap-3 text-[10px] text-stone-600">
+          <span><kbd className="bg-stone-800 border border-stone-700 rounded px-1">↑↓</kbd> navigate</span>
+          <span><kbd className="bg-stone-800 border border-stone-700 rounded px-1">↵</kbd> run</span>
+          <span><kbd className="bg-stone-800 border border-stone-700 rounded px-1">Esc</kbd> close</span>
           <span className="ml-auto">
-            Type <code className="bg-gray-800 rounded px-1">&gt;N</code> to jump to page
+            Type <code className="bg-stone-800 rounded px-1">&gt;N</code> to jump to page
           </span>
         </div>
       </div>

@@ -3,8 +3,21 @@
 @tailwind utilities;
 
 @layer base {
+  /* The Instrument: warm stone surfaces, warm-tinted near-blacks. */
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
+    @apply bg-stone-50 text-stone-900 antialiased;
+  }
+
+  /* Honor reduced-motion globally (DESIGN.md Do: prefers-reduced-motion → duration-0). */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
@@ -35,15 +48,16 @@
   transform-origin: 0% 0%;
 }
 
+/* Selection: warm amber wash, echoes annotation ink (DESIGN.md Amber Reserve). */
 .textLayer ::selection {
-  background: rgba(60, 130, 246, 0.35);
+  background: rgba(217, 119, 6, 0.28);
 }
 
 /* Search match highlight injected by Viewer */
 .textLayer .search-highlight {
-  background: rgba(255, 200, 0, 0.45);
+  background: rgba(253, 224, 71, 0.45); /* warm yellow, document-context */
   border-radius: 1px;
 }
 .textLayer .search-highlight-active {
-  background: rgba(255, 120, 0, 0.55);
+  background: rgba(217, 119, 6, 0.55); /* warm-amber for active match */
 }

@@ -59,7 +59,7 @@ export default function PageThumbnailGrid({ file, selectable, selected, onToggle
 
   if (loading && thumbnails.length === 0) {
     return (
-      <div className="flex items-center justify-center h-40 text-sm text-gray-400">
+      <div className="flex items-center justify-center h-40 text-sm text-stone-400">
         Rendering pages…
       </div>
     );
@@ -79,15 +79,15 @@ export default function PageThumbnailGrid({ file, selectable, selected, onToggle
               selectable ? "cursor-pointer" : "cursor-default",
               isSelected
                 ? "border-brand-500 bg-brand-50"
-                : "border-gray-200 hover:border-gray-300 bg-white"
+                : "border-stone-200 hover:border-stone-300 bg-white"
             )}
           >
             {thumb ? (
               <img src={thumb} alt={`Page ${pageNum}`} className="w-full rounded shadow-sm" />
             ) : (
-              <div className="w-full aspect-[3/4] bg-gray-100 rounded animate-pulse" />
+              <div className="w-full aspect-[3/4] bg-stone-100 rounded animate-pulse" />
             )}
-            <span className="text-[10px] text-gray-500">p.{pageNum}</span>
+            <span className="text-[10px] text-stone-500">p.{pageNum}</span>
           </button>
         );
       })}

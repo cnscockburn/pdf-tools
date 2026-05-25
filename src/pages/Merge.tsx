@@ -43,13 +43,13 @@ export default function Merge() {
         />
 
         {files.length > 0 && (
-          <div className="rounded-xl border border-gray-200 bg-white divide-y divide-gray-100">
-            <div className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">
+          <div className="rounded-xl border border-stone-200 bg-white divide-y divide-stone-100">
+            <div className="px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wide">
               Files — drag to reorder coming soon
             </div>
             {files.map((f, i) => (
               <div key={i} className="flex items-center justify-between px-4 py-3">
-                <span className="text-sm truncate max-w-sm text-gray-800">{f.name}</span>
+                <span className="text-sm truncate max-w-sm text-stone-800">{f.name}</span>
                 <button
                   onClick={() => removeFile(i)}
                   className="ml-2 text-xs text-red-400 hover:text-red-600 transition-colors"

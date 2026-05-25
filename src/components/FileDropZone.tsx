@@ -23,15 +23,15 @@ export default function FileDropZone({ files, onFiles, multiple = false, accept,
           "border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors",
           isDragActive
             ? "border-brand-500 bg-brand-50"
-            : "border-gray-300 hover:border-brand-400 hover:bg-gray-50"
+            : "border-stone-300 hover:border-brand-400 hover:bg-stone-50"
         )}
       >
         <input {...getInputProps()} />
-        <UploadCloud className="mx-auto mb-3 h-10 w-10 text-gray-400" />
-        <p className="text-sm font-medium text-gray-700">
+        <UploadCloud className="mx-auto mb-3 h-10 w-10 text-stone-400" />
+        <p className="text-sm font-medium text-stone-700">
           {isDragActive ? "Drop here" : label ?? "Drop PDF here or click to browse"}
         </p>
-        <p className="mt-1 text-xs text-gray-400">PDF files only</p>
+        <p className="mt-1 text-xs text-stone-400">PDF files only</p>
       </div>
 
       {files.length > 0 && (
@@ -39,10 +39,10 @@ export default function FileDropZone({ files, onFiles, multiple = false, accept,
           {files.map((f, i) => (
             <li
               key={i}
-              className="flex items-center justify-between rounded-lg bg-white border border-gray-200 px-3 py-2 text-sm"
+              className="flex items-center justify-between rounded-lg bg-white border border-stone-200 px-3 py-2 text-sm"
             >
-              <span className="truncate max-w-xs text-gray-700">{f.name}</span>
-              <span className="ml-2 shrink-0 text-gray-400">{formatBytes(f.size)}</span>
+              <span className="truncate max-w-xs text-stone-700">{f.name}</span>
+              <span className="ml-2 shrink-0 text-stone-400">{formatBytes(f.size)}</span>
             </li>
           ))}
         </ul>

@@ -43,11 +43,11 @@ export default function KeyboardCheatSheet({ onClose }: Props) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-[460px] max-h-[80vh] overflow-hidden flex flex-col">
+      <div className="bg-stone-900 border border-stone-700 rounded-2xl shadow-2xl w-[460px] max-h-[80vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-700 shrink-0">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-stone-700 shrink-0">
           <span className="text-sm font-semibold text-white tracking-tight">Keyboard shortcuts</span>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition">
+          <button onClick={onClose} className="text-stone-400 hover:text-white transition">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -56,14 +56,14 @@ export default function KeyboardCheatSheet({ onClose }: Props) {
         <div className="overflow-y-auto p-4 space-y-1">
           {SHORTCUTS.map((s, i) => {
             if ("section" in s) return (
-              <p key={i} className="pt-3 pb-0.5 text-[10px] font-semibold text-gray-500 uppercase tracking-wider first:pt-0">
+              <p key={i} className="pt-3 pb-0.5 text-[10px] font-semibold text-stone-500 uppercase tracking-wider first:pt-0">
                 {s.section}
               </p>
             );
             return (
               <div key={i} className="flex items-center justify-between gap-6 py-0.5">
-                <span className="text-xs text-gray-400">{s.desc}</span>
-                <kbd className="shrink-0 inline-flex items-center rounded border border-gray-600 bg-gray-800 px-1.5 py-0.5 text-[10px] font-mono text-gray-300">
+                <span className="text-xs text-stone-400">{s.desc}</span>
+                <kbd className="shrink-0 inline-flex items-center rounded border border-stone-600 bg-stone-800 px-1.5 py-0.5 text-[10px] font-mono text-stone-300">
                   {s.key}
                 </kbd>
               </div>
@@ -71,8 +71,8 @@ export default function KeyboardCheatSheet({ onClose }: Props) {
           })}
         </div>
 
-        <div className="px-5 py-2.5 border-t border-gray-700 shrink-0">
-          <p className="text-[10px] text-gray-600">Press <kbd className="inline px-1 py-0.5 rounded border border-gray-700 bg-gray-800 font-mono">?</kbd> or <kbd className="inline px-1 py-0.5 rounded border border-gray-700 bg-gray-800 font-mono">Esc</kbd> to dismiss</p>
+        <div className="px-5 py-2.5 border-t border-stone-700 shrink-0">
+          <p className="text-[10px] text-stone-600">Press <kbd className="inline px-1 py-0.5 rounded border border-stone-700 bg-stone-800 font-mono">?</kbd> or <kbd className="inline px-1 py-0.5 rounded border border-stone-700 bg-stone-800 font-mono">Esc</kbd> to dismiss</p>
         </div>
       </div>
     </div>

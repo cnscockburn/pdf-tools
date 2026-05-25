@@ -23,5 +23,9 @@ backend/temp/
 # Claude Code
 .claude/
 
+# Skills CLI (impeccable etc.) — third-party agent code installed locally.
+# The skills-lock.json IS committed so installs are deterministic.
+.agents/
+
 # Stray nested repo artefact
 pdf-tools/

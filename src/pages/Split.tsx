@@ -59,8 +59,8 @@ export default function Split() {
         />
 
         {file && (
-          <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
-            <p className="text-sm text-gray-500">
+          <div className="rounded-xl border border-stone-200 bg-white p-5 space-y-4">
+            <p className="text-sm text-stone-500">
               {pageCount ? `${pageCount} pages detected` : "Loading…"}
             </p>
 
@@ -72,7 +72,7 @@ export default function Split() {
                   className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
                     mode === m
                       ? "bg-brand-500 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      : "bg-stone-100 text-stone-600 hover:bg-stone-200"
                   }`}
                 >
                   {m === "every" ? "Split every page" : "Custom ranges"}
@@ -82,7 +82,7 @@ export default function Split() {
 
             {mode === "ranges" && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-stone-700 mb-1">
                   Page ranges
                 </label>
                 <input
@@ -90,9 +90,9 @@ export default function Split() {
                   placeholder="e.g. 1-3, 5, 7-10"
                   value={rangeInput}
                   onChange={(e) => setRangeInput(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
-                <p className="mt-1 text-xs text-gray-400">
+                <p className="mt-1 text-xs text-stone-400">
                   Each range becomes a separate PDF. Download arrives as a .zip.
                 </p>
               </div>
