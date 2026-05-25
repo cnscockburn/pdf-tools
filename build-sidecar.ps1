@@ -36,9 +36,19 @@ Write-Host "PyInstaller succeeded." -ForegroundColor Green
 # ── Step 3: determine Rust target triple ─────────────────────────────────────
 # `rustc -vV` prints something like:
 #   host: x86_64-pc-windows-msvc
-$triple = (rustc -vV) -match "^host:" | ForEach-Object { ($_ -split ":\s+")[1] }
+# Try PATH first, then fall back to the standard cargo bin directory.
+$rustc = (Get-Command rustc -ErrorAction SilentlyContinue).Source
+if (-not $rustc) {
+    $rustc = "$env:USERPROFILE\.cargo\bin\rustc.exe"
+    if (-not (Test-Path $rustc)) { $rustc = $null }
+}
+if (-not $rustc) {
+    Write-Host "Could not find rustc. Install Rust via https://rustup.rs" -ForegroundColor Red
+    exit 1
+}
+$triple = (& $rustc -vV) -match "^host:" | ForEach-Object { ($_ -split ":\s+")[1] }
 if (-not $triple) {
-    Write-Host "Could not determine Rust target triple from 'rustc -vV'." -ForegroundColor Red
+    Write-Host "Could not determine Rust target triple from '$rustc -vV'." -ForegroundColor Red
     Write-Host "Set `$triple manually and re-run, e.g.: x86_64-pc-windows-msvc"
     exit 1
 }

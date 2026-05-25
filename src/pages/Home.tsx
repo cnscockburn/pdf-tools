@@ -3,29 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useDropzone } from "react-dropzone";
 import { Layers, Scissors, Minimize2, EyeOff, LayoutGrid, FileImage } from "lucide-react";
 import { cn } from "../lib/utils";
-
-// ── Stria brand mark ─────────────────────────────────────────────────────────
-// Two-panel geometric folio: square with X diagonals + open fold at top-right
-// + 1px anchor dot at centre.
-function StriaLogo({ size = 28 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      {/* Main folio square */}
-      <rect x="2" y="9" width="18" height="18" stroke="#d97706" strokeWidth="1.5" strokeLinejoin="round"/>
-      {/* X diagonals */}
-      <line x1="2"  y1="9"  x2="20" y2="27" stroke="#d97706" strokeWidth="1.5"/>
-      <line x1="20" y1="9"  x2="2"  y2="27" stroke="#d97706" strokeWidth="1.5"/>
-      {/* Open fold — top-right panel */}
-      <line x1="20" y1="9"  x2="30" y2="2"  stroke="#d97706" strokeWidth="1.5"/>
-      <line x1="30" y1="2"  x2="30" y2="13" stroke="#d97706" strokeWidth="1.5"/>
-      <line x1="20" y1="13" x2="30" y2="13" stroke="#d97706" strokeWidth="1.5"/>
-      {/* Fold interior diagonal */}
-      <line x1="20" y1="9"  x2="30" y2="13" stroke="#d97706" strokeWidth="1.5"/>
-      {/* 1px anchor dot */}
-      <circle cx="11" cy="18" r="1.5" fill="#d97706"/>
-    </svg>
-  );
-}
+import striaLogo from "../assets/stria-logo.png";
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
 
@@ -113,7 +91,7 @@ export default function Home() {
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="shrink-0 h-12 bg-white border-b border-stone-200 px-6 flex items-center gap-3">
-        <StriaLogo size={26} />
+        <img src={striaLogo} alt="" aria-hidden="true" className="h-7 w-auto object-contain" />
         <div className="leading-none">
           <p className="text-[16px] font-semibold text-stone-900 tracking-[-0.01em] leading-[1.25]">Stria</p>
           <p className="text-[12px] text-stone-400 leading-[1.25] mt-0.5">PDF toolkit</p>

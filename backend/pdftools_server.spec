@@ -51,7 +51,7 @@ a = Analysis(
         "multipart",
         # PyMuPDF
         "fitz",
-        "fitz.fitz",
+        "pymupdf",
         # Pikepdf / lxml (used by pikepdf)
         "pikepdf",
         "lxml",
