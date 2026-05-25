@@ -11,12 +11,12 @@ import AnnotationsListPanel from "./AnnotationsListPanel";
 import OutlinePanel from "./OutlinePanel";
 import BookmarksPanel from "./BookmarksPanel";
 import type { LocalAnnot, AnnotId, AnnotStatus } from "./AnnotationLayer";
-import type { UserBookmark } from "../lib/storage";
+import type { UserBookmark, Snippet } from "../lib/storage";
 
 export type PanelTool =
   | "compress" | "watermark" | "split" | "extract"
   | "rotate-delete" | "security" | "pdf-to-images"
-  | "annotations" | "outline" | "bookmarks"
+  | "annotations" | "outline" | "bookmarks" | "snippets"
   | null;
 
 interface Props {
@@ -40,6 +40,10 @@ interface Props {
   onAddBookmark?: () => void;
   onDeleteBookmark?: (id: string) => void;
   onRenameBookmark?: (id: string, label: string) => void;
+  // ── Snippets panel ───────────────────────────────────────────────────────
+  snippets?: Snippet[];
+  onAddSnippet?: (text: string) => void;
+  onRemoveSnippet?: (id: string) => void;
 }
 
 function PanelHeader({ title, onClose }: { title: string; onClose: () => void }) {
@@ -580,12 +584,73 @@ function PdfToImagesPanel({ file, onClose }: { file: File; onClose: () => void }
 }
 
 // ---------------------------------------------------------------------------
+// Snippets panel
+// ---------------------------------------------------------------------------
+
+function SnippetsPanel({ snippets, onAdd, onRemove }: {
+  snippets: Snippet[];
+  onAdd: (text: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  const [draft, setDraft] = useState("");
+
+  function submit() {
+    if (draft.trim()) { onAdd(draft.trim()); setDraft(""); }
+  }
+
+  return (
+    <div className="flex flex-col flex-1 overflow-hidden">
+      {/* Add form */}
+      <div className="px-3 pt-3 pb-2 border-b border-stone-700 shrink-0 space-y-2">
+        <p className="text-[10px] text-stone-500 leading-snug">
+          Save reusable phrases you type often in comments. Insert via the "Snippets" dropdown in any annotation editor.
+        </p>
+        <textarea
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); submit(); } }}
+          placeholder="Type a snippet… (Ctrl+Enter to save)"
+          rows={2}
+          className="w-full rounded-lg border border-stone-600 bg-stone-800 px-2.5 py-1.5 text-xs text-stone-200 placeholder-stone-600 resize-none focus:outline-none focus:ring-1 focus:ring-brand-500"
+        />
+        <button
+          onClick={submit}
+          disabled={!draft.trim()}
+          className="w-full rounded-lg bg-brand-500 hover:bg-brand-600 disabled:opacity-40 py-1.5 text-xs font-semibold text-white transition"
+        >
+          Save snippet
+        </button>
+      </div>
+
+      {/* List */}
+      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
+        {snippets.length === 0 ? (
+          <p className="text-xs text-stone-600 text-center py-6">No snippets yet.</p>
+        ) : (
+          snippets.map(s => (
+            <div key={s.id}
+              className="flex items-start gap-2 rounded-lg bg-stone-800 border border-stone-700 px-2.5 py-2 group">
+              <span className="flex-1 text-xs text-stone-300 break-words leading-relaxed">{s.text}</span>
+              <button onClick={() => onRemove(s.id)}
+                className="shrink-0 text-stone-600 hover:text-red-400 transition opacity-0 group-hover:opacity-100 mt-0.5">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Root export
 // ---------------------------------------------------------------------------
 export default function RightPanel({
   tool, file, pageCount, onClose, onApplied,
   annotations = [], currentPage = 1, onGoToPage, onDeleteAnnot, onStatusChange, onExportReport,
   pdf, bookmarks = [], onAddBookmark, onDeleteBookmark, onRenameBookmark,
+  snippets = [], onAddSnippet, onRemoveSnippet,
 }: Props) {
   if (!tool) return null;
 
@@ -593,6 +658,7 @@ export default function RightPanel({
     annotations: "Annotations",
     outline: "Table of Contents",
     bookmarks: "Bookmarks",
+    snippets: "Comment Snippets",
   };
   const title = PANEL_TITLES[tool];
 
@@ -640,6 +706,14 @@ export default function RightPanel({
           onDelete={onDeleteBookmark ?? (() => {})}
           onRename={onRenameBookmark ?? (() => {})}
           onAddBookmark={onAddBookmark ?? (() => {})}
+        />
+      )}
+
+      {tool === "snippets" && (
+        <SnippetsPanel
+          snippets={snippets}
+          onAdd={onAddSnippet ?? (() => {})}
+          onRemove={onRemoveSnippet ?? (() => {})}
         />
       )}
 

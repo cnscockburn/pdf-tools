@@ -9,7 +9,7 @@ import {
   Minimize2, Stamp, Scissors, FileOutput, RotateCw, Lock, FileImage,
   ExternalLink, Loader2, Highlighter, Type, Pencil, Check, X, Download,
   Underline, Strikethrough, Search, HelpCircle, List, User, FileText,
-  PenLine, Square, BookOpen, Bookmark, Command,
+  PenLine, Square, BookOpen, Bookmark, Command, Quote,
 } from "lucide-react";
 import { cn, downloadBlob } from "../lib/utils";
 import ThumbnailSidebar from "../components/ThumbnailSidebar";
@@ -86,7 +86,7 @@ interface PageText {
 
 export default function Viewer() {
   // ── Settings + bookmarks ──────────────────────────────────────────────────
-  const { settings, updateSettings } = useSettings();
+  const { settings, updateSettings, addSnippet, removeSnippet } = useSettings();
   const { bookmarks, addBookmark, removeBookmark, renameBookmark } = useBookmarks();
   const [editingAuthor, setEditingAuthor] = useState(false);
   const [authorInput, setAuthorInput]     = useState("");
@@ -383,6 +383,16 @@ export default function Viewer() {
     window.addEventListener("mousedown", onDown);
     return () => window.removeEventListener("mousedown", onDown);
   }, []);
+
+  // ── Auto-enable text layer for text-markup annotation modes ──────────────
+  // Highlight / underline / strikethrough all work by selecting text, so the
+  // text layer is automatically made interactive when those sub-modes are active.
+  // All other modes (note, freetext, ink, shape, stamp) use drag/click so the
+  // text layer stays transparent and doesn't interfere.
+  useEffect(() => {
+    const textModes: CreateMode[] = ["highlight", "underline", "strikethrough"];
+    setTextSelectActive(canvasMode === "annotate" && textModes.includes(annotateSubMode));
+  }, [annotateSubMode, canvasMode]);
 
   // ── Keyboard shortcuts (stable handler via ref) ────────────────────────────
   useEffect(() => {
@@ -767,6 +777,12 @@ export default function Viewer() {
         canvasMode === m ? "bg-brand-600 text-white shadow" : "text-stone-300 hover:bg-stone-700"
       )}>
       {icon} {label}
+      <kbd className={cn(
+        "ml-0.5 rounded border px-1 py-0 text-[9px] font-mono leading-4 transition",
+        canvasMode === m
+          ? "border-white/25 bg-white/10 text-white/70"
+          : "border-stone-600 bg-stone-800 text-stone-500"
+      )}>{key}</kbd>
     </button>
   );
 
@@ -1018,33 +1034,34 @@ export default function Viewer() {
                 {/* Sub-mode */}
                 <div className="flex gap-1 flex-wrap">
                   {([
-                    { m: "note"          as CreateMode, icon: <MessageSquare className="h-3.5 w-3.5" />, label: "Note",    key: "A" },
+                    { m: "note"          as CreateMode, icon: <MessageSquare className="h-3.5 w-3.5" />, label: "Note",      key: "A" },
                     { m: "highlight"     as CreateMode, icon: <Highlighter   className="h-3.5 w-3.5" />, label: "Highlight", key: "H" },
                     { m: "underline"     as CreateMode, icon: <Underline     className="h-3.5 w-3.5" />, label: "Underline", key: "U" },
-                    { m: "strikethrough" as CreateMode, icon: <Strikethrough className="h-3.5 w-3.5" />, label: "Strike",  key: "S" },
-                    { m: "freetext"      as CreateMode, icon: <Type          className="h-3.5 w-3.5" />, label: "Text",    key: "T" },
-                    { m: "ink"           as CreateMode, icon: <PenLine       className="h-3.5 w-3.5" />, label: "Draw",    key: "I" },
-                    { m: "shape"         as CreateMode, icon: <Square        className="h-3.5 w-3.5" />, label: "Shape",   key: "" },
-                    { m: "stamp"         as CreateMode, icon: <Stamp         className="h-3.5 w-3.5" />, label: "Stamp",   key: "" },
-                  ]).map(({ m, icon, label, key }) => (
-                    <button key={m} onClick={() => { setAnnotateSubMode(m); setTextSelectActive(false); }}
-                      title={`${label}${key ? ` (${key})` : ""}`}
-                      className={cn("flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition",
-                        annotateSubMode === m && !textSelectActive ? "bg-brand-600 text-white" : "bg-stone-700 text-stone-300 hover:bg-stone-600")}>
-                      {icon} {label}
-                    </button>
-                  ))}
-                  {/* Text select toggle */}
-                  <button
-                    onClick={() => setTextSelectActive(v => !v)}
-                    title="Select text to highlight/underline/strike"
-                    className={cn("flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition",
-                      textSelectActive ? "bg-purple-600 text-white" : "bg-stone-700 text-stone-300 hover:bg-stone-600")}>
-                    <Type className="h-3.5 w-3.5" /> Select
-                  </button>
+                    { m: "strikethrough" as CreateMode, icon: <Strikethrough className="h-3.5 w-3.5" />, label: "Strike",    key: "S" },
+                    { m: "freetext"      as CreateMode, icon: <Type          className="h-3.5 w-3.5" />, label: "Text",      key: "T" },
+                    { m: "ink"           as CreateMode, icon: <PenLine       className="h-3.5 w-3.5" />, label: "Draw",      key: "I" },
+                    { m: "shape"         as CreateMode, icon: <Square        className="h-3.5 w-3.5" />, label: "Shape",     key: "" },
+                    { m: "stamp"         as CreateMode, icon: <Stamp         className="h-3.5 w-3.5" />, label: "Stamp",     key: "" },
+                  ]).map(({ m, icon, label, key }) => {
+                    const active = annotateSubMode === m;
+                    return (
+                      <button key={m} onClick={() => setAnnotateSubMode(m)}
+                        title={`${label}${key ? ` (${key})` : ""}`}
+                        className={cn("flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition",
+                          active ? "bg-brand-600 text-white" : "bg-stone-700 text-stone-300 hover:bg-stone-600")}>
+                        {icon} {label}
+                        {key && (
+                          <kbd className={cn(
+                            "ml-0.5 rounded border px-1 py-0 text-[9px] font-mono leading-4 transition",
+                            active ? "border-white/25 bg-white/10 text-white/70" : "border-stone-600 bg-stone-800 text-stone-500"
+                          )}>{key}</kbd>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
                 {/* Highlight colour swatches */}
-                {annotateSubMode === "highlight" && !textSelectActive && (
+                {annotateSubMode === "highlight" && (
                   <div className="flex items-center gap-1">
                     {HIGHLIGHT_COLORS.map((c, i) => (
                       <button key={i} onClick={() => setHlColor(i)} title={`${c.label} (${i + 1})`}
@@ -1255,15 +1272,20 @@ export default function Viewer() {
 
               {/* Search */}
               <button onClick={() => setSearchOpen(v => !v)} title="Search (Ctrl+F)"
-                className={cn("p-1.5 rounded-lg transition text-stone-400 hover:text-white hover:bg-stone-700",
-                  searchOpen && "bg-brand-600 text-white")}>
+                className={cn("flex items-center gap-1 rounded-lg px-2 py-1.5 transition",
+                  searchOpen ? "bg-brand-600 text-white" : "text-stone-400 hover:text-white hover:bg-stone-700")}>
                 <Search className="h-3.5 w-3.5" />
+                <kbd className={cn(
+                  "rounded border px-1 py-0 text-[9px] font-mono leading-4 transition",
+                  searchOpen ? "border-white/25 bg-white/10 text-white/70" : "border-stone-600 bg-stone-800 text-stone-500"
+                )}>^F</kbd>
               </button>
 
               {/* Navigation panels */}
               {panelBtn("annotations", <List     className="h-3.5 w-3.5" />, "Annotations")}
               {panelBtn("outline",     <BookOpen className="h-3.5 w-3.5" />, "Outline")}
               {panelBtn("bookmarks",   <Bookmark className="h-3.5 w-3.5" />, "Bookmarks")}
+              {panelBtn("snippets",    <Quote    className="h-3.5 w-3.5" />, "Snippets")}
 
               <div className="w-px h-5 bg-stone-700 mx-0.5" />
 
@@ -1295,14 +1317,16 @@ export default function Viewer() {
 
               {/* Command palette */}
               <button onClick={() => setPaletteOpen(true)} title="Command palette (Ctrl+Shift+P)"
-                className="p-1.5 rounded-lg hover:bg-stone-700 transition text-stone-500 hover:text-stone-300">
+                className="flex items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-stone-700 transition text-stone-500 hover:text-stone-300">
                 <Command className="h-3.5 w-3.5" />
+                <kbd className="rounded border border-stone-600 bg-stone-800 px-1 py-0 text-[9px] font-mono leading-4 text-stone-500">^⇧P</kbd>
               </button>
 
               {/* Keyboard cheat sheet */}
               <button onClick={() => setCheatSheetOpen(true)} title="Keyboard shortcuts (?)"
-                className="p-1.5 rounded-lg hover:bg-stone-700 transition text-stone-500 hover:text-stone-300">
+                className="flex items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-stone-700 transition text-stone-500 hover:text-stone-300">
                 <HelpCircle className="h-3.5 w-3.5" />
+                <kbd className="rounded border border-stone-600 bg-stone-800 px-1 py-0 text-[9px] font-mono leading-4 text-stone-500">?</kbd>
               </button>
             </div>
           </div>
@@ -1318,7 +1342,7 @@ export default function Viewer() {
             onClose={() => setPanelTool(null)}
             onApplied={async (blob) => {
               await applyBlob(blob);
-              if (panelTool !== "annotations" && panelTool !== "outline" && panelTool !== "bookmarks")
+              if (panelTool !== "annotations" && panelTool !== "outline" && panelTool !== "bookmarks" && panelTool !== "snippets")
                 setPanelTool(null);
             }}
             // Annotations panel props
@@ -1335,6 +1359,10 @@ export default function Viewer() {
             onAddBookmark={() => addBookmark(currentPage)}
             onDeleteBookmark={removeBookmark}
             onRenameBookmark={renameBookmark}
+            // Snippets panel
+            snippets={settings.snippets}
+            onAddSnippet={addSnippet}
+            onRemoveSnippet={removeSnippet}
           />
         )}
 
@@ -1399,6 +1427,7 @@ export default function Viewer() {
       { id: "bookmarks",    label: "Bookmarks",        description: "Open the bookmarks panel",       category: "Navigation", action: () => { togglePanel("bookmarks"); setPaletteOpen(false); } },
       { id: "annotations",  label: "Annotations panel",description: "Open the annotations sidebar",   category: "Navigation", action: () => { togglePanel("annotations"); setPaletteOpen(false); } },
       { id: "bm-add",       label: "Bookmark this page",description: `Bookmark page ${currentPage}`,  category: "Bookmarks",  action: () => { addBookmark(currentPage); setPaletteOpen(false); } },
+      { id: "snippets",     label: "Comment snippets", description: "Manage reusable comment text",  category: "Navigation", action: () => { togglePanel("snippets"); setPaletteOpen(false); } },
       { id: "export",       label: "Export report",    description: "Download annotations as .md",    category: "Export",     action: () => { downloadAnnotationReport(annotations, filename); setPaletteOpen(false); } },
       ...(workingBlob ? [{
         id: "download", label: "Download PDF", description: "Save modified PDF (Ctrl+S)", category: "Export",

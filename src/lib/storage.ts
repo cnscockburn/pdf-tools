@@ -66,7 +66,21 @@ export function useSettings() {
     });
   }
 
-  return { settings, updateSettings };
+  function addSnippet(text: string) {
+    if (!text.trim()) return;
+    updateSettings({
+      snippets: [
+        ...settings.snippets.filter(s => s.text !== text.trim()),
+        { id: `sn${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, text: text.trim() },
+      ],
+    });
+  }
+
+  function removeSnippet(id: string) {
+    updateSettings({ snippets: settings.snippets.filter(s => s.id !== id) });
+  }
+
+  return { settings, updateSettings, addSnippet, removeSnippet };
 }
 
 export function useBookmarks() {

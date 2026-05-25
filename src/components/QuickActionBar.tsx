@@ -1,8 +1,9 @@
 /**
  * QuickActionBar — floats above a text selection.
- * Parent is responsible for positioning (viewport px coords).
+ * Shows labeled action buttons with key-binding chips for fast markup.
  */
 import { Highlighter, Underline, Strikethrough, MessageSquare, Copy } from "lucide-react";
+import type { ReactNode } from "react";
 
 interface Props {
   /** Horizontal centre of the bar in viewport px */
@@ -16,32 +17,40 @@ interface Props {
   onCopy:          () => void;
 }
 
-const BTN = "flex items-center justify-center p-1.5 rounded hover:bg-stone-700 transition";
+function Btn({ icon, label, k, onClick }: {
+  icon: ReactNode; label: string; k?: string; onClick: () => void;
+}) {
+  return (
+    <button
+      className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg hover:bg-stone-700 transition min-w-[2.75rem]"
+      onClick={onClick}
+      title={k ? `${label} (${k})` : label}
+    >
+      {icon}
+      <span className="text-[9px] text-stone-400 leading-none whitespace-nowrap">{label}</span>
+      {k && (
+        <kbd className="rounded border border-stone-600 bg-stone-800 px-1 text-[8px] font-mono leading-3 text-stone-500">
+          {k}
+        </kbd>
+      )}
+    </button>
+  );
+}
 
 export default function QuickActionBar({ x, y, onHighlight, onUnderline, onStrikethrough, onComment, onCopy }: Props) {
   return (
     <div
       className="fixed z-50 flex items-center gap-0.5 bg-stone-900 border border-stone-700 rounded-xl shadow-2xl px-1.5 py-1"
-      style={{ left: x, top: y - 46, transform: "translateX(-50%)" }}
+      style={{ left: x, top: y - 68, transform: "translateX(-50%)" }}
       onMouseDown={e => e.stopPropagation()}
       onPointerDown={e => e.stopPropagation()}
     >
-      <button className={BTN} title="Highlight (H)" onClick={onHighlight}>
-        <Highlighter className="h-3.5 w-3.5 text-yellow-400" />
-      </button>
-      <button className={BTN} title="Underline (U)" onClick={onUnderline}>
-        <Underline className="h-3.5 w-3.5 text-sky-400" />
-      </button>
-      <button className={BTN} title="Strikethrough (S)" onClick={onStrikethrough}>
-        <Strikethrough className="h-3.5 w-3.5 text-red-400" />
-      </button>
-      <div className="w-px h-3.5 bg-stone-700 mx-0.5" />
-      <button className={BTN} title="Add note" onClick={onComment}>
-        <MessageSquare className="h-3.5 w-3.5 text-stone-300" />
-      </button>
-      <button className={BTN} title="Copy text" onClick={onCopy}>
-        <Copy className="h-3.5 w-3.5 text-stone-300" />
-      </button>
+      <Btn icon={<Highlighter  className="h-3.5 w-3.5 text-yellow-400" />} label="Highlight"  k="H" onClick={onHighlight} />
+      <Btn icon={<Underline    className="h-3.5 w-3.5 text-sky-400"    />} label="Underline"  k="U" onClick={onUnderline} />
+      <Btn icon={<Strikethrough className="h-3.5 w-3.5 text-red-400"  />} label="Strike"     k="S" onClick={onStrikethrough} />
+      <div className="w-px h-9 bg-stone-700 mx-0.5" />
+      <Btn icon={<MessageSquare className="h-3.5 w-3.5 text-stone-300"/>} label="Note"        onClick={onComment} />
+      <Btn icon={<Copy          className="h-3.5 w-3.5 text-stone-300" />} label="Copy"        onClick={onCopy} />
     </div>
   );
 }

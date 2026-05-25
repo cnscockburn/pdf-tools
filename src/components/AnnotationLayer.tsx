@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "../lib/utils";
 import type { Snippet } from "../lib/storage";
+import MathText from "./MathText";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -291,6 +292,7 @@ export default function AnnotationLayer({
   const [selectedIds, setSelectedIds] = useState<Set<AnnotId>>(new Set());
   const [editingId,   setEditingId]   = useState<AnnotId | null>(null);
   const [editText,    setEditText]    = useState("");
+  const [editTagsStr, setEditTagsStr] = useState(""); // comma-separated tags during edit
   const [replyingId,  setReplyingId]  = useState<AnnotId | null>(null);
   const [replyText,   setReplyText]   = useState("");
   const [showReplies, setShowReplies] = useState<AnnotId | null>(null);
@@ -357,13 +359,15 @@ export default function AnnotationLayer({
   // ── Edit helpers ──────────────────────────────────────────────────────────
   function startEdit(ann: NoteAnnot | FreetextAnnot) {
     setEditingId(ann.id); setEditText(ann.text);
+    setEditTagsStr((ann.tags ?? []).join(", "));
     setSelectedId(ann.id); setShowReplies(null);
   }
 
   function commitEdit(id: AnnotId) {
     const ann = annotations.find(a => a.id === id);
     if (!ann || (ann.type !== "note" && ann.type !== "freetext")) return;
-    if (editText.trim()) updateAnnot({ ...ann, text: editText.trim() } as LocalAnnot);
+    const tags = editTagsStr.split(",").map(t => t.trim()).filter(Boolean);
+    if (editText.trim()) updateAnnot({ ...ann, text: editText.trim(), tags: tags.length ? tags : undefined } as LocalAnnot);
     else deleteAnnot(id);
     setEditingId(null);
   }
@@ -919,9 +923,15 @@ export default function AnnotationLayer({
                         if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commitEdit(ann.id); }
                         if (e.key === "Escape") { e.preventDefault(); cancelEdit(); }
                       }}
-                      onBlur={() => commitEdit(ann.id)}
                       placeholder="Type note… (Ctrl+Enter to save)"
                       className="w-full rounded-lg border border-yellow-300 bg-white px-2 py-1.5 text-xs text-stone-800 resize-none focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                    />
+                    <input
+                      value={editTagsStr}
+                      onChange={e => setEditTagsStr(e.target.value)}
+                      onKeyDown={e => { e.stopPropagation(); if (e.key === "Escape") { e.preventDefault(); cancelEdit(); } }}
+                      placeholder="Tags: citation, question…"
+                      className="w-full rounded border border-yellow-200 bg-white px-2 py-1 text-[10px] text-stone-600 focus:outline-none focus:ring-1 focus:ring-yellow-400"
                     />
                     <div className="flex gap-1.5 items-center">
                       <SnippetDropdown onInsert={text => setEditText(prev => prev + text)} />
@@ -938,7 +948,7 @@ export default function AnnotationLayer({
                   onMouseDown={e => { e.stopPropagation(); setShowReplies(v => v === ann.id ? null : ann.id); }}
                 >
                   {ann.author && <div className="text-[9px] text-stone-500 mb-0.5 font-medium">{ann.author}</div>}
-                  {ann.text || <span className="italic text-stone-400">empty — double-click to edit</span>}
+                  {ann.text ? <MathText text={ann.text} /> : <span className="italic text-stone-400">empty — double-click to edit</span>}
                   {tagsDisplay(ann.tags)}
                   {(ann.replies?.length ?? 0) > 0 && (
                     <div className="text-[9px] text-brand-500 mt-0.5">{ann.replies!.length} reply{ann.replies!.length > 1 ? "s" : ""}</div>
@@ -951,7 +961,7 @@ export default function AnnotationLayer({
                   className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-40 pointer-events-auto bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg px-2 py-1.5 w-56"
                   onMouseDown={e => e.stopPropagation()}
                 >
-                  {ann.text && <p className="text-xs text-stone-800 mb-1.5">{ann.text}</p>}
+                  {ann.text && <MathText text={ann.text} className="text-xs text-stone-800 mb-1.5 block" />}
                   {renderReplies(ann)}
                 </div>
               )}
@@ -1052,8 +1062,15 @@ export default function AnnotationLayer({
                   className="flex-1 bg-transparent border-none px-1.5 py-1 text-xs text-stone-800 resize-none focus:outline-none"
                   style={{ lineHeight: 1.4 }}
                 />
-                <div className="px-1 pb-0.5">
+                <div className="px-1 pb-0.5 space-y-0.5">
                   <SnippetDropdown onInsert={text => setEditText(prev => prev + text)} />
+                  <input
+                    value={editTagsStr}
+                    onChange={e => setEditTagsStr(e.target.value)}
+                    onKeyDown={e => { e.stopPropagation(); }}
+                    placeholder="tags: citation, question…"
+                    className="w-full rounded border border-yellow-200 bg-white/70 px-1.5 py-0.5 text-[9px] text-stone-600 focus:outline-none"
+                  />
                 </div>
               </div>
             ) : (
