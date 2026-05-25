@@ -1,4 +1,4 @@
-"""End-to-end HTTP test — hits the live backend at localhost:7341.
+"""End-to-end HTTP test — hits the live backend at localhost:7342.
 
 Verifies that the full HTTP stack works for the new annotation types.
 Run from `backend/` with the venv Python (uses stdlib only).
@@ -11,7 +11,7 @@ import urllib.request
 
 import fitz
 
-BASE = "http://127.0.0.1:7341/api"
+BASE = "http://127.0.0.1:7342/api"
 
 
 def make_test_pdf() -> bytes:

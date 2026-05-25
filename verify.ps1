@@ -10,7 +10,7 @@
 #   4. Backend smoke test     (exercises every pdf_engine code path)
 #
 # The backend HTTP integration test (http_test.py) is intentionally NOT run
-# here because it requires a live server at localhost:7341.  Run it manually:
+# here because it requires a live server at localhost:7342.  Run it manually:
 #   cd backend && .venv\Scripts\python.exe http_test.py
 
 $failures = @()

@@ -8,7 +8,7 @@ app = FastAPI(title="PDF Tools API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:7341", "tauri://localhost"],
+    allow_origins=["http://localhost:5173", "http://localhost:7342", "tauri://localhost"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -32,4 +32,4 @@ async def health():
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=7341, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=7342, reload=True)

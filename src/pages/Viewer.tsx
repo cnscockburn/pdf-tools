@@ -395,6 +395,64 @@ export default function Viewer() {
     setTextSelectActive(canvasMode === "annotate" && textModes.includes(annotateSubMode));
   }, [annotateSubMode, canvasMode]);
 
+  // ── Continuous scroll — advance page at scroll boundary ────────────────────
+  // When the canvas area is scrolled to its top or bottom edge and the user
+  // keeps scrolling, advance to the previous / next page.
+  useEffect(() => {
+    const area = canvasAreaRef.current;
+    if (!area) return;
+
+    // Accumulate sub-threshold scroll deltas so trackpads with tiny events
+    // don't require dozens of micro-scrolls before changing page.
+    let accum = 0;
+    const THRESHOLD = 100;          // px of overscroll needed to flip
+    let cooldown = false;           // prevent rapid-fire page changes
+
+    function onWheel(e: WheelEvent) {
+      const el = canvasAreaRef.current;
+      if (!el) return;
+      const { pdf, currentPage } = kbRef.current;
+      if (!pdf) return;
+
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
+      const atTop    = el.scrollTop <= 2;
+
+      if (e.deltaY > 0 && atBottom && currentPage < pdf.numPages) {
+        // Scrolling down while at bottom → next page
+        accum += e.deltaY;
+        if (accum >= THRESHOLD && !cooldown) {
+          accum = 0;
+          cooldown = true;
+          const next = currentPage + 1;
+          setCurrentPage(next);
+          setPageInput(String(next));
+          // After render, scroll to top of new page
+          requestAnimationFrame(() => { el.scrollTop = 0; });
+          setTimeout(() => { cooldown = false; }, 300);
+        }
+      } else if (e.deltaY < 0 && atTop && currentPage > 1) {
+        // Scrolling up while at top → previous page
+        accum += e.deltaY;  // negative
+        if (accum <= -THRESHOLD && !cooldown) {
+          accum = 0;
+          cooldown = true;
+          const prev = currentPage - 1;
+          setCurrentPage(prev);
+          setPageInput(String(prev));
+          // After render, scroll to bottom of new page
+          requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+          setTimeout(() => { cooldown = false; }, 300);
+        }
+      } else {
+        // Normal scrolling within the page — reset accumulator
+        accum = 0;
+      }
+    }
+
+    area.addEventListener("wheel", onWheel, { passive: true });
+    return () => area.removeEventListener("wheel", onWheel);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Keyboard shortcuts (stable handler via ref) ────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -567,7 +625,7 @@ export default function Viewer() {
   async function autoSaveAnnotations(targetMode: CanvasMode) {
     if (!workingFile || annotations.length === 0) { doSwitchMode(targetMode); return; }
     if (backendOk === false) {
-      setAnnotateError("Backend not running — start it: cd backend && uvicorn main:app --port 7341");
+      setAnnotateError("Backend not running — start it: cd backend && uvicorn main:app --port 7342");
       return;
     }
     setAutoSaving(true); setAnnotateError(null);
@@ -1302,7 +1360,7 @@ export default function Viewer() {
               <button onClick={() => setPaletteOpen(true)} title="Command palette (Ctrl+Shift+P)"
                 className="flex items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-stone-700 transition text-stone-500 hover:text-stone-300">
                 <Command className="h-3.5 w-3.5" />
-                <kbd className="rounded border border-stone-600 bg-stone-800 px-1 py-0 text-[9px] font-mono leading-4 text-stone-500">^⇧P</kbd>
+                <kbd className="rounded border border-stone-600 bg-stone-800 px-1 py-0 text-[9px] font-mono leading-4 text-stone-500">Ctrl+Shift+P</kbd>
               </button>
 
               {/* Keyboard cheat sheet */}

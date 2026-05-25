@@ -42,7 +42,7 @@ A self-hosted, local-first PDF toolkit running entirely on Windows (targeting Wi
   [Local filesystem]
 ```
 
-**How it works:** A Python FastAPI server runs on localhost (e.g. port 7341). The UI is a React SPA served by that same server. Users open `http://localhost:7341` in their browser, or the whole thing is wrapped in an Electron/Tauri shell to make it feel like a native app.
+**How it works:** A Python FastAPI server runs on localhost (e.g. port 7342). The UI is a React SPA served by that same server. Users open `http://localhost:7342` in their browser, or the whole thing is wrapped in an Electron/Tauri shell to make it feel like a native app.
 
 **Pros:**
 - Best-in-class PDF libraries live in the Python ecosystem
@@ -310,10 +310,10 @@ PyMuPDF: set `Page.set_cropbox(fitz.Rect(x0,y0,x1,y1))`. Note: this is non-destr
 ### Phase 1 — Developer mode
 ```
 # Terminal 1
-cd backend && uv run uvicorn main:app --port 7341
+cd backend && uv run uvicorn main:app --port 7342
 
 # Terminal 2
-cd frontend && pnpm dev  # proxies /api → localhost:7341
+cd frontend && pnpm dev  # proxies /api → localhost:7342
 ```
 
 ### Phase 2 — Single portable binary
@@ -321,12 +321,12 @@ cd frontend && pnpm dev  # proxies /api → localhost:7341
 1. `pnpm build` → static files into `backend/static/`
 2. FastAPI serves static files from `/`
 3. `pyinstaller --onefile main.py` → `pdf-tools.exe`
-4. User double-clicks `pdf-tools.exe`, server starts, browser auto-opens at `http://localhost:7341`
+4. User double-clicks `pdf-tools.exe`, server starts, browser auto-opens at `http://localhost:7342`
 
 ### Phase 3 — Native app (optional)
 Wrap with Electron Builder:
 - Electron main process spawns `pdf-tools.exe` as child process
-- Opens `BrowserWindow` pointing at `http://localhost:7341`
+- Opens `BrowserWindow` pointing at `http://localhost:7342`
 - System tray icon, minimize-to-tray, file association for `.pdf`
 - `electron-builder` produces NSIS installer for Windows
 

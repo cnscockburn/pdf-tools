@@ -465,14 +465,21 @@ export default function AnnotationLayer({
       live: { x0: startFrac.x, y0: startFrac.y, x1: startFrac.x, y1: startFrac.y },
     };
 
+    const isLineShape = createMode === "shape" && (shapeSubType === "line" || shapeSubType === "arrow");
+
     const onMove = (me: MouseEvent) => {
       if (!dragRef.current || dragRef.current.kind !== "create") return;
       const cur = getContainerFrac(me);
       const sf = dragRef.current.startFrac;
-      dragRef.current.live = {
-        x0: Math.min(sf.x, cur.x), y0: Math.min(sf.y, cur.y),
-        x1: Math.max(sf.x, cur.x), y1: Math.max(sf.y, cur.y),
-      };
+      if (isLineShape) {
+        // Lines/arrows: keep directional start→end (don't normalize)
+        dragRef.current.live = { x0: sf.x, y0: sf.y, x1: cur.x, y1: cur.y };
+      } else {
+        dragRef.current.live = {
+          x0: Math.min(sf.x, cur.x), y0: Math.min(sf.y, cur.y),
+          x1: Math.max(sf.x, cur.x), y1: Math.max(sf.y, cur.y),
+        };
+      }
       forceUpdate(n => n + 1);
     };
 
@@ -482,9 +489,16 @@ export default function AnnotationLayer({
       if (!dragRef.current || dragRef.current.kind !== "create") return;
       const { live } = dragRef.current;
       dragRef.current = null;
-      if (!live || (live.x1 - live.x0 < 0.01 && live.y1 - live.y0 < 0.004)) {
+      if (!live) { forceUpdate(n => n + 1); return; }
+
+      if (isLineShape) {
+        // For lines/arrows, check distance instead of width×height
+        const dx = live.x1 - live.x0, dy = live.y1 - live.y0;
+        if (Math.sqrt(dx * dx + dy * dy) < 0.015) { forceUpdate(n => n + 1); return; }
+      } else if (live.x1 - live.x0 < 0.01 && live.y1 - live.y0 < 0.004) {
         forceUpdate(n => n + 1); return;
       }
+
       const id = newId();
       const base = { id, page, author: author || undefined };
       if (createMode === "highlight") {
@@ -870,12 +884,19 @@ export default function AnnotationLayer({
       {pageAnns.map(ann => {
         if (ann.type !== "ink" && ann.type !== "shape") return null;
         const sel = ann.id === selectedId || selectedIds.has(ann.id);
+        const isLine = ann.type === "shape" && (ann.shape === "line" || ann.shape === "arrow");
+        // For lines: compute bounding box from directional endpoints + padding
+        const pad = isLine ? 0.01 : 0;
+        const bx0 = Math.min(ann.x0, ann.x1) - pad;
+        const by0 = Math.min(ann.y0, ann.y1) - pad;
+        const bx1 = Math.max(ann.x0, ann.x1) + pad;
+        const by1 = Math.max(ann.y0, ann.y1) + pad;
         return (
           <div key={ann.id} data-annot="true"
             className="absolute pointer-events-auto"
             style={{
-              left: `${ann.x0 * 100}%`, top: `${ann.y0 * 100}%`,
-              width: `${(ann.x1 - ann.x0) * 100}%`, height: `${(ann.y1 - ann.y0) * 100}%`,
+              left: `${bx0 * 100}%`, top: `${by0 * 100}%`,
+              width: `${(bx1 - bx0) * 100}%`, height: `${(by1 - by0) * 100}%`,
               zIndex: sel ? 25 : 13,
               cursor: "move",
             }}
@@ -885,7 +906,7 @@ export default function AnnotationLayer({
             {sel && ann.type !== "ink" && (
               <>
                 {deleteBtn(ann.id)}
-                {ann.type === "shape" && renderResizeHandles(ann, svgColor(ann.color))}
+                {ann.type === "shape" && !isLine && renderResizeHandles(ann, svgColor(ann.color))}
                 {ann.type === "shape" && renderLineCommentEditor(ann)}
               </>
             )}
@@ -1176,15 +1197,39 @@ export default function AnnotationLayer({
       })}
 
       {/* ── In-progress drag preview ────────────────────────────────────────── */}
-      {live && createMode !== "ink" && (live.x1 - live.x0 > 0.002 || live.y1 - live.y0 > 0.002) && (
-        <div className="absolute pointer-events-none rounded-sm" style={{
-          left: `${live.x0 * 100}%`, top: `${live.y0 * 100}%`,
-          width: `${(live.x1 - live.x0) * 100}%`, height: `${(live.y1 - live.y0) * 100}%`,
-          border: `2px dashed ${dragColor}`,
-          backgroundColor: dragBg,
-          zIndex: 20,
-        }} />
-      )}
+      {live && createMode !== "ink" && (() => {
+        const isLineDrag = createMode === "shape" && (shapeSubType === "line" || shapeSubType === "arrow");
+        if (isLineDrag) {
+          // Render a line preview in the SVG, not a rectangle
+          const dx = live.x1 - live.x0, dy = live.y1 - live.y0;
+          if (Math.sqrt(dx * dx + dy * dy) < 0.005) return null;
+          return (
+            <svg className="absolute inset-0 pointer-events-none"
+              viewBox="0 0 1 1" preserveAspectRatio="none"
+              style={{ zIndex: 20, width: "100%", height: "100%" }}>
+              <line x1={live.x0} y1={live.y0} x2={live.x1} y2={live.y1}
+                stroke={dragColor} strokeWidth={2} strokeDasharray="6,4"
+                vectorEffect="non-scaling-stroke" strokeLinecap="round" />
+              {shapeSubType === "arrow" && (() => {
+                const pts = arrowheadPoints(live.x0, live.y0, live.x1, live.y1);
+                return pts ? <polygon points={pts} fill={dragColor} vectorEffect="non-scaling-stroke" opacity={0.6} /> : null;
+              })()}
+            </svg>
+          );
+        }
+        if (live.x1 - live.x0 > 0.002 || live.y1 - live.y0 > 0.002) {
+          return (
+            <div className="absolute pointer-events-none rounded-sm" style={{
+              left: `${live.x0 * 100}%`, top: `${live.y0 * 100}%`,
+              width: `${(live.x1 - live.x0) * 100}%`, height: `${(live.y1 - live.y0) * 100}%`,
+              border: `2px dashed ${dragColor}`,
+              backgroundColor: dragBg,
+              zIndex: 20,
+            }} />
+          );
+        }
+        return null;
+      })()}
 
       {/* ── Multi-select bulk action bar ────────────────────────────────────── */}
       {multiselectActive && (

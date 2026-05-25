@@ -12,10 +12,10 @@ Write-Host "Starting PDF Tools dev environment..." -ForegroundColor Cyan
 $backendJob = Start-Job -Name "backend" -ScriptBlock {
     param($dir)
     Set-Location $dir
-    & ".venv\Scripts\uvicorn.exe" main:app --host 127.0.0.1 --port 7341 --reload
+    & ".venv\Scripts\uvicorn.exe" main:app --host 127.0.0.1 --port 7342 --reload
 } -ArgumentList "$root\backend"
 
-Write-Host "[backend] Started on http://127.0.0.1:7341" -ForegroundColor Green
+Write-Host "[backend] Started on http://127.0.0.1:7342" -ForegroundColor Green
 
 # ── Frontend ───────────────────────────────────────────────────────────────
 $frontendJob = Start-Job -Name "frontend" -ScriptBlock {
@@ -44,7 +44,7 @@ try {
     Stop-Job  -Job $backendJob, $frontendJob -ErrorAction SilentlyContinue
     Remove-Job -Job $backendJob, $frontendJob -ErrorAction SilentlyContinue
     # Kill any leftover process on 7341
-    Get-NetTCPConnection -LocalPort 7341 -ErrorAction SilentlyContinue |
+    Get-NetTCPConnection -LocalPort 7342 -ErrorAction SilentlyContinue |
         Select-Object -ExpandProperty OwningProcess | Sort-Object -Unique |
         ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
     Write-Host "Done." -ForegroundColor Green

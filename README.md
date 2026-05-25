@@ -24,7 +24,7 @@ python -m uv venv
 python -m uv pip install --python .venv\Scripts\python.exe fastapi "uvicorn[standard]" python-multipart PyMuPDF pikepdf Pillow
 
 # Start server:
-.venv\Scripts\uvicorn.exe main:app --host 127.0.0.1 --port 7341 --reload
+.venv\Scripts\uvicorn.exe main:app --host 127.0.0.1 --port 7342 --reload
 ```
 
 **Terminal 2 — Browser-only mode (works now, no Rust needed)**
@@ -39,7 +39,7 @@ npm run dev
 npm run tauri dev
 ```
 
-The Vite dev server proxies `/api/*` → `http://localhost:7341`.
+The Vite dev server proxies `/api/*` → `http://localhost:7342`.
 
 ## Features
 
@@ -52,6 +52,20 @@ The Vite dev server proxies `/api/*` → `http://localhost:7341`.
 | Rotate / Delete Pages | `/rotate-delete` |
 | Extract Pages | `/extract` |
 | Images → PDF | `/images-to-pdf` |
+
+### PDF Viewer / Annotator
+
+Full-featured document reviewer with:
+
+- **8 annotation types:** notes, highlights, underline, strikethrough, freetext, ink/freehand, shapes (rect, ellipse, line, arrow), stamps
+- **Text-aware selection:** drag-select actual PDF text for highlight/underline/strike markup
+- **Continuous scroll:** scrolling past a page edge advances to the next/previous page
+- **In-document search** (`Ctrl+F`) with match navigation
+- **Annotations sidebar** with filtering, status tracking, and jump-to-annotation
+- **Command palette** (`Ctrl+Shift+P`) for fuzzy-search across all actions
+- **Keyboard-first workflow:** every action has a binding; press `?` for the cheat sheet
+- **Export annotations** as a Markdown review report
+- **Redact** and **crop** modes with drag-select regions
 
 ## Production build
 
@@ -73,7 +87,7 @@ pnpm tauri build
 Tauri window (WebView2)
     ↕ HTTP on localhost:5173 (dev) / embedded (prod)
 React + Vite frontend
-    ↕ /api/* proxied to :7341
+    ↕ /api/* proxied to :7342
 FastAPI Python server
     ↕ in-process
 PyMuPDF (fitz) — all PDF operations

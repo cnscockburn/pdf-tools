@@ -17,13 +17,14 @@ const SHORTCUTS: Entry[] = [
 
   { section: "While annotating" },
   { key: "1 – 4",    desc: "Switch highlight colour" },
-  { key: "Del / ⌫",  desc: "Delete selected annotation" },
+  { key: "Del / Backspace",  desc: "Delete selected annotation" },
   { key: "Shift+click", desc: "Multi-select annotations" },
   { key: "Ctrl+Z",    desc: "Undo last annotation" },
 
   { section: "Navigation" },
   { key: "→ / ↓",    desc: "Next page" },
   { key: "← / ↑",    desc: "Previous page" },
+  { key: "Scroll",    desc: "Continuous page advance at edges" },
   { key: "Home",      desc: "First page" },
   { key: "End",       desc: "Last page" },
 
@@ -34,7 +35,7 @@ const SHORTCUTS: Entry[] = [
   { section: "Panels & Global" },
   { key: "Ctrl+F",    desc: "Search in document" },
   { key: "Ctrl+S",    desc: "Download PDF" },
-  { key: "Ctrl+⇧+P", desc: "Command palette" },
+  { key: "Ctrl+Shift+P", desc: "Command palette" },
   { key: "?",         desc: "Show / hide this panel" },
 ];
 

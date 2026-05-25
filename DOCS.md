@@ -25,7 +25,7 @@ You need two terminals running simultaneously.
 
 ```powershell
 cd C:\Users\cnsco\Git\pdf-tools\backend
-.venv\Scripts\uvicorn.exe main:app --host 127.0.0.1 --port 7341 --reload
+.venv\Scripts\uvicorn.exe main:app --host 127.0.0.1 --port 7342 --reload
 ```
 
 The `--reload` flag restarts the server automatically when you edit Python files.
@@ -39,7 +39,7 @@ npm run dev
 
 Then open **http://localhost:5173** in your browser.
 
-> **Why two processes?** The React app runs in Vite's dev server and talks to the Python server over HTTP on port 7341. Vite proxies `/api/*` requests automatically — you never need to think about CORS in development.
+> **Why two processes?** The React app runs in Vite's dev server and talks to the Python server over HTTP on port 7342. Vite proxies `/api/*` requests automatically — you never need to think about CORS in development.
 
 ### First-time setup
 
@@ -85,8 +85,18 @@ Open and read any PDF file entirely in your browser — nothing is uploaded anyw
 | **Open…** button | Load a different PDF |
 
 **Keyboard shortcuts** (click the canvas area first):
-- `←` / `→` — previous/next page (planned)
-- `+` / `−` — zoom (planned)
+- `←` / `→` / `↑` / `↓` — previous/next page
+- `Home` / `End` — first/last page
+- `+` / `−` — zoom in/out
+- `V` — view mode, `A` — annotate (note), `H` — highlight, `U` — underline, `S` — strikethrough, `T` — text box, `I` — ink, `R` — redact, `C` — crop
+- `1`–`4` — switch highlight colour (while annotating)
+- `Del` / `Backspace` — delete selected annotation
+- `Ctrl+Z` — undo last annotation
+- `Ctrl+F` — search in document
+- `Ctrl+S` — download PDF
+- `Ctrl+Shift+P` — command palette
+- `?` — keyboard cheat sheet
+- **Continuous scroll:** scrolling past the edge of a page advances to the next/previous page automatically
 
 ---
 
@@ -208,7 +218,7 @@ Convert one or more images into a PDF where each image becomes one page.
 │                                             │
 │  /api/* ──proxy──►                          │
 └─────────────────────────────────────────────┘
-                    │ HTTP (localhost:7341)
+                    │ HTTP (localhost:7342)
 ┌─────────────────────────────────────────────┐
 │  FastAPI + Uvicorn (Python 3.13)            │
 │                                             │
@@ -236,7 +246,7 @@ Convert one or more images into a PDF where each image becomes one page.
 1. User drops a file → stored as a browser `File` object in React state
 2. User clicks a process button
 3. `src/api/client.ts` builds a `FormData` with the file + parameters and POSTs to `/api/<operation>`
-4. Vite dev server proxies the request to `http://localhost:7341/api/<operation>`
+4. Vite dev server proxies the request to `http://localhost:7342/api/<operation>`
 5. FastAPI reads the multipart body, calls `pdf_engine.<operation>(bytes, params)`
 6. PyMuPDF processes the bytes in-memory (no temp files for most operations)
 7. FastAPI returns the result as a streaming `application/pdf` response
@@ -353,12 +363,12 @@ In `src/pages/Home.tsx`, add a card to the `tools` array:
 The Python server isn't running. Start it:
 ```powershell
 cd backend
-.venv\Scripts\uvicorn.exe main:app --host 127.0.0.1 --port 7341 --reload
+.venv\Scripts\uvicorn.exe main:app --host 127.0.0.1 --port 7342 --reload
 ```
 
 Check it's responding:
 ```powershell
-Invoke-WebRequest http://localhost:7341/api/health
+Invoke-WebRequest http://localhost:7342/api/health
 ```
 
 ### PDF viewer shows black canvas
@@ -389,11 +399,11 @@ Thumbnail rendering is done client-side in the browser via PDF.js. For PDFs with
 
 pnpm v11 blocks postinstall scripts by default. Use `npm install` instead — it has no such restriction.
 
-### Port 7341 already in use
+### Port 7342 already in use
 
 Kill the existing process:
 ```powershell
-netstat -ano | findstr :7341
+netstat -ano | findstr :7342
 # Note the PID in the last column
 taskkill /PID <PID> /F
 ```
