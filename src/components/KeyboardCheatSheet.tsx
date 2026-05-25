@@ -44,6 +44,9 @@ interface Props { onClose: () => void }
 export default function KeyboardCheatSheet({ onClose }: Props) {
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Keyboard shortcuts"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >

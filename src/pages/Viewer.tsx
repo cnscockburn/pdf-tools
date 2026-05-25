@@ -163,6 +163,11 @@ export default function Viewer() {
   const [cropError, setCropError]         = useState<string | null>(null);
   const cropDragRef = useRef<{ startFrac: { x: number; y: number } } | null>(null);
 
+  // ── Confirmation gates for destructive actions ─────────────────────────────
+  const [confirmRedact, setConfirmRedact]       = useState(false);
+  const [confirmCrop, setConfirmCrop]           = useState(false);
+  const [confirmClearAnnot, setConfirmClearAnnot] = useState(false);
+
   // ── Refs ───────────────────────────────────────────────────────────────────
   const canvasRef     = useRef<HTMLCanvasElement>(null);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
@@ -908,6 +913,7 @@ export default function Viewer() {
             <button
               onClick={() => { setAuthorInput(settings.author); setEditingAuthor(true); }}
               title="Set your name for annotations"
+              aria-label={settings.author ? `Author: ${settings.author}` : "Set author name"}
               className="flex items-center gap-1 text-[10px] text-stone-500 hover:text-stone-300 transition"
             >
               <User className="h-3 w-3" />
@@ -917,10 +923,16 @@ export default function Viewer() {
 
           {/* Backend status dot */}
           <div
+            role="status"
+            aria-label={
+              backendOk === null  ? "Checking backend connection" :
+              backendOk           ? "Backend connected" :
+              "Backend offline"
+            }
             title={
               backendOk === null  ? "Checking backend…" :
               backendOk           ? "Backend connected" :
-              "Backend offline — run: cd backend && .venv\\Scripts\\uvicorn main:app --port 7341"
+              "Backend offline — run: cd backend && .venv\\Scripts\\uvicorn main:app --port 7342"
             }
             className={cn(
               "w-2 h-2 rounded-full shrink-0 transition-colors",
@@ -936,7 +948,7 @@ export default function Viewer() {
             <button
               onClick={() => downloadBlob(workingBlob, filename)}
               title="Download modified PDF (Ctrl+S)"
-              className="flex items-center gap-1.5 rounded-lg bg-green-600 hover:bg-green-500 px-3 py-1.5 text-xs font-semibold text-white transition shadow-lg"
+              className="flex items-center gap-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition shadow-lg"
             >
               <Download className="h-3.5 w-3.5" /> Download PDF
             </button>
@@ -956,7 +968,7 @@ export default function Viewer() {
 
           <div {...getRootProps()} className="cursor-pointer">
             <input {...getInputProps()} />
-            <button className="text-xs px-2.5 py-1.5 rounded bg-stone-700 hover:bg-stone-600 transition text-stone-300">Open…</button>
+            <button aria-label="Open a different PDF" className="text-xs px-2.5 py-1.5 rounded bg-stone-700 hover:bg-stone-600 transition text-stone-300">Open…</button>
           </div>
         </div>
       </div>
@@ -1071,7 +1083,7 @@ export default function Viewer() {
                       <div className="absolute bg-black/40" style={{ bottom: 0, left: 0, right: 0, top: `${displayCrop.y1 * 100}%` }} />
                       <div className="absolute bg-black/40" style={{ top: `${displayCrop.y0 * 100}%`, bottom: `${(1 - displayCrop.y1) * 100}%`, left: 0, width: `${displayCrop.x0 * 100}%` }} />
                       <div className="absolute bg-black/40" style={{ top: `${displayCrop.y0 * 100}%`, bottom: `${(1 - displayCrop.y1) * 100}%`, right: 0, left: `${displayCrop.x1 * 100}%` }} />
-                      <div className="absolute" style={{ left: `${displayCrop.x0 * 100}%`, top: `${displayCrop.y0 * 100}%`, width: `${(displayCrop.x1 - displayCrop.x0) * 100}%`, height: `${(displayCrop.y1 - displayCrop.y0) * 100}%`, border: "2px solid #3b82f6" }} />
+                      <div className="absolute" style={{ left: `${displayCrop.x0 * 100}%`, top: `${displayCrop.y0 * 100}%`, width: `${(displayCrop.x1 - displayCrop.x0) * 100}%`, height: `${(displayCrop.y1 - displayCrop.y0) * 100}%`, border: "2px solid #d97706" }} />
                     </div>
                   )}
                   {!displayCrop && (
@@ -1185,8 +1197,18 @@ export default function Viewer() {
                     <>
                       <button onClick={() => setAnnotations(prev => prev.slice(0, -1))} title="Undo last (Ctrl+Z)"
                         className="text-xs text-stone-500 hover:text-stone-300 transition">Undo</button>
-                      <button onClick={() => setAnnotations([])}
-                        className="text-xs text-stone-500 hover:text-stone-300 transition">Clear all</button>
+                      {confirmClearAnnot ? (
+                        <span className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-stone-400">Remove all?</span>
+                          <button onClick={() => { setAnnotations([]); setConfirmClearAnnot(false); }}
+                            className="text-xs text-red-400 hover:text-red-300 transition font-medium">Yes</button>
+                          <button onClick={() => setConfirmClearAnnot(false)}
+                            className="text-xs text-stone-500 hover:text-stone-300 transition">No</button>
+                        </span>
+                      ) : (
+                        <button onClick={() => setConfirmClearAnnot(true)}
+                          className="text-xs text-stone-500 hover:text-stone-300 transition">Clear all</button>
+                      )}
                     </>
                   )}
                   {annotateError && annotations.length > 0 && (
@@ -1211,11 +1233,24 @@ export default function Viewer() {
                   {redactBoxes.length > 0 && (
                     <>
                       <button onClick={() => setRedactBoxes([])} className="text-xs text-red-400 hover:text-red-300 transition">Clear all</button>
-                      <button onClick={applyRedactions} disabled={redactLoading}
-                        className="flex items-center gap-1.5 rounded-lg bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition">
-                        {redactLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <EyeOff className="h-3.5 w-3.5" />}
-                        Apply Redactions
-                      </button>
+                      {confirmRedact ? (
+                        <span className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-red-300">This is permanent.</span>
+                          <button onClick={() => { setConfirmRedact(false); applyRedactions(); }} disabled={redactLoading}
+                            className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-50 transition">
+                            {redactLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <EyeOff className="h-3.5 w-3.5" />}
+                            Confirm
+                          </button>
+                          <button onClick={() => setConfirmRedact(false)}
+                            className="text-xs text-red-400 hover:text-red-300 transition">Cancel</button>
+                        </span>
+                      ) : (
+                        <button onClick={() => setConfirmRedact(true)} disabled={redactLoading}
+                          className="flex items-center gap-1.5 rounded-lg bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition">
+                          <EyeOff className="h-3.5 w-3.5" />
+                          Apply Redactions
+                        </button>
+                      )}
                     </>
                   )}
                 </div>
@@ -1239,11 +1274,24 @@ export default function Viewer() {
                   {cropSelection && (
                     <>
                       <button onClick={() => setCropSelection(null)} className="text-xs text-brand-400 hover:text-brand-300 transition">Clear</button>
-                      <button onClick={applyCrop} disabled={cropLoading}
-                        className="flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-50 transition">
-                        {cropLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Crop className="h-3.5 w-3.5" />}
-                        Apply Crop
-                      </button>
+                      {confirmCrop ? (
+                        <span className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-brand-300">Content outside the selection will be removed.</span>
+                          <button onClick={() => { setConfirmCrop(false); applyCrop(); }} disabled={cropLoading}
+                            className="flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-50 transition">
+                            {cropLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Crop className="h-3.5 w-3.5" />}
+                            Confirm
+                          </button>
+                          <button onClick={() => setConfirmCrop(false)}
+                            className="text-xs text-brand-400 hover:text-brand-300 transition">Cancel</button>
+                        </span>
+                      ) : (
+                        <button onClick={() => setConfirmCrop(true)} disabled={cropLoading}
+                          className="flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-50 transition">
+                          <Crop className="h-3.5 w-3.5" />
+                          Apply Crop
+                        </button>
+                      )}
                     </>
                   )}
                 </div>
@@ -1280,12 +1328,12 @@ export default function Viewer() {
 
               {/* Zoom */}
               <button onClick={() => setScale(s => parseFloat(Math.max(s - 0.2, 0.5).toFixed(2)))}
-                title="Zoom out (−)" className="p-1.5 rounded-lg hover:bg-stone-700 transition text-stone-300">
+                title="Zoom out (−)" aria-label="Zoom out" className="p-1.5 rounded-lg hover:bg-stone-700 transition text-stone-300">
                 <ZoomOut className="h-4 w-4" />
               </button>
-              <span className="text-xs text-stone-300 tabular-nums w-10 text-center">{Math.round(scale * 100)}%</span>
+              <span className="text-xs text-stone-300 tabular-nums w-10 text-center" aria-live="polite">{Math.round(scale * 100)}%</span>
               <button onClick={() => setScale(s => parseFloat(Math.min(s + 0.2, 4).toFixed(2)))}
-                title="Zoom in (+)" className="p-1.5 rounded-lg hover:bg-stone-700 transition text-stone-300">
+                title="Zoom in (+)" aria-label="Zoom in" className="p-1.5 rounded-lg hover:bg-stone-700 transition text-stone-300">
                 <ZoomIn className="h-4 w-4" />
               </button>
               <button onClick={() => {
@@ -1301,7 +1349,7 @@ export default function Viewer() {
 
               {/* Page navigation */}
               <button onClick={() => goTo(currentPage - 1)} disabled={currentPage <= 1}
-                className="p-1.5 rounded-lg hover:bg-stone-700 transition disabled:opacity-30 text-stone-300">
+                aria-label="Previous page" className="p-1.5 rounded-lg hover:bg-stone-700 transition disabled:opacity-30 text-stone-300">
                 <ChevronLeft className="h-4 w-4" />
               </button>
               {editingPage ? (
@@ -1322,7 +1370,7 @@ export default function Viewer() {
                 </button>
               )}
               <button onClick={() => goTo(currentPage + 1)} disabled={currentPage >= pdf.numPages}
-                className="p-1.5 rounded-lg hover:bg-stone-700 transition disabled:opacity-30 text-stone-300">
+                aria-label="Next page" className="p-1.5 rounded-lg hover:bg-stone-700 transition disabled:opacity-30 text-stone-300">
                 <ChevronRight className="h-4 w-4" />
               </button>
 
@@ -1336,7 +1384,7 @@ export default function Viewer() {
                 <kbd className={cn(
                   "rounded border px-1 py-0 text-[9px] font-mono leading-4 transition",
                   searchOpen ? "border-white/25 bg-white/10 text-white/70" : "border-stone-600 bg-stone-800 text-stone-500"
-                )}>^F</kbd>
+                )}>Ctrl+F</kbd>
               </button>
 
               <div className="w-px h-5 bg-stone-700 mx-0.5" />

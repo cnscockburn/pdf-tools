@@ -16,6 +16,7 @@
  */
 import { useState } from "react";
 import { List, BookOpen, Bookmark } from "lucide-react";
+import { cn } from "../lib/utils";
 import AnnotationsListPanel from "./AnnotationsListPanel";
 import OutlinePanel from "./OutlinePanel";
 import BookmarksPanel from "./BookmarksPanel";
@@ -66,13 +67,11 @@ export default function RightRail({
 
   return (
     <div
-      className="w-64 flex-shrink-0 flex flex-col overflow-hidden"
-      style={{ backgroundColor: "#292524", borderLeft: "1px solid #57534e" }}
+      className="w-64 flex-shrink-0 flex flex-col overflow-hidden bg-stone-800 border-l border-stone-600"
     >
       {/* ── Tab bar ─────────────────────────────────────────────────────── */}
       <div
-        className="flex shrink-0"
-        style={{ borderBottom: "1px solid #57534e" }}
+        className="flex shrink-0 border-b border-stone-600"
       >
         {TABS.map(({ id, label, Icon }) => {
           const active = activeTab === id;
@@ -80,11 +79,12 @@ export default function RightRail({
             <button
               key={id}
               onClick={() => setTab(id)}
-              className="flex-1 flex flex-col items-center gap-0.5 px-2 py-2.5 transition-colors"
-              style={active
-                ? { color: "#d97706", borderBottom: "2px solid #d97706", marginBottom: "-1px" }
-                : { color: "#78716c" }
-              }
+              className={cn(
+                "flex-1 flex flex-col items-center gap-0.5 px-2 py-2.5 transition-colors",
+                active
+                  ? "text-brand-500 border-b-2 border-brand-500 -mb-px"
+                  : "text-stone-500 hover:text-stone-300"
+              )}
             >
               <Icon className="h-3.5 w-3.5" />
               <span className="text-[9px] font-semibold uppercase tracking-wide">{label}</span>
@@ -95,8 +95,7 @@ export default function RightRail({
 
       {/* ── Panel header ────────────────────────────────────────────────── */}
       <div
-        className="shrink-0 px-3 py-2"
-        style={{ borderBottom: "1px solid #57534e" }}
+        className="shrink-0 px-3 py-2 border-b border-stone-600"
       >
         <span className="text-[12px] font-semibold text-stone-300 tracking-tight">
           {activeTab === "annotations" && (

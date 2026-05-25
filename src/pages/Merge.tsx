@@ -45,7 +45,7 @@ export default function Merge() {
         {files.length > 0 && (
           <div className="rounded-xl border border-stone-200 bg-white divide-y divide-stone-100">
             <div className="px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wide">
-              Files — drag to reorder coming soon
+              Files to merge
             </div>
             {files.map((f, i) => (
               <div key={i} className="flex items-center justify-between px-4 py-3">

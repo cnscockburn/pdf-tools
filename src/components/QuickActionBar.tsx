@@ -2,6 +2,7 @@
  * QuickActionBar — floats above a text selection.
  * Shows labeled action buttons with key-binding chips for fast markup.
  */
+import { useRef, useState, useEffect } from "react";
 import { Highlighter, Underline, Strikethrough, MessageSquare, Copy } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -38,10 +39,17 @@ function Btn({ icon, label, k, onClick }: {
 }
 
 export default function QuickActionBar({ x, y, onHighlight, onUnderline, onStrikethrough, onComment, onCopy }: Props) {
+  const barRef = useRef<HTMLDivElement>(null);
+  const [barH, setBarH] = useState(68);
+  useEffect(() => {
+    if (barRef.current) setBarH(barRef.current.offsetHeight + 8);
+  }, []);
+
   return (
     <div
+      ref={barRef}
       className="fixed z-50 flex items-center gap-0.5 bg-stone-900 border border-stone-700 rounded-xl shadow-2xl px-1.5 py-1"
-      style={{ left: x, top: y - 68, transform: "translateX(-50%)" }}
+      style={{ left: x, top: y - barH, transform: "translateX(-50%)" }}
       onMouseDown={e => e.stopPropagation()}
       onPointerDown={e => e.stopPropagation()}
     >

@@ -116,12 +116,12 @@ export default function Home() {
         <StriaLogo size={26} />
         <div className="leading-none">
           <p className="text-[16px] font-semibold text-stone-900 tracking-[-0.01em] leading-[1.25]">Stria</p>
-          <p className="text-[12px] text-stone-400 leading-[1.25] mt-0.5">Local precision. Private execution.</p>
+          <p className="text-[12px] text-stone-400 leading-[1.25] mt-0.5">PDF toolkit</p>
         </div>
       </header>
 
       {/* ── Body ───────────────────────────────────────────────────────────── */}
-      <div className="flex-1 grid overflow-hidden" style={{ gridTemplateColumns: "5fr 7fr" }}>
+      <div className="flex-1 grid overflow-hidden" style={{ gridTemplateColumns: "1fr 1fr" }}>
 
         {/* Left — file intake ───────────────────────────────────────────── */}
         <div className="bg-white border-r border-stone-200 flex flex-col p-8 gap-5 overflow-hidden">
@@ -160,40 +160,48 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Right — tool grid ────────────────────────────────────────────── */}
-        <div className="overflow-auto p-8 flex flex-col gap-5">
+        {/* Right — tool list ────────────────────────────────────────────── */}
+        <div className="overflow-auto p-8 flex flex-col gap-4">
           <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-[0.08em]">Document tools</p>
 
-          <div className="grid grid-cols-3 gap-3">
+          <nav className="flex flex-col gap-0.5" aria-label="Document tools">
             {TOOLS.map(tool => {
-              const card = (
+              const row = (
                 <div
                   className={cn(
-                    "group bg-white rounded-2xl border border-stone-100 p-5",
-                    "shadow-sm hover:shadow-md hover:-translate-y-0.5",
-                    "transition-all duration-150 ease-out cursor-pointer",
+                    "group flex items-center gap-3.5 px-3.5 py-3 rounded-xl cursor-pointer",
+                    "transition-all duration-150 ease-out",
+                    "hover:bg-white hover:shadow-sm",
                   )}
                 >
-                  <div className="text-stone-400 group-hover:text-amber-600 transition-colors duration-150 mb-3">
+                  <div className={cn(
+                    "shrink-0 w-9 h-9 rounded-lg flex items-center justify-center",
+                    "bg-stone-100 text-stone-400 transition-colors duration-150",
+                    "group-hover:bg-amber-50 group-hover:text-amber-600",
+                  )}>
                     {tool.icon}
                   </div>
-                  <p className="text-sm font-semibold text-stone-800 group-hover:text-amber-700 transition-colors duration-150 mb-1">
-                    {tool.title}
-                  </p>
-                  <p className="text-[11px] text-stone-500 leading-snug">{tool.description}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold text-stone-700 group-hover:text-stone-900 transition-colors duration-150">
+                      {tool.title}
+                    </p>
+                    <p className="text-[11px] text-stone-400 leading-snug mt-0.5">
+                      {tool.description}
+                    </p>
+                  </div>
                 </div>
               );
 
               if (tool.href) {
-                return <Link key={tool.id} to={tool.href}>{card}</Link>;
+                return <Link key={tool.id} to={tool.href}>{row}</Link>;
               }
               return (
                 <div key={tool.id} onClick={() => fileRef.current?.click()}>
-                  {card}
+                  {row}
                 </div>
               );
             })}
-          </div>
+          </nav>
         </div>
       </div>
 

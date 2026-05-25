@@ -133,6 +133,9 @@ export default function CommandPalette({
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Command palette"
       className="fixed inset-0 z-50 flex items-start justify-center pt-20"
       onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
     >

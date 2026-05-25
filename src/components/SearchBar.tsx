@@ -34,7 +34,7 @@ export default function SearchBar({ query, onChange, results, focusIdx, loading,
   const current = total > 0 ? focusIdx + 1 : 0;
 
   return (
-    <div className="flex items-center gap-1.5 bg-stone-900 border border-stone-600 rounded-xl px-2 py-1.5 shadow-xl w-full max-w-sm">
+    <div role="search" aria-label="Search in document" className="flex items-center gap-1.5 bg-stone-900 border border-stone-600 rounded-xl px-2 py-1.5 shadow-xl w-full max-w-sm">
       <input
         ref={inputRef}
         type="text"
@@ -50,7 +50,7 @@ export default function SearchBar({ query, onChange, results, focusIdx, loading,
       />
 
       {/* Match count */}
-      <span className="shrink-0 text-[10px] tabular-nums text-stone-500 min-w-[3.5rem] text-right">
+      <span className="shrink-0 text-[10px] tabular-nums text-stone-500 min-w-[3.5rem] text-right" aria-live="polite">
         {loading
           ? <Loader2 className="h-3 w-3 animate-spin inline" />
           : query
@@ -66,6 +66,7 @@ export default function SearchBar({ query, onChange, results, focusIdx, loading,
           onClick={onPrev}
           disabled={total === 0}
           title="Previous match (Shift+Enter)"
+          aria-label="Previous match"
           className="p-1 rounded hover:bg-stone-700 disabled:opacity-30 text-stone-400 hover:text-white transition"
         >
           <ChevronUp className="h-3.5 w-3.5" />
@@ -74,6 +75,7 @@ export default function SearchBar({ query, onChange, results, focusIdx, loading,
           onClick={onNext}
           disabled={total === 0}
           title="Next match (Enter)"
+          aria-label="Next match"
           className="p-1 rounded hover:bg-stone-700 disabled:opacity-30 text-stone-400 hover:text-white transition"
         >
           <ChevronDown className="h-3.5 w-3.5" />
@@ -81,6 +83,7 @@ export default function SearchBar({ query, onChange, results, focusIdx, loading,
         <button
           onClick={onClose}
           title="Close search (Esc)"
+          aria-label="Close search"
           className="p-1 rounded hover:bg-stone-700 text-stone-500 hover:text-white transition"
         >
           <X className="h-3.5 w-3.5" />
