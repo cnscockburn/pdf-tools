@@ -32,8 +32,8 @@ function SortablePage({ id, thumb, label }: { id: string; thumb?: string; label:
       style={{ transform: CSS.Transform.toString(transform), transition }}
       {...attributes}
       {...listeners}
-      className={`flex flex-col items-center gap-1 rounded-lg border-2 p-1 bg-white cursor-grab active:cursor-grabbing select-none transition ${
-        isDragging ? "border-brand-500 opacity-50 scale-105 shadow-lg" : "border-stone-200 hover:border-stone-300"
+      className={`flex flex-col items-center gap-1 rounded-lg p-1 bg-white cursor-grab active:cursor-grabbing select-none transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 ${
+        isDragging ? "border-2 border-brand-500 opacity-50 scale-105 shadow-lg" : "border border-stone-200 hover:border-stone-300"
       }`}
     >
       {thumb ? (
@@ -95,6 +95,7 @@ export default function Rearrange() {
           files={file ? [file] : []}
           onFiles={([f]) => { setFile(f); setOrder([]); }}
           accept={{ "application/pdf": [".pdf"] }}
+          hint="PDF files only"
         />
 
         {file && order.length > 0 && (

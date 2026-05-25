@@ -15,7 +15,7 @@ export default function ProcessButton({ onClick, loading, disabled, label }: Pro
       disabled={disabled || loading}
       className={cn(
         "flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 ease-out",
-        "bg-brand-500 hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/60 focus:ring-offset-2 focus:ring-offset-stone-50",
+        "bg-brand-500 hover:bg-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50",
         (disabled || loading) && "opacity-50 cursor-not-allowed"
       )}
     >

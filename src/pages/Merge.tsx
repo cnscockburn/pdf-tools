@@ -40,6 +40,7 @@ export default function Merge() {
           multiple
           accept={{ "application/pdf": [".pdf"] }}
           label="Drop PDFs here (add as many as you need)"
+          hint="PDF files only"
         />
 
         {files.length > 0 && (
@@ -52,7 +53,8 @@ export default function Merge() {
                 <span className="text-sm truncate max-w-sm text-stone-800">{f.name}</span>
                 <button
                   onClick={() => removeFile(i)}
-                  className="ml-2 text-xs text-red-400 hover:text-red-600 transition-colors"
+                  aria-label={`Remove ${f.name}`}
+                  className="ml-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded px-1.5 py-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
                 >
                   Remove
                 </button>

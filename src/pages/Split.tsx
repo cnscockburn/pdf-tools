@@ -56,6 +56,7 @@ export default function Split() {
           files={file ? [file] : []}
           onFiles={([f]) => setFile(f)}
           accept={{ "application/pdf": [".pdf"] }}
+          hint="PDF files only"
         />
 
         {file && (
@@ -69,7 +70,7 @@ export default function Split() {
                 <button
                   key={m}
                   onClick={() => setMode(m)}
-                  className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                  className={`rounded-lg px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 ${
                     mode === m
                       ? "bg-brand-500 text-white"
                       : "bg-stone-100 text-stone-600 hover:bg-stone-200"
@@ -90,7 +91,7 @@ export default function Split() {
                   placeholder="e.g. 1-3, 5, 7-10"
                   value={rangeInput}
                   onChange={(e) => setRangeInput(e.target.value)}
-                  className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50"
                 />
                 <p className="mt-1 text-xs text-stone-400">
                   Each range becomes a separate PDF. Download arrives as a .zip.

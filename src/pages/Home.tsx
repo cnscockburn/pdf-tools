@@ -171,12 +171,12 @@ export default function Home() {
               );
 
               if (tool.href) {
-                return <Link key={tool.id} to={tool.href}>{row}</Link>;
+                return <Link key={tool.id} to={tool.href} className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50">{row}</Link>;
               }
               return (
-                <div key={tool.id} onClick={() => fileRef.current?.click()}>
+                <button key={tool.id} onClick={() => fileRef.current?.click()} className="w-full text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50">
                   {row}
-                </div>
+                </button>
               );
             })}
           </nav>

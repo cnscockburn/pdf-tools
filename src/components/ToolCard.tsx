@@ -14,7 +14,7 @@ export default function ToolCard({ icon: Icon, title, description, to, color }: 
   return (
     <button
       onClick={() => navigate(to)}
-      className="group flex flex-col items-start gap-3 rounded-2xl border border-stone-200 bg-white p-5 text-left shadow-sm transition-all duration-150 ease-out hover:shadow-md hover:border-stone-300 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-brand-500/60 focus:ring-offset-2 focus:ring-offset-stone-50"
+      className="group flex flex-col items-start gap-3 rounded-2xl border border-stone-200 bg-white p-5 text-left shadow-sm transition-all duration-150 ease-out hover:shadow-md hover:border-stone-300 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50"
     >
       <div className={`rounded-xl p-3 ${color}`}>
         <Icon className="h-6 w-6 text-white" />
