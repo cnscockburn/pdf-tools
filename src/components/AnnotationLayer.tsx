@@ -454,6 +454,12 @@ export default function AnnotationLayer({
   function onBgMouseDown(e: React.MouseEvent<HTMLDivElement>) {
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest("[data-annot]")) return;
+
+    // Auto-commit any open note/freetext editor.
+    // commitEdit() already deletes the annotation when the text is empty —
+    // this is the "click away from an empty note → discard" behavior.
+    if (editingId) commitEdit(editingId);
+
     setSelectedId(null);
     setSelectedIds(new Set());
     onSelectedChange?.(null);
@@ -1033,36 +1039,38 @@ export default function AnnotationLayer({
                     onMouseDown={e => e.stopPropagation()}
                   >
                     {/* Header: author · status badge · prev/next */}
-                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-stone-700/70">
+                    <div className="flex items-center gap-2 px-2.5 py-2 border-b border-stone-700/70">
                       {ann.author && (
                         <span className="text-[10px] text-stone-500 flex-1 min-w-0 truncate">{ann.author}</span>
                       )}
+                      {/* Status badge — prominent, clearly clickable */}
                       <button
                         onClick={e => { e.stopPropagation(); updateAnnot({ ...ann, status: nextStatus(ann.status) }); }}
-                        title="Click to change status"
+                        title="Click to cycle status: Open → Resolved → Won't fix"
                         className={cn(
-                          "shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium border transition",
+                          "shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold border-2 transition-all hover:opacity-80 active:scale-95",
                           STATUS_CLASS[ann.status ?? "open"],
                         )}
                       >
                         {STATUS_LABEL[ann.status ?? "open"]}
                       </button>
+                      {/* Prev/next navigation */}
                       <div className="flex gap-0.5 shrink-0 ml-auto">
                         <button
                           onClick={e => { e.stopPropagation(); if (prevAnn) onNavigateAnnot?.(prevAnn.id); }}
                           disabled={!prevAnn}
                           title={prevAnn ? `Previous (pg ${prevAnn.page})` : "No previous"}
-                          className="p-0.5 rounded text-stone-500 hover:text-white disabled:opacity-25 transition"
+                          className="p-1 rounded bg-stone-700 text-stone-200 hover:bg-stone-600 disabled:opacity-30 disabled:bg-transparent disabled:text-stone-600 transition"
                         >
-                          <ChevronUp className="h-3 w-3" />
+                          <ChevronUp className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={e => { e.stopPropagation(); if (nextAnn) onNavigateAnnot?.(nextAnn.id); }}
                           disabled={!nextAnn}
                           title={nextAnn ? `Next (pg ${nextAnn.page})` : "No next"}
-                          className="p-0.5 rounded text-stone-500 hover:text-white disabled:opacity-25 transition"
+                          className="p-1 rounded bg-stone-700 text-stone-200 hover:bg-stone-600 disabled:opacity-30 disabled:bg-transparent disabled:text-stone-600 transition"
                         >
-                          <ChevronDown className="h-3 w-3" />
+                          <ChevronDown className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </div>

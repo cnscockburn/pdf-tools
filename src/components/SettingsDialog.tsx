@@ -8,7 +8,13 @@ import { useState } from "react";
 import { X, Check } from "lucide-react";
 import { cn } from "../lib/utils";
 import { DEFAULT_COLOR_LABELS } from "../lib/storage";
-import type { Settings } from "../lib/storage";
+import type { Settings, UiScale } from "../lib/storage";
+
+const UI_SCALES: { value: UiScale; label: string }[] = [
+  { value: 1,    label: "100% — default" },
+  { value: 1.25, label: "125%"           },
+  { value: 1.5,  label: "150%"           },
+];
 
 // The four base highlight colours (order must match HIGHLIGHT_COLORS in Viewer.tsx).
 const BASE_SWATCHES = [
@@ -29,9 +35,10 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
   const [labels, setLabels]           = useState<[string, string, string, string]>(
     [...settings.colorLabels] as [string, string, string, string],
   );
+  const [uiScale, setUiScale]         = useState<UiScale>(settings.uiScale ?? 1);
 
   function save() {
-    onUpdate({ author: authorDraft.trim(), colorLabels: labels });
+    onUpdate({ author: authorDraft.trim(), colorLabels: labels, uiScale });
     onClose();
   }
 
@@ -82,6 +89,32 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
             <p className="text-[11px] text-stone-600 leading-snug">
               Stamped on new annotations as the author.
             </p>
+          </section>
+
+          {/* UI scale */}
+          <section className="space-y-2">
+            <label className="block text-[11px] font-semibold text-stone-400 uppercase tracking-wider">
+              UI scale
+            </label>
+            <p className="text-[11px] text-stone-600 leading-snug">
+              Scales the entire interface. Takes effect immediately on save.
+            </p>
+            <div className="flex gap-2">
+              {UI_SCALES.map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setUiScale(value)}
+                  className={cn(
+                    "flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition",
+                    uiScale === value
+                      ? "bg-brand-600 border-brand-500 text-white"
+                      : "bg-stone-800 border-stone-600 text-stone-400 hover:border-stone-500 hover:text-stone-200",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </section>
 
           {/* Highlight colour labels */}

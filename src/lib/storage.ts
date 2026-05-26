@@ -13,6 +13,8 @@ export interface UserBookmark {
   label: string;
 }
 
+export type UiScale = 1 | 1.25 | 1.5;
+
 export interface Settings {
   /** Display name stamped on new annotations. */
   author: string;
@@ -24,6 +26,8 @@ export interface Settings {
    * When undefined or shorter than 4, missing entries fall back to defaults.
    */
   colorLabels: [string, string, string, string];
+  /** Global UI zoom factor — 1 = 100%, 1.25 = 125%, 1.5 = 150%. */
+  uiScale: UiScale;
 }
 
 // ── Persistence ──────────────────────────────────────────────────────────────
@@ -34,7 +38,7 @@ const BOOKMARKS_KEY = "pdf-tools-bookmarks";
 export const DEFAULT_COLOR_LABELS: [string, string, string, string] = ["Yellow", "Cyan", "Green", "Pink"];
 
 function defaults(): Settings {
-  return { author: "", snippets: [], colorLabels: [...DEFAULT_COLOR_LABELS] };
+  return { author: "", snippets: [], colorLabels: [...DEFAULT_COLOR_LABELS], uiScale: 1 };
 }
 
 export function loadSettings(): Settings {
@@ -53,6 +57,9 @@ export function loadSettings(): Settings {
           parsed.colorLabels?.[2] ?? d.colorLabels[2],
           parsed.colorLabels?.[3] ?? d.colorLabels[3],
         ],
+        uiScale: ([1, 1.25, 1.5] as UiScale[]).includes(parsed.uiScale as UiScale)
+          ? (parsed.uiScale as UiScale)
+          : d.uiScale,
       };
     }
   } catch { /* ignore */ }

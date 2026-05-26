@@ -136,6 +136,13 @@ export default function Viewer() {
 
   // ── Annotations ────────────────────────────────────────────────────────────
   const [annotations, setAnnotations]         = useState<LocalAnnot[]>([]);
+  /**
+   * Annotations that have been committed (baked into the PDF blob).
+   * Kept in state so they remain visible in the sidebar and overlay after "Done".
+   * Only `annotations` (the draft overlay) gets submitted to the backend —
+   * `bakedAnnotations` are already in the blob.
+   */
+  const [bakedAnnotations, setBakedAnnotations] = useState<LocalAnnot[]>([]);
   /** Externally-requested annotation to select (from sidebar / popup nav arrows). */
   const [focusAnnotId, setFocusAnnotId]       = useState<AnnotId | null>(null);
   const [autoSaving, setAutoSaving]           = useState(false);
@@ -207,6 +214,8 @@ export default function Viewer() {
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const renderTaskRef = useRef<RenderTask | null>(null);
   const location      = useLocation();
+  /** Tracks drag-start for the rect-fallback mode (when textSelectActive=true but no text selected) */
+  const freeRectDragRef = useRef<{ x: number; y: number } | null>(null);
 
   // ── Stable ref for mode switch ─────────────────────────────────────────────
   const switchModeRef = useRef<(m: CanvasMode) => void>(() => {});
@@ -230,6 +239,11 @@ export default function Viewer() {
     })),
     [settings.colorLabels],
   );
+
+  // ── Current annotate state ref (for free-rect fallback closure) ─────────
+  // Avoids stale closures inside the mouseup listener without re-registering it.
+  const freeRectStateRef = useRef({ annotateSubMode, hlColor, effectiveHlColors, currentPage, settings });
+  freeRectStateRef.current = { annotateSubMode, hlColor, effectiveHlColors, currentPage, settings };
 
   // ── Working file ──────────────────────────────────────────────────────────
   const workingFile = useMemo<File | null>(() => {
@@ -377,12 +391,41 @@ export default function Viewer() {
   useEffect(() => {
     if (canvasMode !== "annotate") return;
 
-    function onMouseUp(_e: MouseEvent) {
+    function onMouseUp(e: MouseEvent) {
       // Small delay so the selection settles
       setTimeout(() => {
         const sel = window.getSelection();
         if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
           setQuickBar(null);
+
+          // ── Free-rect fallback ──────────────────────────────────────────
+          // When the user dragged inside the canvas but no text was selected
+          // (e.g. scanned PDF with no text layer), create a rectangle annotation.
+          const dragStart = freeRectDragRef.current;
+          freeRectDragRef.current = null;
+          if (dragStart && canvasWrapRef.current) {
+            const wrap = canvasWrapRef.current;
+            const rect = wrap.getBoundingClientRect();
+            const endX = (e.clientX - rect.left) / rect.width;
+            const endY = (e.clientY - rect.top)  / rect.height;
+            const x0 = Math.max(0, Math.min(dragStart.x, endX));
+            const y0 = Math.max(0, Math.min(dragStart.y, endY));
+            const x1 = Math.min(1, Math.max(dragStart.x, endX));
+            const y1 = Math.min(1, Math.max(dragStart.y, endY));
+            // Require a meaningful drag — tiny movements are just clicks
+            if (x1 - x0 > 0.015 && y1 - y0 > 0.004) {
+              const { annotateSubMode: mode, hlColor: ci, effectiveHlColors: hcs, currentPage: pg, settings: s } = freeRectStateRef.current;
+              const id = newId();
+              const base = { id, page: pg, author: s.author || undefined };
+              if (mode === "highlight") {
+                setAnnotations(prev => [...prev, { ...base, type: "highlight", x0, y0, x1, y1, colorIdx: ci, color: hcs[ci].rgb }]);
+              } else if (mode === "underline") {
+                setAnnotations(prev => [...prev, { ...base, type: "underline", x0, y0, x1, y1 }]);
+              } else if (mode === "strikethrough") {
+                setAnnotations(prev => [...prev, { ...base, type: "strikethrough", x0, y0, x1, y1 }]);
+              }
+            }
+          }
           return;
         }
         // Only act on selections within our canvas wrapper
@@ -623,6 +666,7 @@ export default function Viewer() {
     setCurrentPage(1);
     setPageInput("1");
     setAnnotations([]);
+    setBakedAnnotations([]);
     setUndoStack([]); setRedoStack([]);
     setRedactBoxes([]);
     setCropSelection(null);
@@ -764,9 +808,9 @@ export default function Viewer() {
     try {
       const blob = await annotatePDF(workingFile, toApiAnnotations(annotations));
       await applyBlob(blob);
-      // Annotations are now burned into the PDF blob. Clear the overlay so the
-      // in-memory list doesn't ghost-persist (causing undo to remove
-      // visually-gone annotations from the sidebar while they remain in the blob).
+      // Move drafted annotations into the committed (baked) list so they remain
+      // visible in the sidebar without being re-sent on the next save.
+      setBakedAnnotations(prev => [...prev, ...annotations]);
       setAnnotations([]);
       setUndoStack([]);
       setRedoStack([]);
@@ -858,10 +902,17 @@ export default function Viewer() {
 
   function deleteAnnot(id: AnnotId) {
     changeAnnotations(annotations.filter(a => a.id !== id));
+    // Also remove from baked list (display-only — PDF still has it until next save)
+    setBakedAnnotations(prev => prev.filter(a => a.id !== id));
   }
 
   function changeAnnotStatus(id: AnnotId, status: AnnotStatus) {
-    changeAnnotations(annotations.map(a => a.id === id ? { ...a, status } : a));
+    // Try draft list first; fall back to updating baked list (display-only change)
+    if (annotations.some(a => a.id === id)) {
+      changeAnnotations(annotations.map(a => a.id === id ? { ...a, status } : a));
+    } else {
+      setBakedAnnotations(prev => prev.map(a => a.id === id ? { ...a, status } as LocalAnnot : a));
+    }
   }
 
   // ── Drop zone ──────────────────────────────────────────────────────────────
@@ -1056,8 +1107,13 @@ export default function Viewer() {
     ];
   }
 
+  const uiScale = settings.uiScale ?? 1;
+
   return (
-    <div className="h-screen flex flex-col bg-stone-800 overflow-hidden">
+    <div
+      className="h-screen flex flex-col bg-stone-800 overflow-hidden"
+      style={uiScale !== 1 ? { zoom: uiScale } as React.CSSProperties : undefined}
+    >
 
       {/* ── Top bar ───────────────────────────────────────────────────────────── */}
       {/* Hidden dropzone input — triggered via openFilePicker() from File menu */}
@@ -1179,7 +1235,7 @@ export default function Viewer() {
           onSelect={goTo}
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(c => !c)}
-          annotations={annotations}
+          annotations={[...bakedAnnotations, ...annotations]}
         />
 
         {/* Center: canvas + context bars + toolbar */}
@@ -1188,7 +1244,22 @@ export default function Viewer() {
           {/* Canvas scroll area */}
           <div ref={canvasAreaRef} className="flex-1 overflow-auto flex flex-col items-center py-8 px-4">
 
-            <div ref={canvasWrapRef} className="relative inline-block shadow-2xl rounded" style={{ lineHeight: 0 }}>
+            <div
+              ref={canvasWrapRef}
+              className="relative inline-block shadow-2xl rounded"
+              style={{ lineHeight: 0 }}
+              onMouseDown={e => {
+                // Record drag-start for free-rect fallback when textSelectActive=true
+                if (!textSelectActive || canvasMode !== "annotate") return;
+                const wrap = canvasWrapRef.current;
+                if (!wrap) return;
+                const rect = wrap.getBoundingClientRect();
+                freeRectDragRef.current = {
+                  x: (e.clientX - rect.left) / rect.width,
+                  y: (e.clientY - rect.top)  / rect.height,
+                };
+              }}
+            >
               <canvas ref={canvasRef} className="rounded block" />
 
               {/* ── Text layer (always in annotate mode) ────────────────────── */}
@@ -1563,7 +1634,7 @@ export default function Viewer() {
               <MiniMap
                 totalPages={pdf.numPages}
                 currentPage={currentPage}
-                annotations={annotations}
+                annotations={[...bakedAnnotations, ...annotations]}
                 onGoTo={goTo}
               />
             </div>
@@ -1676,13 +1747,13 @@ export default function Viewer() {
           />
         ) : (
           <RightRail
-            annotations={annotations}
+            annotations={[...bakedAnnotations, ...annotations]}
             currentPage={currentPage}
             onGoToPage={goTo}
             onFocusAnnot={focusAnnotation}
             onDeleteAnnot={deleteAnnot}
             onStatusChange={changeAnnotStatus}
-            onExportReport={() => downloadAnnotationReport(annotations, filename)}
+            onExportReport={() => downloadAnnotationReport([...bakedAnnotations, ...annotations], filename)}
             pdf={pdf}
             bookmarks={bookmarks}
             onAddBookmark={() => addBookmark(currentPage)}
