@@ -751,13 +751,22 @@ export default function AnnotationLayer({
   }
 
   // ── Arrowhead polygon points (fractional coords) ──────────────────────────
-  function arrowheadPoints(x0: number, y0: number, x1: number, y1: number): string {
+  // Size is proportional to strokeWidth in screen pixels, converted to the
+  // SVG's fractional coordinate space via a fixed page-width assumption.
+  // This keeps the head the same visual size regardless of line length.
+  function arrowheadPoints(
+    x0: number, y0: number, x1: number, y1: number,
+    strokeWidth: number = 2,
+  ): string {
     const dx = x1 - x0, dy = y1 - y0;
     const len = Math.sqrt(dx * dx + dy * dy);
     if (len < 0.005) return "";
     const ux = dx / len, uy = dy / len;
-    const headLen  = Math.min(0.07, len * 0.3);
-    const headW    = headLen * 0.45;
+    // headLen ≈ 4× stroke width, expressed as fraction of page width.
+    // 800px is a reasonable page-width baseline; adjust keeps it visually stable.
+    const baseLen = (strokeWidth * 4) / 800;
+    const headLen = Math.max(baseLen, Math.min(0.025, len * 0.25));
+    const headW   = headLen * 0.55;
     const perpX = -uy, perpY = ux;
     const bx = x1 - ux * headLen, by = y1 - uy * headLen;
     return [
@@ -846,7 +855,7 @@ export default function AnnotationLayer({
                   stroke={stroke} strokeWidth={sw}
                   vectorEffect="non-scaling-stroke" strokeLinecap="round" {...selProps} />;
               case "arrow": {
-                const pts = arrowheadPoints(x0, y0, x1, y1);
+                const pts = arrowheadPoints(x0, y0, x1, y1, sw);
                 return (
                   <g key={ann.id}>
                     <line x1={x0} y1={y0} x2={x1} y2={y1}
@@ -1209,7 +1218,7 @@ export default function AnnotationLayer({
                 stroke={dragColor} strokeWidth={2} strokeDasharray="6,4"
                 vectorEffect="non-scaling-stroke" strokeLinecap="round" />
               {shapeSubType === "arrow" && (() => {
-                const pts = arrowheadPoints(live.x0, live.y0, live.x1, live.y1);
+                const pts = arrowheadPoints(live.x0, live.y0, live.x1, live.y1, inkStrokeWidth);
                 return pts ? <polygon points={pts} fill={dragColor} vectorEffect="non-scaling-stroke" opacity={0.6} /> : null;
               })()}
             </svg>

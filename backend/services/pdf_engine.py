@@ -414,7 +414,10 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
                 a.set_colors(stroke=color)
                 if shape == "arrow":
                     try:
-                        a.set_line_ends(fitz.PDF_ANNOT_LE_NONE, fitz.PDF_ANNOT_LE_OPEN_ARROW)
+                        # ClosedArrow matches the frontend's filled polygon arrowhead.
+                        a.set_line_ends(fitz.PDF_ANNOT_LE_NONE, fitz.PDF_ANNOT_LE_CLOSED_ARROW)
+                        # Fill the arrowhead with the same color as the stroke.
+                        a.set_colors(stroke=color, fill=color)
                     except Exception:
                         pass  # older PyMuPDF may use different API
             else:
@@ -432,14 +435,20 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
             rect = fitz.Rect(x0, y0, x1, y1)
             label = ann.get("label", "DRAFT")
             color = ann.get("color", [0.6, 0, 0])
-            fs = max(8, min(24, (y1 - y0) * 0.6))
+            # Use a FreeText annotation styled to match the CSS preview:
+            # white fill, colored border (2pt), bold Helvetica, centred.
+            # font_name "hebo" = Helvetica-Bold in PyMuPDF's built-in fonts.
+            fs = max(6, (y1 - y0) * 0.55)
             a = page.add_freetext_annot(
                 rect, label,
                 fontsize=fs,
+                fontname="hebo",
                 text_color=color,
                 fill_color=(1, 1, 1),
                 align=fitz.TEXT_ALIGN_CENTER,
             )
+            a.set_border(width=1.5)
+            a.set_colors(stroke=color, fill=(1, 1, 1))
             a.update()
 
     return _save(doc)

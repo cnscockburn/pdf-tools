@@ -430,18 +430,14 @@ export default function Viewer() {
       const { pdf, currentPage } = kbRef.current;
       if (!pdf) return;
 
-      // Only fire page-advance when the canvas actually overflows the viewport.
-      // Without this guard, when the page fits within the scroll area
-      // (scrollHeight ≤ clientHeight), atBottom is always true and every
-      // scroll tick immediately flips to the next page.
       const hasOverflow = el.scrollHeight > el.clientHeight + 10;
-      if (!hasOverflow) return;
-
-      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
-      const atTop    = el.scrollTop <= 2;
+      const atBottom = hasOverflow
+        ? el.scrollTop + el.clientHeight >= el.scrollHeight - 2
+        : true;   // when page fits, treat whole scroll area as "at edge"
+      const atTop = hasOverflow ? el.scrollTop <= 2 : true;
 
       if (e.deltaY > 0 && atBottom && currentPage < pdf.numPages) {
-        // Scrolling down while at bottom → next page
+        // Scrolling down at bottom (or page fits viewport) → accumulate towards next page
         accum += e.deltaY;
         if (accum >= THRESHOLD && !cooldown) {
           accum = 0;
@@ -449,12 +445,11 @@ export default function Viewer() {
           const next = currentPage + 1;
           setCurrentPage(next);
           setPageInput(String(next));
-          // After render, scroll to top of new page
           requestAnimationFrame(() => { el.scrollTop = 0; });
           setTimeout(() => { cooldown = false; }, 300);
         }
       } else if (e.deltaY < 0 && atTop && currentPage > 1) {
-        // Scrolling up while at top → previous page
+        // Scrolling up at top (or page fits viewport) → accumulate towards previous page
         accum += e.deltaY;  // negative
         if (accum <= -THRESHOLD && !cooldown) {
           accum = 0;
@@ -462,12 +457,11 @@ export default function Viewer() {
           const prev = currentPage - 1;
           setCurrentPage(prev);
           setPageInput(String(prev));
-          // After render, scroll to bottom of new page
           requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
           setTimeout(() => { cooldown = false; }, 300);
         }
-      } else {
-        // Normal scrolling within the page — reset accumulator
+      } else if (hasOverflow) {
+        // Normal scrolling within an overflowing page — reset accumulator
         accum = 0;
       }
     }
@@ -1271,7 +1265,7 @@ export default function Viewer() {
                   ) : (
                     <span className="text-xs text-stone-500">
                       {annotations.length} annotation{annotations.length !== 1 ? "s" : ""}
-                      {annotations.length > 0 && <span className="text-stone-600 ml-1">· auto-saves on exit</span>}
+                      {annotations.length > 0 && <span className="text-stone-600 ml-1">· saved on Done / Esc</span>}
                     </span>
                   )}
                   {annotateError && (
@@ -1301,6 +1295,16 @@ export default function Viewer() {
                       <Check className="h-3 w-3" /> Retry Save
                     </button>
                   )}
+
+                  {/* Done — visible save-and-exit button */}
+                  <button
+                    onClick={() => switchMode("view")}
+                    disabled={autoSaving}
+                    title="Save annotations and return to view mode (Esc)"
+                    className="flex items-center gap-1.5 rounded-lg bg-stone-600 hover:bg-stone-500 border border-stone-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50 transition ml-1"
+                  >
+                    <Check className="h-3.5 w-3.5" /> Done
+                  </button>
                 </div>
               </div>
             </div>
@@ -1396,6 +1400,25 @@ export default function Viewer() {
                 onPrev={() => setSearchIdx(i => searchResults.length > 0 ? (i - 1 + searchResults.length) % searchResults.length : 0)}
                 onClose={() => { setSearchOpen(false); setSearchQuery(""); setSearchResults([]); }}
               />
+            </div>
+          )}
+
+          {/* ── Annotations hidden notice ───────────────────────────────────── */}
+          {!annotationsVisible && (
+            <div className="shrink-0 px-4 pb-1 flex justify-center">
+              <div className="flex items-center gap-2 bg-stone-900/90 border border-stone-600/60 rounded-lg px-3 py-1.5 text-xs text-stone-400">
+                <EyeOff className="h-3 w-3 shrink-0 text-amber-500" />
+                <span>
+                  {annotations.length > 0
+                    ? <>Annotations hidden ({annotations.length}) — <span className="text-stone-500">they will still save to the PDF</span></>
+                    : <>Annotations are hidden</>
+                  }
+                </span>
+                <button
+                  onClick={() => setAnnotationsVisible(true)}
+                  className="ml-1 text-amber-400 hover:text-amber-200 font-medium transition"
+                >Show</button>
+              </div>
             </div>
           )}
 
