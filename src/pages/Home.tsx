@@ -12,8 +12,9 @@ type ToolDef = {
   title: string;
   description: string;
   icon: React.ReactNode;
-  href?: string;       // navigate directly
-  needsFile?: true;    // open file picker → viewer
+  href?: string;       // navigate directly (no file needed)
+  needsFile?: true;    // open file picker → viewer with tool pre-selected
+  toolHint?: string;   // panel id or mode to activate once file loads
 };
 
 const TOOLS: ToolDef[] = [
@@ -30,6 +31,7 @@ const TOOLS: ToolDef[] = [
     description: "Divide a PDF into separate files by page range",
     icon: <Scissors className="h-[18px] w-[18px]" />,
     needsFile: true,
+    toolHint: "split",
   },
   {
     id: "compress",
@@ -37,6 +39,7 @@ const TOOLS: ToolDef[] = [
     description: "Reduce file size without visible quality loss",
     icon: <Minimize2 className="h-[18px] w-[18px]" />,
     needsFile: true,
+    toolHint: "compress",
   },
   {
     id: "redact",
@@ -44,6 +47,7 @@ const TOOLS: ToolDef[] = [
     description: "Permanently remove sensitive content",
     icon: <EyeOff className="h-[18px] w-[18px]" />,
     needsFile: true,
+    toolHint: "redact",
   },
   {
     id: "organize",
@@ -65,9 +69,10 @@ const TOOLS: ToolDef[] = [
 
 export default function Home() {
   const navigate = useNavigate();
-  const fileRef  = useRef<HTMLInputElement>(null);
+  const fileRef        = useRef<HTMLInputElement>(null);
+  const pendingToolRef = useRef<string | null>(null);
 
-  // Drop zone — opens a PDF in the viewer
+  // Drop zone — opens a PDF in the viewer (no tool hint, just open the file)
   const onDrop = useCallback((files: File[]) => {
     const f = files[0];
     if (f) navigate("/viewer", { state: { file: f } });
@@ -79,10 +84,20 @@ export default function Home() {
     multiple: false,
   });
 
-  // Tool cards that need a file open a shared file picker then go to viewer
+  // Tool cards that need a file: store the tool hint, open the picker, then
+  // navigate to the viewer with both the file and the tool hint in router state.
+  function openToolFilePicker(toolHint?: string) {
+    pendingToolRef.current = toolHint ?? null;
+    fileRef.current?.click();
+  }
+
   function handleToolFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
-    if (f) navigate("/viewer", { state: { file: f } });
+    if (f) {
+      const tool = pendingToolRef.current;
+      navigate("/viewer", { state: { file: f, ...(tool ? { tool } : {}) } });
+    }
+    pendingToolRef.current = null;
     e.target.value = "";
   }
 
@@ -174,7 +189,7 @@ export default function Home() {
                 return <Link key={tool.id} to={tool.href} className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50">{row}</Link>;
               }
               return (
-                <button key={tool.id} onClick={() => fileRef.current?.click()} className="w-full text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50">
+                <button key={tool.id} onClick={() => openToolFilePicker(tool.toolHint)} className="w-full text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50">
                   {row}
                 </button>
               );

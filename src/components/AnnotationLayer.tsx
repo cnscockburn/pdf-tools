@@ -199,28 +199,14 @@ interface StampDivProps {
 }
 
 function StampDiv({ ann, sel, onMouseDown, deleteBtn, renderResizeHandles }: StampDivProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [fontPx, setFontPx] = useState(12);
   const textColor = colorToCSS(ann.color);
 
-  // Observe element size and pick a font size that fits ~60 % of the box height.
-  useEffect(() => {
-    if (!ref.current) return;
-    const el = ref.current;
-    const measure = () => {
-      const r = el.getBoundingClientRect();
-      // Aim for ~60 % of height, capped 8–28 px for readability.
-      const target = Math.max(8, Math.min(28, r.height * 0.55));
-      setFontPx(target);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
+  // Font size is 55% of the box height, computed via CSS container queries.
+  // This is zoom-independent: the box grows with page zoom, and the text
+  // tracks proportionally — no ResizeObserver or JS pixel arithmetic needed.
   return (
-    <div ref={ref} data-annot="true"
+    <div
+      data-annot="true"
       className="absolute pointer-events-auto"
       style={{
         left: `${ann.x0 * 100}%`, top: `${ann.y0 * 100}%`,
@@ -229,14 +215,15 @@ function StampDiv({ ann, sel, onMouseDown, deleteBtn, renderResizeHandles }: Sta
         backgroundColor: "rgba(255,255,255,0.92)",
         zIndex: sel ? 25 : 16,
         cursor: "move",
-        display: "flex", alignItems: "center", justifyContent: "center",
         borderRadius: 3,
+        containerType: "size",
+        display: "flex", alignItems: "center", justifyContent: "center",
       }}
       onMouseDown={e => onMouseDown(e, ann)}
     >
       <span
-        className="font-bold tracking-widest text-center select-none whitespace-nowrap"
-        style={{ color: textColor, fontSize: `${fontPx}px`, lineHeight: 1 }}
+        className="font-bold tracking-widest text-center select-none whitespace-nowrap overflow-hidden"
+        style={{ color: textColor, fontSize: "55cqh", lineHeight: 1 }}
       >
         {ann.label}
       </span>
@@ -277,6 +264,8 @@ interface Props {
   stampColor?: [number, number, number];
   /** Available snippets for comment editors */
   snippets?: Snippet[];
+  /** When false, annotations are rendered invisible (Shift+H toggle) */
+  visible?: boolean;
 }
 
 export default function AnnotationLayer({
@@ -284,7 +273,7 @@ export default function AnnotationLayer({
   onAnnotationsChange, textSelectActive, author, onSelectedChange,
   shapeSubType = "rect", inkColor = [0, 0, 0], inkStrokeWidth = 2,
   stampLabel = "DRAFT", stampColor = [0.6, 0, 0],
-  snippets = [],
+  snippets = [], visible = true,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -533,8 +522,11 @@ export default function AnnotationLayer({
     if (createMode === "stamp") {
       const pt = getContainerFrac(e);
       const id = newId();
-      // Place a stamp box centred on the click, proportional
-      const w = 0.18, h = 0.05;
+      // Auto-size the bounding box to fit the label at the default font size.
+      // h = 6% of page height; w = per-char estimate + padding (min 14%).
+      // At 55cqh font-size and bold tracking-widest, each char ≈ 2.8% page width.
+      const h = 0.06;
+      const w = Math.max(0.14, stampLabel.length * 0.028 + 0.04);
       addAnnot({
         id, type: "stamp", page,
         x0: clamp(pt.x - w / 2), y0: clamp(pt.y - h / 2),
@@ -783,7 +775,13 @@ export default function AnnotationLayer({
     <div
       ref={containerRef}
       className={`absolute inset-0 ${cursorClass}`}
-      style={{ userSelect: "none", pointerEvents: textSelectActive ? "none" : "auto" }}
+      style={{
+        userSelect: "none",
+        // When invisible (Shift+H), block pointer events so the canvas is clickable.
+        // In text-select mode the layer is always transparent to pointer events.
+        pointerEvents: (!visible || textSelectActive) ? "none" : "auto",
+        opacity: visible ? 1 : 0,
+      } as React.CSSProperties}
       onMouseDown={textSelectActive ? undefined : onBgMouseDown}
       onClick={textSelectActive ? undefined : onBgClick}
     >

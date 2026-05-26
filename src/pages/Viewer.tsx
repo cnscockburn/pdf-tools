@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { useLocation, Link } from "react-router-dom";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { useDropzone } from "react-dropzone";
 import {
   ZoomIn, ZoomOut, ChevronLeft, ChevronRight, UploadCloud,
-  Eye, MessageSquare, EyeOff, Crop, AlignLeft,
-  Stamp, ExternalLink, Loader2, Highlighter, Type, Pencil, Check, X, Download,
-  Underline, Strikethrough, Search, HelpCircle, User, FileText,
+  MessageSquare, EyeOff, Crop,
+  Stamp, Loader2, Highlighter, Type, Pencil, Check, X, Download,
+  Underline, Strikethrough, Search, HelpCircle, User,
   PenLine, Square, Command,
 } from "lucide-react";
 import { cn, downloadBlob } from "../lib/utils";
@@ -23,6 +23,7 @@ import QuickActionBar from "../components/QuickActionBar";
 import SearchBar, { type SearchResult } from "../components/SearchBar";
 import KeyboardCheatSheet from "../components/KeyboardCheatSheet";
 import CommandPalette, { type PaletteCommand } from "../components/CommandPalette";
+import MenuBar, { type MenuDef } from "../components/MenuBar";
 import { annotatePDF, redactPDF, cropPDF, checkHealth, type Annotation, type RedactRegion } from "../api/client";
 import { useSettings, useBookmarks } from "../lib/storage";
 import { downloadAnnotationReport } from "../lib/annotationReport";
@@ -122,6 +123,15 @@ export default function Viewer() {
   // ── Command palette ────────────────────────────────────────────────────────
   const [paletteOpen, setPaletteOpen] = useState(false);
 
+  // ── Annotations visibility toggle (Shift+H / View menu) ───────────────────
+  const [annotationsVisible, setAnnotationsVisible] = useState(true);
+
+  // ── Pending tool: activated when a PDF loads (from Home page card clicks) ─
+  const pendingToolRef = useRef<string | null>(null);
+
+  // ── Router navigation ──────────────────────────────────────────────────────
+  const navigate = useNavigate();
+
   // ── Annotations ────────────────────────────────────────────────────────────
   const [annotations, setAnnotations]         = useState<LocalAnnot[]>([]);
   const [autoSaving, setAutoSaving]           = useState(false);
@@ -197,8 +207,9 @@ export default function Viewer() {
 
   // ── Load from router state ────────────────────────────────────────────────
   useEffect(() => {
-    const stateFile = (location.state as { file?: File } | null)?.file;
-    if (stateFile) loadFile(stateFile);
+    const state = location.state as { file?: File; tool?: string } | null;
+    if (state?.tool) pendingToolRef.current = state.tool;
+    if (state?.file) loadFile(state.file);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -419,6 +430,13 @@ export default function Viewer() {
       const { pdf, currentPage } = kbRef.current;
       if (!pdf) return;
 
+      // Only fire page-advance when the canvas actually overflows the viewport.
+      // Without this guard, when the page fits within the scroll area
+      // (scrollHeight ≤ clientHeight), atBottom is always true and every
+      // scroll tick immediately flips to the next page.
+      const hasOverflow = el.scrollHeight > el.clientHeight + 10;
+      if (!hasOverflow) return;
+
       const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
       const atTop    = el.scrollTop <= 2;
 
@@ -510,6 +528,13 @@ export default function Viewer() {
 
       if (tag === "INPUT" || tag === "TEXTAREA") return;
 
+      // ── Shift+H: toggle annotation visibility ────────────────────────
+      if ((e.key === "h" || e.key === "H") && e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setAnnotationsVisible(v => !v);
+        return;
+      }
+
       // ── Mode shortcuts (no modifier) ──────────────────────────────────
       if (!e.ctrlKey && !e.metaKey && !e.altKey) {
         if (e.key === "v" || e.key === "V") { e.preventDefault(); switchModeRef.current("view"); return; }
@@ -519,6 +544,8 @@ export default function Viewer() {
         if (e.key === "s" || e.key === "S") { e.preventDefault(); switchModeRef.current("annotate"); setAnnotateSubMode("strikethrough"); return; }
         if (e.key === "t" || e.key === "T") { e.preventDefault(); switchModeRef.current("annotate"); setAnnotateSubMode("freetext"); return; }
         if (e.key === "i" || e.key === "I") { e.preventDefault(); switchModeRef.current("annotate"); setAnnotateSubMode("ink"); return; }
+        if (e.key === "g" || e.key === "G") { e.preventDefault(); switchModeRef.current("annotate"); setAnnotateSubMode("shape"); return; }
+        if (e.key === "p" || e.key === "P") { e.preventDefault(); switchModeRef.current("annotate"); setAnnotateSubMode("stamp"); return; }
         if (e.key === "r" || e.key === "R") { e.preventDefault(); switchModeRef.current("redact"); return; }
         if (e.key === "c" || e.key === "C") { e.preventDefault(); switchModeRef.current("crop"); return; }
         if (e.key === "+" || e.key === "=") { setScale(s => parseFloat(Math.min(s + 0.2, 4).toFixed(2))); return; }
@@ -570,6 +597,8 @@ export default function Viewer() {
     const buf = await f.arrayBuffer();
     const doc = await pdfjsLib.getDocument({ data: buf }).promise;
     setPdf(doc);
+    // Activate any pending tool hint (from Home page card clicks)
+    activatePendingTool();
   }
 
   async function applyBlob(blob: Blob) {
@@ -602,6 +631,22 @@ export default function Viewer() {
     doSwitchMode(m);
   }
   switchModeRef.current = switchMode;
+
+  // Consume the pending tool hint set by router state (Home page card clicks).
+  // Maps tool id strings to the appropriate panel or canvas mode.
+  function activatePendingTool() {
+    const tool = pendingToolRef.current;
+    if (!tool) return;
+    pendingToolRef.current = null;
+
+    const panelTools = ["compress", "watermark", "split", "extract", "rotate-delete", "security", "pdf-to-images", "snippets"] as const;
+    for (const pt of panelTools) {
+      if (tool === pt) { togglePanel(pt); return; }
+    }
+    if (tool === "redact")   { doSwitchMode("redact"); return; }
+    if (tool === "annotate") { doSwitchMode("annotate"); return; }
+    if (tool === "crop")     { doSwitchMode("crop"); return; }
+  }
 
   function goTo(n: number) {
     if (!pdf) return;
@@ -721,7 +766,7 @@ export default function Viewer() {
   }
 
   // ── Drop zone ──────────────────────────────────────────────────────────────
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open: openFilePicker } = useDropzone({
     onDrop: ([f]) => f && loadFile(f),
     accept: { "application/pdf": [".pdf"] },
     multiple: false,
@@ -852,12 +897,75 @@ export default function Viewer() {
 
   const sidebarFile = workingFile ?? file;
 
+  // ── Menu bar definitions ──────────────────────────────────────────────────
+  function buildViewerMenus(): MenuDef[] {
+    const hasDoc = !!pdf;
+    const hasBlob = !!workingBlob;
+
+    return [
+      {
+        label: "File",
+        items: [
+          { label: "Open…",               shortcut: "Ctrl+O",       action: () => openFilePicker() },
+          { label: "Save / Download",      shortcut: "Ctrl+S",       action: () => { if (workingBlob) downloadBlob(workingBlob, filename); }, disabled: !hasBlob },
+          { type: "separator" },
+          { label: "Export Review Report", action: () => downloadAnnotationReport(annotations, filename), disabled: annotations.length === 0 },
+        ],
+      },
+      {
+        label: "Document",
+        items: [
+          { label: "Annotate",         shortcut: "A", action: () => switchMode("annotate"),               disabled: !hasDoc },
+          { label: "Redact",           shortcut: "R", action: () => switchMode("redact"),                 disabled: !hasDoc },
+          { label: "Crop",             shortcut: "C", action: () => switchMode("crop"),                   disabled: !hasDoc },
+          { type: "separator" },
+          { label: "Compress PDF",           action: () => togglePanel("compress"),       disabled: !hasDoc },
+          { label: "Add Watermark",          action: () => togglePanel("watermark"),      disabled: !hasDoc },
+          { label: "Encrypt / Decrypt",      action: () => togglePanel("security"),       disabled: !hasDoc },
+          { type: "separator" },
+          { label: "Split PDF",              action: () => togglePanel("split"),          disabled: !hasDoc },
+          { label: "Extract Pages",          action: () => togglePanel("extract"),        disabled: !hasDoc },
+          { label: "Rotate / Delete Pages",  action: () => togglePanel("rotate-delete"), disabled: !hasDoc },
+          { label: "Rearrange Pages",        action: () => navigate("/rearrange", { state: { file: workingFile ?? file } }), disabled: !hasDoc },
+          { label: "Merge PDFs",             action: () => navigate("/merge", { state: { file: workingFile ?? file } }) },
+          { type: "separator" },
+          { label: "Export to Images",       action: () => togglePanel("pdf-to-images"), disabled: !hasDoc },
+        ],
+      },
+      {
+        label: "View",
+        items: [
+          { label: "Zoom In",          shortcut: "+",        action: () => setScale(s => parseFloat(Math.min(s + 0.2, 4).toFixed(2))) },
+          { label: "Zoom Out",         shortcut: "−",        action: () => setScale(s => parseFloat(Math.max(s - 0.2, 0.5).toFixed(2))) },
+          { label: "Fit Width",                             action: () => {
+              if (!canvasAreaRef.current || !canvasRef.current) return;
+              const w = canvasAreaRef.current.clientWidth - 64;
+              const pw = canvasRef.current.width / scale;
+              setScale(parseFloat(Math.max(0.5, Math.min(w / pw, 4)).toFixed(2)));
+            }
+          },
+          { type: "separator" },
+          { label: "Show Annotations",  shortcut: "Shift+H",  action: () => setAnnotationsVisible(v => !v), checked: annotationsVisible },
+          { label: "Show Thumbnails",                         action: () => setSidebarCollapsed(v => !v),    checked: !sidebarCollapsed },
+          { type: "separator" },
+          { label: "Annotations panel",  action: () => setRailTab("annotations"),  disabled: !hasDoc },
+          { label: "Table of Contents",  action: () => setRailTab("outline"),       disabled: !hasDoc },
+          { label: "Bookmarks",          action: () => setRailTab("bookmarks"),     disabled: !hasDoc },
+        ],
+      },
+    ];
+  }
+
   return (
     <div className="h-screen flex flex-col bg-stone-800 overflow-hidden">
 
       {/* ── Top bar ───────────────────────────────────────────────────────────── */}
-      <div className="bg-stone-900 border-b border-stone-700 px-4 py-2 flex items-center gap-3 shrink-0">
-        <Link to="/" className="shrink-0 flex items-center gap-1.5 text-stone-400 hover:text-white transition text-xs">
+      {/* Hidden dropzone input — triggered via openFilePicker() from File menu */}
+      <div {...getRootProps()} className="hidden"><input {...getInputProps()} /></div>
+
+      <div className="bg-stone-900 border-b border-stone-700 px-3 py-1.5 flex items-center gap-2 shrink-0 min-w-0">
+        {/* Logo + Home link */}
+        <Link to="/" className="shrink-0 flex items-center gap-1.5 text-stone-400 hover:text-white transition">
           <svg width="16" height="16" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <rect x="2" y="9" width="18" height="18" stroke="#d97706" strokeWidth="1.5" strokeLinejoin="round"/>
             <line x1="2"  y1="9"  x2="20" y2="27" stroke="#d97706" strokeWidth="1.5"/>
@@ -868,47 +976,51 @@ export default function Viewer() {
             <line x1="20" y1="9"  x2="30" y2="13" stroke="#d97706" strokeWidth="1.5"/>
             <circle cx="11" cy="18" r="1.5" fill="#d97706"/>
           </svg>
-          <ChevronLeft className="h-3.5 w-3.5" /> Home
         </Link>
-        <div className="w-px h-4 bg-stone-700" />
+
+        <div className="w-px h-4 bg-stone-700 shrink-0" />
 
         {/* Editable filename */}
         {editingFilename ? (
-          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0 w-48">
             <input autoFocus value={filenameInput}
               onChange={e => setFilenameInput(e.target.value)}
               onBlur={commitFilename}
               onKeyDown={e => { if (e.key === "Enter") commitFilename(); if (e.key === "Escape") setEditingFilename(false); }}
-              className="flex-1 min-w-0 bg-stone-800 border border-brand-500 rounded px-2 py-0.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="flex-1 min-w-0 bg-stone-800 border border-brand-500 rounded px-2 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
             />
-            <button onClick={commitFilename} className="shrink-0 text-green-400 hover:text-green-300 transition"><Check className="h-4 w-4" /></button>
-            <button onClick={() => setEditingFilename(false)} className="shrink-0 text-stone-400 hover:text-white transition"><X className="h-4 w-4" /></button>
+            <button onClick={commitFilename} className="shrink-0 text-green-400 hover:text-green-300 transition"><Check className="h-3.5 w-3.5" /></button>
+            <button onClick={() => setEditingFilename(false)} className="shrink-0 text-stone-400 hover:text-white transition"><X className="h-3.5 w-3.5" /></button>
           </div>
         ) : (
           <button onClick={() => { setFilenameInput(filename); setEditingFilename(true); }} title="Click to rename"
-            className="flex items-center gap-1.5 group min-w-0 flex-1 text-left">
-            <span className="text-sm text-stone-200 truncate group-hover:text-white transition">{filename}</span>
-            <Pencil className="h-3 w-3 text-stone-600 group-hover:text-stone-300 shrink-0 transition" />
+            className="flex items-center gap-1 group min-w-0 max-w-[200px]">
+            <span className="text-xs text-stone-300 truncate group-hover:text-white transition">{filename || "No file"}</span>
+            <Pencil className="h-2.5 w-2.5 text-stone-600 group-hover:text-stone-400 shrink-0 transition" />
           </button>
         )}
 
+        <div className="w-px h-4 bg-stone-700 shrink-0" />
+
+        {/* Menu bar: File / Document / View */}
+        <MenuBar menus={buildViewerMenus()} />
+
+        {/* Right side */}
         <div className="ml-auto flex items-center gap-2 shrink-0">
           {/* Author badge */}
           {editingAuthor ? (
-            <div className="flex items-center gap-1">
-              <input
-                autoFocus
-                value={authorInput}
-                onChange={e => setAuthorInput(e.target.value)}
-                onBlur={() => { updateSettings({ author: authorInput.trim() }); setEditingAuthor(false); }}
-                onKeyDown={e => {
-                  if (e.key === "Enter") { updateSettings({ author: authorInput.trim() }); setEditingAuthor(false); }
-                  if (e.key === "Escape") setEditingAuthor(false);
-                }}
-                placeholder="Your name"
-                className="w-28 bg-stone-800 border border-brand-500 rounded px-2 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
-              />
-            </div>
+            <input
+              autoFocus
+              value={authorInput}
+              onChange={e => setAuthorInput(e.target.value)}
+              onBlur={() => { updateSettings({ author: authorInput.trim() }); setEditingAuthor(false); }}
+              onKeyDown={e => {
+                if (e.key === "Enter") { updateSettings({ author: authorInput.trim() }); setEditingAuthor(false); }
+                if (e.key === "Escape") setEditingAuthor(false);
+              }}
+              placeholder="Your name"
+              className="w-24 bg-stone-800 border border-brand-500 rounded px-2 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
+            />
           ) : (
             <button
               onClick={() => { setAuthorInput(settings.author); setEditingAuthor(true); }}
@@ -924,22 +1036,10 @@ export default function Viewer() {
           {/* Backend status dot */}
           <div
             role="status"
-            aria-label={
-              backendOk === null  ? "Checking backend connection" :
-              backendOk           ? "Backend connected" :
-              "Backend offline"
-            }
-            title={
-              backendOk === null  ? "Checking backend…" :
-              backendOk           ? "Backend connected" :
-              "Backend offline — run: cd backend && .venv\\Scripts\\uvicorn main:app --port 7342"
-            }
-            className={cn(
-              "w-2 h-2 rounded-full shrink-0 transition-colors",
-              backendOk === null  ? "bg-stone-600" :
-              backendOk           ? "bg-green-500" :
-              "bg-red-500 animate-pulse"
-            )}
+            aria-label={backendOk === null ? "Checking backend" : backendOk ? "Backend connected" : "Backend offline"}
+            title={backendOk === null ? "Checking backend…" : backendOk ? "Backend connected" : "Backend offline — run: cd backend && .venv\\Scripts\\uvicorn main:app --port 7342"}
+            className={cn("w-2 h-2 rounded-full shrink-0 transition-colors",
+              backendOk === null ? "bg-stone-600" : backendOk ? "bg-green-500" : "bg-red-500 animate-pulse")}
           />
           {rendering && <span className="text-[10px] text-stone-500 animate-pulse">Rendering…</span>}
 
@@ -948,28 +1048,11 @@ export default function Viewer() {
             <button
               onClick={() => downloadBlob(workingBlob, filename)}
               title="Download modified PDF (Ctrl+S)"
-              className="flex items-center gap-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition shadow-lg"
+              className="flex items-center gap-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 px-2.5 py-1.5 text-xs font-semibold text-white transition shadow-lg"
             >
-              <Download className="h-3.5 w-3.5" /> Download PDF
+              <Download className="h-3.5 w-3.5" /> Download
             </button>
           )}
-
-          {/* Export report */}
-          {annotations.length > 0 && (
-            <button
-              onClick={() => downloadAnnotationReport(annotations, filename)}
-              title="Export review report as Markdown"
-              className="flex items-center gap-1.5 rounded-lg bg-stone-700 hover:bg-stone-600 px-2.5 py-1.5 text-xs text-stone-300 hover:text-white transition"
-            >
-              <FileText className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Report</span>
-            </button>
-          )}
-
-          <div {...getRootProps()} className="cursor-pointer">
-            <input {...getInputProps()} />
-            <button aria-label="Open a different PDF" className="text-xs px-2.5 py-1.5 rounded bg-stone-700 hover:bg-stone-600 transition text-stone-300">Open…</button>
-          </div>
         </div>
       </div>
 
@@ -1019,6 +1102,7 @@ export default function Viewer() {
                   inkStrokeWidth={inkStrokeWidth}
                   stampLabel={stampLabel}
                   snippets={settings.snippets}
+                  visible={annotationsVisible}
                 />
               )}
 
@@ -1110,8 +1194,8 @@ export default function Viewer() {
                     { m: "strikethrough" as CreateMode, icon: <Strikethrough className="h-3.5 w-3.5" />, label: "Strike",    key: "S" },
                     { m: "freetext"      as CreateMode, icon: <Type          className="h-3.5 w-3.5" />, label: "Text",      key: "T" },
                     { m: "ink"           as CreateMode, icon: <PenLine       className="h-3.5 w-3.5" />, label: "Draw",      key: "I" },
-                    { m: "shape"         as CreateMode, icon: <Square        className="h-3.5 w-3.5" />, label: "Shape",     key: "" },
-                    { m: "stamp"         as CreateMode, icon: <Stamp         className="h-3.5 w-3.5" />, label: "Stamp",     key: "" },
+                    { m: "shape"         as CreateMode, icon: <Square        className="h-3.5 w-3.5" />, label: "Shape",     key: "G" },
+                    { m: "stamp"         as CreateMode, icon: <Stamp         className="h-3.5 w-3.5" />, label: "Stamp",     key: "P" },
                   ]).map(({ m, icon, label, key }) => {
                     const active = annotateSubMode === m;
                     return (
@@ -1317,12 +1401,10 @@ export default function Viewer() {
 
           {/* ── Bottom toolbar ──────────────────────────────────────────────── */}
           <div className="shrink-0 px-4 pb-4 flex justify-center">
-            <div className="flex items-center gap-1 bg-stone-900 border border-stone-700 rounded-2xl px-3 py-2 shadow-xl flex-wrap">
+            <div className="flex items-center gap-1 bg-stone-900 border border-stone-700 rounded-2xl px-3 py-2 shadow-xl">
 
-              {modeBtn("view",     <Eye className="h-3.5 w-3.5" />,          "View",     "V")}
+              {/* Annotate toggle */}
               {modeBtn("annotate", <MessageSquare className="h-3.5 w-3.5" />, "Annotate", "A")}
-              {modeBtn("redact",   <EyeOff className="h-3.5 w-3.5" />,       "Redact",   "R")}
-              {modeBtn("crop",     <Crop className="h-3.5 w-3.5" />,          "Crop",     "C")}
 
               <div className="w-px h-5 bg-stone-700 mx-0.5" />
 
@@ -1389,26 +1471,11 @@ export default function Viewer() {
 
               <div className="w-px h-5 bg-stone-700 mx-0.5" />
 
-              {/* External links */}
-              <Link to="/rearrange" state={{ file: workingFile ?? file }}
-                title="Rearrange pages"
-                className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-stone-400 hover:text-white hover:bg-stone-700 transition">
-                <AlignLeft className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Rearrange</span>
-                <ExternalLink className="h-2.5 w-2.5 ml-0.5" />
-              </Link>
-              <Link to="/merge" state={{ file: workingFile ?? file }}
-                title="Merge with other PDFs"
-                className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-stone-400 hover:text-white hover:bg-stone-700 transition">
-                <span className="hidden sm:inline">Merge</span>
-                <ExternalLink className="h-2.5 w-2.5 ml-0.5" />
-              </Link>
-
               {/* Command palette */}
               <button onClick={() => setPaletteOpen(true)} title="Command palette (Ctrl+Shift+P)"
                 className="flex items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-stone-700 transition text-stone-500 hover:text-stone-300">
                 <Command className="h-3.5 w-3.5" />
-                <kbd className="rounded border border-stone-600 bg-stone-800 px-1 py-0 text-[9px] font-mono leading-4 text-stone-500">Ctrl+Shift+P</kbd>
+                <kbd className="rounded border border-stone-600 bg-stone-800 px-1 py-0 text-[9px] font-mono leading-4 text-stone-500">⌘P</kbd>
               </button>
 
               {/* Keyboard cheat sheet */}

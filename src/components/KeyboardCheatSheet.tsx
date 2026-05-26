@@ -11,6 +11,8 @@ const SHORTCUTS: Entry[] = [
   { key: "S",         desc: "Annotate — Strikethrough" },
   { key: "T",         desc: "Annotate — Text box" },
   { key: "I",         desc: "Annotate — Ink / Freehand draw" },
+  { key: "G",         desc: "Annotate — Shape (rect / ellipse / arrow)" },
+  { key: "P",         desc: "Annotate — Stamp" },
   { key: "R",         desc: "Redact mode" },
   { key: "C",         desc: "Crop mode" },
   { key: "Esc",       desc: "Return to View / dismiss overlay" },
@@ -24,7 +26,7 @@ const SHORTCUTS: Entry[] = [
   { section: "Navigation" },
   { key: "→ / ↓",    desc: "Next page" },
   { key: "← / ↑",    desc: "Previous page" },
-  { key: "Scroll",    desc: "Continuous page advance at edges" },
+  { key: "Scroll",    desc: "Page advance at scroll boundary" },
   { key: "Home",      desc: "First page" },
   { key: "End",       desc: "Last page" },
 
@@ -33,6 +35,7 @@ const SHORTCUTS: Entry[] = [
   { key: "−",         desc: "Zoom out" },
 
   { section: "Panels & Global" },
+  { key: "Shift+H",   desc: "Show / hide annotations" },
   { key: "Ctrl+F",    desc: "Search in document" },
   { key: "Ctrl+S",    desc: "Download PDF" },
   { key: "Ctrl+Shift+P", desc: "Command palette" },
