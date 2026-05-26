@@ -1617,6 +1617,33 @@ export default function AnnotationLayer({
         >
           <span className="text-xs text-stone-400 mr-1">{selectedIds.size} selected</span>
 
+          {/* Colour bulk-change — only when all selected are highlights */}
+          {Array.from(selectedIds).every(id => {
+            const a = annotations.find(x => x.id === id);
+            return a && a.type === "highlight";
+          }) && (
+            <>
+              <span className="text-[10px] text-stone-600 uppercase tracking-wide">Color</span>
+              {highlightColors.map((hc, ci) => (
+                <button
+                  key={ci}
+                  onClick={() => {
+                    const ids = new Set(selectedIds);
+                    onAnnotationsChange(annotations.map(a =>
+                      ids.has(a.id) && a.type === "highlight"
+                        ? { ...a, colorIdx: ci, color: hc.rgb } as LocalAnnot
+                        : a
+                    ));
+                  }}
+                  title={hc.label}
+                  className="h-4 w-4 rounded-full border-2 border-transparent hover:border-white transition"
+                  style={{ background: hc.bg }}
+                />
+              ))}
+              <div className="w-px h-4 bg-stone-700 mx-0.5" />
+            </>
+          )}
+
           {/* Status bulk-change — only when all selected are comment types (note / freetext) */}
           {Array.from(selectedIds).every(id => {
             const a = annotations.find(x => x.id === id);

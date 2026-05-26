@@ -894,15 +894,20 @@ export default function Viewer() {
 
   // ── Annotation management ─────────────────────────────────────────────────
 
-  /** Jump to an annotation's page AND select it in the overlay. */
+  /** Jump to an annotation's page AND select it in the overlay.
+   *  Works for both draft (annotations) and committed (bakedAnnotations). */
   function focusAnnotation(id: AnnotId) {
-    const ann = annotations.find(a => a.id === id);
+    const isDraft = annotations.some(a => a.id === id);
+    const ann = isDraft
+      ? annotations.find(a => a.id === id)
+      : bakedAnnotations.find(a => a.id === id);
     if (!ann) return;
     goTo(ann.page);
     setFocusAnnotId(id);
-    // Enter annotate mode if not already there so the overlay is visible
-    if (canvasMode !== "annotate") doSwitchMode("annotate");
-    setTimeout(() => setFocusAnnotId(null), 150); // reset after AnnotationLayer picks it up
+    // Only switch to annotate mode for draft annotations — baked ones are
+    // always visible via the read-only layer regardless of canvasMode.
+    if (isDraft && canvasMode !== "annotate") doSwitchMode("annotate");
+    setTimeout(() => setFocusAnnotId(null), 150);
   }
 
   function deleteAnnot(id: AnnotId) {
@@ -1064,7 +1069,7 @@ export default function Viewer() {
           { label: "Open…",               shortcut: "Ctrl+O",       action: () => openFilePicker() },
           { label: "Save / Download",      shortcut: "Ctrl+S",       action: () => { if (workingBlob) downloadBlob(workingBlob, filename); }, disabled: !hasBlob },
           { type: "separator" },
-          { label: "Export Review Report", action: () => downloadAnnotationReport(annotations, filename), disabled: annotations.length === 0 },
+          { label: "Export Review Report", action: () => downloadAnnotationReport([...bakedAnnotations, ...annotations], filename), disabled: bakedAnnotations.length === 0 && annotations.length === 0 },
         ],
       },
       {
@@ -1100,7 +1105,7 @@ export default function Viewer() {
             }
           },
           { type: "separator" },
-          { label: annotationsVisible ? "Hide annotation overlay" : "Show annotation overlay", shortcut: "Shift+H", action: () => setAnnotationsVisible(v => !v), checked: annotationsVisible, disabled: canvasMode !== "annotate" },
+          { label: annotationsVisible ? "Hide annotations" : "Show annotations", shortcut: "Shift+H", action: () => setAnnotationsVisible(v => !v), checked: annotationsVisible },
           { label: "Show Thumbnails",    action: () => setSidebarCollapsed(v => !v), checked: !sidebarCollapsed },
           { label: "Mini-map",          action: () => setMiniMapVisible(v => !v),   checked: miniMapVisible },
           { type: "separator" },
@@ -1617,17 +1622,15 @@ export default function Viewer() {
           )}
 
           {/* ── Annotations hidden notice ───────────────────────────────────── */}
-          {!annotationsVisible && canvasMode === "annotate" && (
-            // The overlay is only active in annotate mode. In view mode the PDF
-            // canvas renders the saved PDF content directly, which always shows
-            // whatever was burned in on the last save — the hide toggle has no
-            // effect there (nothing to hide).
+          {!annotationsVisible && (
             <div className="shrink-0 px-4 pb-1 flex justify-center">
               <div className="flex items-center gap-2 bg-stone-900/90 border border-stone-600/60 rounded-lg px-3 py-1.5 text-xs text-stone-400">
                 <EyeOff className="h-3 w-3 shrink-0 text-amber-500" />
                 <span>
-                  Editing overlay hidden
-                  {annotations.length > 0 && <> ({annotations.length} annotation{annotations.length !== 1 ? "s" : ""}) — <span className="text-stone-500">will save to PDF on Done / Esc</span></>}
+                  Annotations hidden
+                  {canvasMode === "annotate" && annotations.length > 0 && (
+                    <> ({annotations.length} unsaved) — <span className="text-stone-500">will save to PDF on Done</span></>
+                  )}
                 </span>
                 <button
                   onClick={() => setAnnotationsVisible(true)}
@@ -1901,7 +1904,7 @@ export default function Viewer() {
       { id: "to-images",    label: "Export to Images",  description: "Convert pages to PNG / JPEG",   category: "Tools",      action: () => { togglePanel("pdf-to-images"); setPaletteOpen(false); } },
       { id: "minimap",      label: "Toggle mini-map",   description: "Show/hide the page-position strip", category: "Navigation", action: () => { setMiniMapVisible(v => !v); setPaletteOpen(false); } },
       { id: "settings",     label: "Preferences",       description: "Author name, colour labels",    category: "Tools",      action: () => { setSettingsOpen(true); setPaletteOpen(false); } },
-      { id: "export",       label: "Export report",     description: "Download annotations as .md",   category: "Export",     action: () => { downloadAnnotationReport(annotations, filename); setPaletteOpen(false); } },
+      { id: "export",       label: "Export report",     description: "Download annotations as .md",   category: "Export",     action: () => { downloadAnnotationReport([...bakedAnnotations, ...annotations], filename); setPaletteOpen(false); } },
       ...(workingBlob ? [{
         id: "download", label: "Download PDF", description: "Save modified PDF (Ctrl+S)", category: "Export",
         action: () => { downloadBlob(workingBlob, filename); setPaletteOpen(false); },
