@@ -411,12 +411,17 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
                 p1 = fitz.Point(x0, y0)
                 p2 = fitz.Point(x1, y1)
                 a = page.add_line_annot(p1, p2)
+                # Match the screen stroke width. PDF viewers scale arrow heads
+                # proportionally to the line width, so keeping width consistent
+                # is the closest we can get to the frontend's rendered size.
+                sw_px = ann.get("strokeWidth", 2)
+                sw_pdf = max(0.5, float(sw_px) * 0.5)
+                a.set_border(width=sw_pdf)
                 a.set_colors(stroke=color)
                 if shape == "arrow":
                     try:
-                        # ClosedArrow matches the frontend's filled polygon arrowhead.
+                        # ClosedArrow = filled triangle, matching the SVG polygon preview.
                         a.set_line_ends(fitz.PDF_ANNOT_LE_NONE, fitz.PDF_ANNOT_LE_CLOSED_ARROW)
-                        # Fill the arrowhead with the same color as the stroke.
                         a.set_colors(stroke=color, fill=color)
                     except Exception:
                         pass  # older PyMuPDF may use different API
@@ -434,10 +439,10 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
             y1 = pb.y0 + ann["y1"] * pb.height
             rect = fitz.Rect(x0, y0, x1, y1)
             label = ann.get("label", "DRAFT")
-            color = ann.get("color", [0.6, 0, 0])
-            # Use a FreeText annotation styled to match the CSS preview:
-            # white fill, colored border (2pt), bold Helvetica, centred.
-            # font_name "hebo" = Helvetica-Bold in PyMuPDF's built-in fonts.
+            color = tuple(ann.get("color", [0.6, 0, 0]))
+            # FreeText annotation: Helvetica-Bold, white fill, colored 2pt border.
+            # "hebo" is the PyMuPDF alias for Helvetica-Bold (built-in PDF font).
+            # Font size: 55% of box height to match the CSS "55cqh" preview sizing.
             fs = max(6, (y1 - y0) * 0.55)
             a = page.add_freetext_annot(
                 rect, label,
@@ -447,8 +452,10 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
                 fill_color=(1, 1, 1),
                 align=fitz.TEXT_ALIGN_CENTER,
             )
+            # set_border must come before update() so the AP stream is generated
+            # with the border included. Width 1.5pt ≈ 2px CSS border.
             a.set_border(width=1.5)
-            a.set_colors(stroke=color, fill=(1, 1, 1))
+            a.set_colors(stroke=color)   # border colour; fill is already (1,1,1) above
             a.update()
 
     return _save(doc)

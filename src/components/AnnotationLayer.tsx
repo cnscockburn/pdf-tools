@@ -222,8 +222,8 @@ function StampDiv({ ann, sel, onMouseDown, deleteBtn, renderResizeHandles }: Sta
       onMouseDown={e => onMouseDown(e, ann)}
     >
       <span
-        className="font-bold tracking-widest text-center select-none whitespace-nowrap overflow-hidden"
-        style={{ color: textColor, fontSize: "55cqh", lineHeight: 1 }}
+        className="font-bold text-center select-none whitespace-nowrap overflow-hidden"
+        style={{ color: textColor, fontSize: "55cqh", lineHeight: 1, letterSpacing: 0 }}
       >
         {ann.label}
       </span>

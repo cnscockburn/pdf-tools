@@ -939,7 +939,7 @@ export default function Viewer() {
             }
           },
           { type: "separator" },
-          { label: "Show Annotations",  shortcut: "Shift+H",  action: () => setAnnotationsVisible(v => !v), checked: annotationsVisible },
+          { label: annotationsVisible ? "Hide annotation overlay" : "Show annotation overlay", shortcut: "Shift+H", action: () => setAnnotationsVisible(v => !v), checked: annotationsVisible, disabled: canvasMode !== "annotate" },
           { label: "Show Thumbnails",                         action: () => setSidebarCollapsed(v => !v),    checked: !sidebarCollapsed },
           { type: "separator" },
           { label: "Annotations panel",  action: () => setRailTab("annotations"),  disabled: !hasDoc },
@@ -1404,15 +1404,17 @@ export default function Viewer() {
           )}
 
           {/* ── Annotations hidden notice ───────────────────────────────────── */}
-          {!annotationsVisible && (
+          {!annotationsVisible && canvasMode === "annotate" && (
+            // The overlay is only active in annotate mode. In view mode the PDF
+            // canvas renders the saved PDF content directly, which always shows
+            // whatever was burned in on the last save — the hide toggle has no
+            // effect there (nothing to hide).
             <div className="shrink-0 px-4 pb-1 flex justify-center">
               <div className="flex items-center gap-2 bg-stone-900/90 border border-stone-600/60 rounded-lg px-3 py-1.5 text-xs text-stone-400">
                 <EyeOff className="h-3 w-3 shrink-0 text-amber-500" />
                 <span>
-                  {annotations.length > 0
-                    ? <>Annotations hidden ({annotations.length}) — <span className="text-stone-500">they will still save to the PDF</span></>
-                    : <>Annotations are hidden</>
-                  }
+                  Editing overlay hidden
+                  {annotations.length > 0 && <> ({annotations.length} annotation{annotations.length !== 1 ? "s" : ""}) — <span className="text-stone-500">will save to PDF on Done / Esc</span></>}
                 </span>
                 <button
                   onClick={() => setAnnotationsVisible(true)}
