@@ -9,7 +9,8 @@
  * Every annotation carries optional status, author, tags metadata.
  * Notes and freetext support session-only reply threads.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "../lib/utils";
 import type { Snippet } from "../lib/storage";
 import MathText from "./MathText";
@@ -266,14 +267,39 @@ interface Props {
   snippets?: Snippet[];
   /** When false, annotations are rendered invisible (Shift+H toggle) */
   visible?: boolean;
+  /** When set, selects this annotation (from external navigation e.g. sidebar) */
+  focusAnnotId?: AnnotId | null;
+  /** Called when the note popup's prev/next arrows are clicked — parent should navigate */
+  onNavigateAnnot?: (id: AnnotId) => void;
 }
+
+// Only note and freetext are "comments" with status / resolution workflow.
+const COMMENT_TYPES: LocalAnnot["type"][] = ["note", "freetext"];
+function isCommentType(type: LocalAnnot["type"]): boolean {
+  return COMMENT_TYPES.includes(type);
+}
+
+// Status cycle helper used inside the component render loop
+function nextStatus(current?: AnnotStatus): AnnotStatus {
+  const cycle: AnnotStatus[] = ["open", "resolved", "wontfix"];
+  return cycle[(cycle.indexOf(current ?? "open") + 1) % cycle.length];
+}
+
+const STATUS_LABEL: Record<AnnotStatus, string> = {
+  open: "Open", resolved: "Resolved", wontfix: "Won't fix",
+};
+const STATUS_CLASS: Record<AnnotStatus, string> = {
+  open:     "bg-sky-900/50 text-sky-300 border-sky-700/50",
+  resolved: "bg-green-900/50 text-green-300 border-green-700/50",
+  wontfix:  "bg-stone-700/60 text-stone-400 border-stone-600/50",
+};
 
 export default function AnnotationLayer({
   annotations, page, createMode, hlColorIdx, highlightColors,
   onAnnotationsChange, textSelectActive, author, onSelectedChange,
   shapeSubType = "rect", inkColor = [0, 0, 0], inkStrokeWidth = 2,
   stampLabel = "DRAFT", stampColor = [0.6, 0, 0],
-  snippets = [], visible = true,
+  snippets = [], visible = true, focusAnnotId, onNavigateAnnot,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -299,6 +325,14 @@ export default function AnnotationLayer({
     startFrac: { x: number; y: number };
     live: FracRect | null;
   } | null>(null);
+
+  // When parent requests focus (sidebar click / popup nav arrows)
+  useEffect(() => {
+    if (focusAnnotId) {
+      setSelectedId(focusAnnotId);
+      onSelectedChange?.(focusAnnotId);
+    }
+  }, [focusAnnotId]); // eslint-disable-line
 
   // Sync selection to parent
   useEffect(() => { onSelectedChange?.(selectedId); }, [selectedId]); // eslint-disable-line
@@ -330,6 +364,18 @@ export default function AnnotationLayer({
 
   // ── Annotation helpers ────────────────────────────────────────────────────
   const pageAnns = annotations.filter(a => a.page === page);
+
+  /** All annotations sorted by page then vertical position — used for prev/next navigation. */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const navSortedAnnots = useMemo(() =>
+    [...annotations].sort((a, b) => {
+      if (a.page !== b.page) return a.page - b.page;
+      const ay = a.type === "note" ? a.y : a.y0;
+      const by = b.type === "note" ? b.y : b.y0;
+      return ay - by;
+    }),
+    [annotations],
+  );
 
   function updateAnnot(updated: LocalAnnot) {
     onAnnotationsChange(annotations.map(a => a.id === updated.id ? updated : a));
@@ -928,74 +974,151 @@ export default function AnnotationLayer({
         const editing = ann.id === editingId;
 
         /* ── Note ── */
-        if (ann.type === "note") return (
-          <div key={ann.id} data-annot="true"
-            className="absolute pointer-events-auto"
-            style={{ left: `${ann.x * 100}%`, top: `${ann.y * 100}%`, transform: "translate(-50%,-100%)", zIndex: sel ? 30 : 20 }}
-            onMouseDown={e => onAnnotMouseDown(e, ann)}
-            onDoubleClick={e => onAnnotDblClick(e, ann)}
-          >
-            <div className={cn("relative group select-none", sel ? "cursor-move drop-shadow-xl" : "cursor-pointer")}>
-              <span className="text-xl leading-none">📌</span>
-              {sel && !editing && deleteBtn(ann.id)}
-              {editing ? (
-                <div
-                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-40 pointer-events-auto"
-                  onMouseDown={e => e.stopPropagation()}
-                >
-                  <div className="bg-yellow-50 border-2 border-yellow-400 rounded-xl shadow-xl p-3 w-56 space-y-2">
-                    <textarea autoFocus rows={3} value={editText}
-                      onChange={e => setEditText(e.target.value)}
-                      onKeyDown={e => {
-                        e.stopPropagation();
-                        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commitEdit(ann.id); }
-                        if (e.key === "Escape") { e.preventDefault(); cancelEdit(); }
-                      }}
-                      placeholder="Type note… (Ctrl+Enter to save)"
-                      className="w-full rounded-lg border border-yellow-300 bg-white px-2 py-1.5 text-xs text-stone-800 resize-none focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                    />
-                    <input
-                      value={editTagsStr}
-                      onChange={e => setEditTagsStr(e.target.value)}
-                      onKeyDown={e => { e.stopPropagation(); if (e.key === "Escape") { e.preventDefault(); cancelEdit(); } }}
-                      placeholder="Tags: citation, question…"
-                      className="w-full rounded border border-yellow-200 bg-white px-2 py-1 text-[10px] text-stone-600 focus:outline-none focus:ring-1 focus:ring-yellow-400"
-                    />
-                    <div className="flex gap-1.5 items-center">
-                      <SnippetDropdown onInsert={text => setEditText(prev => prev + text)} />
-                      <button onClick={() => commitEdit(ann.id)} disabled={!editText.trim()}
-                        className="flex-1 rounded bg-yellow-400 hover:bg-yellow-300 py-1 text-xs font-semibold text-stone-800 disabled:opacity-40 transition">Save</button>
-                      <button onClick={cancelEdit}
-                        className="px-2 rounded bg-stone-200 hover:bg-stone-300 text-xs text-stone-600 transition">Cancel</button>
+        if (ann.type === "note") {
+          const navIdx  = navSortedAnnots.findIndex(a => a.id === ann.id);
+          const prevAnn = navIdx > 0 ? navSortedAnnots[navIdx - 1] : null;
+          const nextAnn = navIdx >= 0 && navIdx < navSortedAnnots.length - 1 ? navSortedAnnots[navIdx + 1] : null;
+
+          return (
+            <div key={ann.id} data-annot="true"
+              className="absolute pointer-events-auto"
+              style={{ left: `${ann.x * 100}%`, top: `${ann.y * 100}%`, transform: "translate(-50%,-100%)", zIndex: sel ? 30 : 20 }}
+              onMouseDown={e => onAnnotMouseDown(e, ann)}
+              onDoubleClick={e => onAnnotDblClick(e, ann)}
+            >
+              <div className={cn("relative group select-none", sel ? "cursor-move drop-shadow-xl" : "cursor-pointer")}>
+                <span className="text-xl leading-none">📌</span>
+                {sel && !editing && deleteBtn(ann.id)}
+
+                {editing ? (
+                  /* ── Editor popup ── */
+                  <div
+                    className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-40 pointer-events-auto"
+                    onMouseDown={e => e.stopPropagation()}
+                  >
+                    <div className="bg-yellow-50 border-2 border-yellow-400 rounded-xl shadow-xl p-3 w-56 space-y-2">
+                      <textarea autoFocus rows={3} value={editText}
+                        onChange={e => setEditText(e.target.value)}
+                        onKeyDown={e => {
+                          e.stopPropagation();
+                          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commitEdit(ann.id); }
+                          if (e.key === "Escape") { e.preventDefault(); cancelEdit(); }
+                        }}
+                        placeholder="Type note… (Ctrl+Enter to save)"
+                        className="w-full rounded-lg border border-yellow-300 bg-white px-2 py-1.5 text-xs text-stone-800 resize-none focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                      />
+                      <input
+                        value={editTagsStr}
+                        onChange={e => setEditTagsStr(e.target.value)}
+                        onKeyDown={e => { e.stopPropagation(); if (e.key === "Escape") { e.preventDefault(); cancelEdit(); } }}
+                        placeholder="Tags: citation, question…"
+                        className="w-full rounded border border-yellow-200 bg-white px-2 py-1 text-[10px] text-stone-600 focus:outline-none focus:ring-1 focus:ring-yellow-400"
+                      />
+                      <div className="flex gap-1.5 items-center">
+                        <SnippetDropdown onInsert={text => setEditText(prev => prev + text)} />
+                        <button onClick={() => commitEdit(ann.id)} disabled={!editText.trim()}
+                          className="flex-1 rounded bg-yellow-400 hover:bg-yellow-300 py-1 text-xs font-semibold text-stone-800 disabled:opacity-40 transition">Save</button>
+                        <button onClick={cancelEdit}
+                          className="px-2 rounded bg-stone-200 hover:bg-stone-300 text-xs text-stone-600 transition">Cancel</button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-30 pointer-events-none
-                  bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg px-2 py-1.5 text-xs text-stone-800 max-w-52 whitespace-pre-wrap"
-                  onMouseDown={e => { e.stopPropagation(); setShowReplies(v => v === ann.id ? null : ann.id); }}
-                >
-                  {ann.author && <div className="text-[9px] text-stone-500 mb-0.5 font-medium">{ann.author}</div>}
-                  {ann.text ? <MathText text={ann.text} /> : <span className="italic text-stone-400">empty — double-click to edit</span>}
-                  {tagsDisplay(ann.tags)}
-                  {(ann.replies?.length ?? 0) > 0 && (
-                    <div className="text-[9px] text-brand-500 mt-0.5">{ann.replies!.length} reply{ann.replies!.length > 1 ? "s" : ""}</div>
-                  )}
-                </div>
-              )}
-              {/* Reply thread (shown when popover is visible + clicked) */}
-              {showReplies === ann.id && !editing && (
-                <div
-                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-40 pointer-events-auto bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg px-2 py-1.5 w-56"
-                  onMouseDown={e => e.stopPropagation()}
-                >
-                  {ann.text && <MathText text={ann.text} className="text-xs text-stone-800 mb-1.5 block" />}
-                  {renderReplies(ann)}
-                </div>
-              )}
+
+                ) : sel ? (
+                  /* ── Selected — persistent preview popup ── */
+                  <div
+                    className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30 pointer-events-auto
+                      bg-stone-900 border border-stone-600 rounded-xl shadow-2xl"
+                    style={{ width: 228 }}
+                    onMouseDown={e => e.stopPropagation()}
+                  >
+                    {/* Header: author · status badge · prev/next */}
+                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-stone-700/70">
+                      {ann.author && (
+                        <span className="text-[10px] text-stone-500 flex-1 min-w-0 truncate">{ann.author}</span>
+                      )}
+                      <button
+                        onClick={e => { e.stopPropagation(); updateAnnot({ ...ann, status: nextStatus(ann.status) }); }}
+                        title="Click to change status"
+                        className={cn(
+                          "shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium border transition",
+                          STATUS_CLASS[ann.status ?? "open"],
+                        )}
+                      >
+                        {STATUS_LABEL[ann.status ?? "open"]}
+                      </button>
+                      <div className="flex gap-0.5 shrink-0 ml-auto">
+                        <button
+                          onClick={e => { e.stopPropagation(); if (prevAnn) onNavigateAnnot?.(prevAnn.id); }}
+                          disabled={!prevAnn}
+                          title={prevAnn ? `Previous (pg ${prevAnn.page})` : "No previous"}
+                          className="p-0.5 rounded text-stone-500 hover:text-white disabled:opacity-25 transition"
+                        >
+                          <ChevronUp className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={e => { e.stopPropagation(); if (nextAnn) onNavigateAnnot?.(nextAnn.id); }}
+                          disabled={!nextAnn}
+                          title={nextAnn ? `Next (pg ${nextAnn.page})` : "No next"}
+                          className="p-0.5 rounded text-stone-500 hover:text-white disabled:opacity-25 transition"
+                        >
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Body: text content */}
+                    <div className="px-2.5 py-2 text-xs leading-snug max-h-28 overflow-y-auto">
+                      {ann.text
+                        ? <span className="text-stone-200 whitespace-pre-wrap"><MathText text={ann.text} /></span>
+                        : <span className="italic text-stone-600">Empty — double-click to edit</span>
+                      }
+                    </div>
+
+                    {/* Tags */}
+                    {ann.tags && ann.tags.length > 0 && (
+                      <div className="px-2.5 pb-1.5">{tagsDisplay(ann.tags)}</div>
+                    )}
+
+                    {/* Reply thread */}
+                    {((ann.replies?.length ?? 0) > 0 || replyingId === ann.id) && (
+                      <div className="px-2.5 pb-1.5 border-t border-stone-700/50 pt-1.5">
+                        {renderReplies(ann)}
+                      </div>
+                    )}
+
+                    {/* Footer: edit + reply */}
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 border-t border-stone-700/70">
+                      <button
+                        onClick={e => { e.stopPropagation(); startEdit(ann); }}
+                        className="text-[10px] text-stone-500 hover:text-stone-200 transition"
+                      >Edit</button>
+                      {(ann.replies?.length ?? 0) === 0 && replyingId !== ann.id && (
+                        <button
+                          onClick={e => { e.stopPropagation(); setReplyingId(ann.id); }}
+                          className="text-[10px] text-brand-500 hover:text-brand-400 transition ml-auto"
+                        >Reply…</button>
+                      )}
+                    </div>
+                  </div>
+
+                ) : (
+                  /* ── Unselected — hover-only preview ── */
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-30 pointer-events-none
+                    bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg px-2 py-1.5 text-xs text-stone-800 max-w-52 whitespace-pre-wrap"
+                  >
+                    {ann.author && <div className="text-[9px] text-stone-500 mb-0.5 font-medium">{ann.author}</div>}
+                    {ann.text ? <MathText text={ann.text} /> : <span className="italic text-stone-400">double-click to edit</span>}
+                    {tagsDisplay(ann.tags)}
+                    {(ann.replies?.length ?? 0) > 0 && (
+                      <div className="text-[9px] text-brand-500 mt-0.5">{ann.replies!.length} repl{ann.replies!.length > 1 ? "ies" : "y"}</div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        );
+          );
+        }
 
         /* ── Highlight ── */
         if (ann.type === "highlight") {
@@ -1246,31 +1369,37 @@ export default function AnnotationLayer({
         >
           <span className="text-xs text-stone-400 mr-1">{selectedIds.size} selected</span>
 
-          {/* Status bulk-change */}
-          <span className="text-[10px] text-stone-600 uppercase tracking-wide">Status</span>
-          {(["open", "resolved", "wontfix"] as AnnotStatus[]).map(s => (
-            <button
-              key={s}
-              onClick={() => {
-                const ids = new Set(selectedIds);
-                onAnnotationsChange(annotations.map(a =>
-                  ids.has(a.id) ? { ...a, status: s } as LocalAnnot : a
-                ));
-              }}
-              className={cn(
-                "px-2 py-0.5 rounded text-[10px] font-medium transition",
-                s === "resolved"
-                  ? "bg-green-900/60 text-green-300 hover:bg-green-800/60"
-                  : s === "wontfix"
-                    ? "bg-stone-700 text-stone-400 hover:bg-stone-600"
-                    : "bg-amber-900/50 text-amber-300 hover:bg-amber-800/50",
-              )}
-            >
-              {s === "wontfix" ? "Won't fix" : s.charAt(0).toUpperCase() + s.slice(1)}
-            </button>
-          ))}
-
-          <div className="w-px h-4 bg-stone-700 mx-0.5" />
+          {/* Status bulk-change — only when all selected are comment types (note / freetext) */}
+          {Array.from(selectedIds).every(id => {
+            const a = annotations.find(x => x.id === id);
+            return a && isCommentType(a.type);
+          }) && (
+            <>
+              <span className="text-[10px] text-stone-600 uppercase tracking-wide">Status</span>
+              {(["open", "resolved", "wontfix"] as AnnotStatus[]).map(s => (
+                <button
+                  key={s}
+                  onClick={() => {
+                    const ids = new Set(selectedIds);
+                    onAnnotationsChange(annotations.map(a =>
+                      ids.has(a.id) ? { ...a, status: s } as LocalAnnot : a
+                    ));
+                  }}
+                  className={cn(
+                    "px-2 py-0.5 rounded text-[10px] font-medium transition",
+                    s === "resolved"
+                      ? "bg-green-900/60 text-green-300 hover:bg-green-800/60"
+                      : s === "wontfix"
+                        ? "bg-stone-700 text-stone-400 hover:bg-stone-600"
+                        : "bg-amber-900/50 text-amber-300 hover:bg-amber-800/50",
+                  )}
+                >
+                  {s === "wontfix" ? "Won't fix" : s.charAt(0).toUpperCase() + s.slice(1)}
+                </button>
+              ))}
+              <div className="w-px h-4 bg-stone-700 mx-0.5" />
+            </>
+          )}
 
           {/* Delete */}
           <button

@@ -136,6 +136,8 @@ export default function Viewer() {
 
   // ── Annotations ────────────────────────────────────────────────────────────
   const [annotations, setAnnotations]         = useState<LocalAnnot[]>([]);
+  /** Externally-requested annotation to select (from sidebar / popup nav arrows). */
+  const [focusAnnotId, setFocusAnnotId]       = useState<AnnotId | null>(null);
   const [autoSaving, setAutoSaving]           = useState(false);
   const [annotateError, setAnnotateError]     = useState<string | null>(null);
 
@@ -499,7 +501,11 @@ export default function Viewer() {
 
     area.addEventListener("wheel", onWheel, { passive: false });
     return () => area.removeEventListener("wheel", onWheel);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Re-attach whenever `pdf` changes: the canvasAreaRef div only exists after
+  // a PDF is loaded (the empty-state early-return hides it at mount), so the
+  // initial [] run would find canvasAreaRef.current === null and bail out.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pdf]);
 
   // ── Keyboard shortcuts (stable handler via ref) ────────────────────────────
   useEffect(() => {
@@ -702,9 +708,9 @@ export default function Viewer() {
     else navigate(nav.path, { state: nav.routeState });
   }
 
-  /** Navigate, but if there are unsaved modifications show the download-first modal. */
+  /** Navigate, but show the guard modal when there is unsaved work. */
   function maybeNavigate(nav: PendingNav) {
-    if (workingBlob) { setPendingNav(nav); return; }
+    if (workingBlob || annotations.length > 0) { setPendingNav(nav); return; }
     doNavigate(nav);
   }
 
@@ -758,6 +764,12 @@ export default function Viewer() {
     try {
       const blob = await annotatePDF(workingFile, toApiAnnotations(annotations));
       await applyBlob(blob);
+      // Annotations are now burned into the PDF blob. Clear the overlay so the
+      // in-memory list doesn't ghost-persist (causing undo to remove
+      // visually-gone annotations from the sidebar while they remain in the blob).
+      setAnnotations([]);
+      setUndoStack([]);
+      setRedoStack([]);
       doSwitchMode(targetMode);
     } catch (e) {
       setAnnotateError(e instanceof Error ? e.message : "Unknown error");
@@ -832,6 +844,17 @@ export default function Viewer() {
   }
 
   // ── Annotation management ─────────────────────────────────────────────────
+
+  /** Jump to an annotation's page AND select it in the overlay. */
+  function focusAnnotation(id: AnnotId) {
+    const ann = annotations.find(a => a.id === id);
+    if (!ann) return;
+    goTo(ann.page);
+    setFocusAnnotId(id);
+    // Enter annotate mode if not already there so the overlay is visible
+    if (canvasMode !== "annotate") doSwitchMode("annotate");
+    setTimeout(() => setFocusAnnotId(null), 150); // reset after AnnotationLayer picks it up
+  }
 
   function deleteAnnot(id: AnnotId) {
     changeAnnotations(annotations.filter(a => a.id !== id));
@@ -1160,19 +1183,7 @@ export default function Viewer() {
         />
 
         {/* Center: canvas + context bars + toolbar */}
-        <div className="flex-1 flex flex-col overflow-hidden relative">
-
-          {/* Mini-map — absolute within the center column so it stays put while page scrolls */}
-          {pdf && miniMapVisible && (
-            <div className="absolute top-4 right-2 z-20" style={{ maxHeight: "calc(100% - 6rem)" }}>
-              <MiniMap
-                totalPages={pdf.numPages}
-                currentPage={currentPage}
-                annotations={annotations}
-                onGoTo={goTo}
-              />
-            </div>
-          )}
+        <div className="flex-1 flex flex-col overflow-hidden">
 
           {/* Canvas scroll area */}
           <div ref={canvasAreaRef} className="flex-1 overflow-auto flex flex-col items-center py-8 px-4">
@@ -1206,6 +1217,8 @@ export default function Viewer() {
                   stampLabel={stampLabel}
                   snippets={settings.snippets}
                   visible={annotationsVisible}
+                  focusAnnotId={focusAnnotId}
+                  onNavigateAnnot={focusAnnotation}
                 />
               )}
 
@@ -1544,6 +1557,18 @@ export default function Viewer() {
             </div>
           )}
 
+          {/* ── Mini-map strip — sits between context bars and bottom toolbar ── */}
+          {pdf && miniMapVisible && (
+            <div className="shrink-0 px-4 pt-1">
+              <MiniMap
+                totalPages={pdf.numPages}
+                currentPage={currentPage}
+                annotations={annotations}
+                onGoTo={goTo}
+              />
+            </div>
+          )}
+
           {/* ── Bottom toolbar ──────────────────────────────────────────────── */}
           <div className="shrink-0 px-4 pb-4 flex justify-center">
             <div className="flex items-center gap-1 bg-stone-900 border border-stone-700 rounded-2xl px-3 py-2 shadow-xl">
@@ -1654,6 +1679,7 @@ export default function Viewer() {
             annotations={annotations}
             currentPage={currentPage}
             onGoToPage={goTo}
+            onFocusAnnot={focusAnnotation}
             onDeleteAnnot={deleteAnnot}
             onStatusChange={changeAnnotStatus}
             onExportReport={() => downloadAnnotationReport(annotations, filename)}
@@ -1710,7 +1736,7 @@ export default function Viewer() {
       )}
 
       {/* ── Unsaved-changes guard modal ───────────────────────────────────────── */}
-      {pendingNav && workingBlob && (
+      {pendingNav && (workingBlob || annotations.length > 0) && (
         <div
           role="dialog"
           aria-modal="true"
@@ -1722,15 +1748,16 @@ export default function Viewer() {
             <div>
               <h2 className="text-sm font-semibold text-white">Modified PDF — download before leaving?</h2>
               <p className="mt-1.5 text-xs text-stone-400 leading-relaxed">
-                You have a modified version of{" "}
-                <span className="text-stone-300 font-medium">{filename}</span>{" "}
-                that hasn't been saved to disk.
+                {workingBlob
+                  ? <>You have a modified version of <span className="text-stone-300 font-medium">{filename}</span> that hasn't been downloaded.</>
+                  : <>You have <span className="text-stone-300 font-medium">{annotations.length} unsaved annotation{annotations.length !== 1 ? "s" : ""}</span> that haven't been burned into the PDF yet.</>
+                }
               </p>
             </div>
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => {
-                  downloadBlob(workingBlob, filename);
+                  if (workingBlob) downloadBlob(workingBlob, filename);
                   const nav = pendingNav;
                   setPendingNav(null);
                   setTimeout(() => doNavigate(nav), 80);
