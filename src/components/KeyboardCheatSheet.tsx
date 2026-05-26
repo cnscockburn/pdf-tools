@@ -21,7 +21,8 @@ const SHORTCUTS: Entry[] = [
   { key: "1 – 4",    desc: "Switch highlight colour" },
   { key: "Del / Backspace",  desc: "Delete selected annotation" },
   { key: "Shift+click", desc: "Multi-select annotations" },
-  { key: "Ctrl+Z",    desc: "Undo last annotation" },
+  { key: "Ctrl+Z",         desc: "Undo annotation change" },
+  { key: "Ctrl+Shift+Z",  desc: "Redo annotation change" },
 
   { section: "Navigation" },
   { key: "→ / ↓",    desc: "Next page" },

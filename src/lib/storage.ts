@@ -18,6 +18,12 @@ export interface Settings {
   author: string;
   /** Saved comment snippets (reusable text). */
   snippets: Snippet[];
+  /**
+   * Custom labels for the 4 highlight colors (index 0-3 = Yellow, Cyan, Green, Pink).
+   * Overrides the default colour names everywhere they are displayed.
+   * When undefined or shorter than 4, missing entries fall back to defaults.
+   */
+  colorLabels: [string, string, string, string];
 }
 
 // ── Persistence ──────────────────────────────────────────────────────────────
@@ -25,14 +31,30 @@ export interface Settings {
 const KEY = "pdf-tools-settings";
 const BOOKMARKS_KEY = "pdf-tools-bookmarks";
 
+export const DEFAULT_COLOR_LABELS: [string, string, string, string] = ["Yellow", "Cyan", "Green", "Pink"];
+
 function defaults(): Settings {
-  return { author: "", snippets: [] };
+  return { author: "", snippets: [], colorLabels: [...DEFAULT_COLOR_LABELS] };
 }
 
 export function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...defaults(), ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<Settings>;
+      const d = defaults();
+      return {
+        ...d,
+        ...parsed,
+        // Ensure colorLabels is always a 4-element tuple, filling gaps from defaults
+        colorLabels: [
+          parsed.colorLabels?.[0] ?? d.colorLabels[0],
+          parsed.colorLabels?.[1] ?? d.colorLabels[1],
+          parsed.colorLabels?.[2] ?? d.colorLabels[2],
+          parsed.colorLabels?.[3] ?? d.colorLabels[3],
+        ],
+      };
+    }
   } catch { /* ignore */ }
   return defaults();
 }

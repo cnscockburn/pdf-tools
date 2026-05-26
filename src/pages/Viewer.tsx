@@ -8,7 +8,7 @@ import {
   MessageSquare, EyeOff, Crop,
   Stamp, Loader2, Highlighter, Type, Pencil, Check, X, Download,
   Underline, Strikethrough, Search, HelpCircle, User,
-  PenLine, Square, Command,
+  PenLine, Square, Command, Settings as SettingsIcon,
 } from "lucide-react";
 import { cn, downloadBlob } from "../lib/utils";
 import ThumbnailSidebar from "../components/ThumbnailSidebar";
@@ -23,6 +23,8 @@ import QuickActionBar from "../components/QuickActionBar";
 import SearchBar, { type SearchResult } from "../components/SearchBar";
 import KeyboardCheatSheet from "../components/KeyboardCheatSheet";
 import CommandPalette, { type PaletteCommand } from "../components/CommandPalette";
+import SettingsDialog from "../components/SettingsDialog";
+import MiniMap from "../components/MiniMap";
 import MenuBar, { type MenuDef } from "../components/MenuBar";
 import { annotatePDF, redactPDF, cropPDF, checkHealth, type Annotation, type RedactRegion } from "../api/client";
 import { useSettings, useBookmarks } from "../lib/storage";
@@ -154,6 +156,12 @@ export default function Viewer() {
   // ── Keyboard cheat sheet ──────────────────────────────────────────────────
   const [cheatSheetOpen, setCheatSheetOpen] = useState(false);
 
+  // ── Settings dialog ────────────────────────────────────────────────────────
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // ── Mini-map visibility ────────────────────────────────────────────────────
+  const [miniMapVisible, setMiniMapVisible] = useState(true);
+
   // ── Backend health ─────────────────────────────────────────────────────────
   const [backendOk, setBackendOk] = useState<boolean | null>(null);
 
@@ -178,6 +186,19 @@ export default function Viewer() {
   const [confirmCrop, setConfirmCrop]           = useState(false);
   const [confirmClearAnnot, setConfirmClearAnnot] = useState(false);
 
+  // ── Unsaved-changes navigation guard ──────────────────────────────────────
+  type PendingNav =
+    | { type: "home" }
+    | { type: "route"; path: string; routeState?: object };
+  const [pendingNav, setPendingNav] = useState<PendingNav | null>(null);
+
+  // ── Multi-level undo / redo ────────────────────────────────────────────────
+  const [undoStack, setUndoStack] = useState<LocalAnnot[][]>([]);
+  const [redoStack, setRedoStack] = useState<LocalAnnot[][]>([]);
+  const annotationsRef   = useRef<LocalAnnot[]>([]);
+  const undoAnnotationRef = useRef<() => void>(() => {});
+  const redoAnnotationRef = useRef<() => void>(() => {});
+
   // ── Refs ───────────────────────────────────────────────────────────────────
   const canvasRef     = useRef<HTMLCanvasElement>(null);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
@@ -197,6 +218,16 @@ export default function Viewer() {
     selectedRedact: null as string | null,
   });
   kbRef.current = { currentPage, pdf, workingBlob, filename, selectedRedact };
+  annotationsRef.current = annotations;
+
+  // ── Effective highlight colors (user-labelled palette) ───────────────────
+  const effectiveHlColors = useMemo<typeof HIGHLIGHT_COLORS>(
+    () => HIGHLIGHT_COLORS.map((c, i) => ({
+      ...c,
+      label: settings.colorLabels[i] ?? c.label,
+    })),
+    [settings.colorLabels],
+  );
 
   // ── Working file ──────────────────────────────────────────────────────────
   const workingFile = useMemo<File | null>(() => {
@@ -414,15 +445,15 @@ export default function Viewer() {
   // ── Continuous scroll — advance page at scroll boundary ────────────────────
   // When the canvas area is scrolled to its top or bottom edge and the user
   // keeps scrolling, advance to the previous / next page.
+  // passive:false is required so we can call preventDefault() at boundaries,
+  // preventing parent-container scroll or Mac rubber-band while we accumulate.
   useEffect(() => {
     const area = canvasAreaRef.current;
     if (!area) return;
 
-    // Accumulate sub-threshold scroll deltas so trackpads with tiny events
-    // don't require dozens of micro-scrolls before changing page.
     let accum = 0;
-    const THRESHOLD = 100;          // px of overscroll needed to flip
-    let cooldown = false;           // prevent rapid-fire page changes
+    const THRESHOLD = 80;            // px of delta needed to flip page
+    let cooldown = false;
 
     function onWheel(e: WheelEvent) {
       const el = canvasAreaRef.current;
@@ -430,43 +461,43 @@ export default function Viewer() {
       const { pdf, currentPage } = kbRef.current;
       if (!pdf) return;
 
-      const hasOverflow = el.scrollHeight > el.clientHeight + 10;
-      const atBottom = hasOverflow
-        ? el.scrollTop + el.clientHeight >= el.scrollHeight - 2
-        : true;   // when page fits, treat whole scroll area as "at edge"
-      const atTop = hasOverflow ? el.scrollTop <= 2 : true;
+      // hasOverflow: the rendered page is taller than the scroll container
+      const hasOverflow = el.scrollHeight > el.clientHeight + 2;
+      // at-boundary checks — 6px tolerance for sub-pixel rounding
+      const atBottom = hasOverflow ? el.scrollTop + el.clientHeight >= el.scrollHeight - 6 : true;
+      const atTop    = hasOverflow ? el.scrollTop <= 6 : true;
 
       if (e.deltaY > 0 && atBottom && currentPage < pdf.numPages) {
-        // Scrolling down at bottom (or page fits viewport) → accumulate towards next page
+        // At bottom boundary, more pages → swallow the event, accumulate
+        e.preventDefault();
         accum += e.deltaY;
         if (accum >= THRESHOLD && !cooldown) {
-          accum = 0;
-          cooldown = true;
+          accum = 0; cooldown = true;
           const next = currentPage + 1;
           setCurrentPage(next);
           setPageInput(String(next));
           requestAnimationFrame(() => { el.scrollTop = 0; });
-          setTimeout(() => { cooldown = false; }, 300);
+          setTimeout(() => { cooldown = false; }, 400);
         }
       } else if (e.deltaY < 0 && atTop && currentPage > 1) {
-        // Scrolling up at top (or page fits viewport) → accumulate towards previous page
-        accum += e.deltaY;  // negative
+        // At top boundary, prior pages → swallow, accumulate
+        e.preventDefault();
+        accum += e.deltaY; // negative
         if (accum <= -THRESHOLD && !cooldown) {
-          accum = 0;
-          cooldown = true;
+          accum = 0; cooldown = true;
           const prev = currentPage - 1;
           setCurrentPage(prev);
           setPageInput(String(prev));
           requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
-          setTimeout(() => { cooldown = false; }, 300);
+          setTimeout(() => { cooldown = false; }, 400);
         }
-      } else if (hasOverflow) {
-        // Normal scrolling within an overflowing page — reset accumulator
+      } else {
+        // Mid-page scroll (or last/first page) — native scroll handles it
         accum = 0;
       }
     }
 
-    area.addEventListener("wheel", onWheel, { passive: true });
+    area.addEventListener("wheel", onWheel, { passive: false });
     return () => area.removeEventListener("wheel", onWheel);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -505,7 +536,12 @@ export default function Viewer() {
         }
         if ((e.key === "z" || e.key === "Z") && !e.shiftKey) {
           e.preventDefault();
-          setAnnotations(prev => prev.slice(0, -1));
+          undoAnnotationRef.current();
+          return;
+        }
+        if (((e.key === "z" || e.key === "Z") && e.shiftKey) || e.key === "y" || e.key === "Y") {
+          e.preventDefault();
+          redoAnnotationRef.current();
           return;
         }
         if (e.key === "+" || e.key === "=") { e.preventDefault(); setScale(s => parseFloat(Math.min(s + 0.2, 4).toFixed(2))); return; }
@@ -581,6 +617,7 @@ export default function Viewer() {
     setCurrentPage(1);
     setPageInput("1");
     setAnnotations([]);
+    setUndoStack([]); setRedoStack([]);
     setRedactBoxes([]);
     setCropSelection(null);
     doSwitchMode("view");
@@ -625,6 +662,51 @@ export default function Viewer() {
     doSwitchMode(m);
   }
   switchModeRef.current = switchMode;
+
+  // ── Annotation history (multi-level undo / redo) ───────────────────────────
+
+  /** Record current annotations into the undo stack, clear redo, then apply next. */
+  function changeAnnotations(next: LocalAnnot[]) {
+    setUndoStack(prev => [...prev.slice(-60), annotationsRef.current]);
+    setRedoStack([]);
+    setAnnotations(next);
+  }
+
+  function undoAnnotation() {
+    setUndoStack(prev => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      setRedoStack(r => [...r.slice(-60), annotationsRef.current]);
+      setAnnotations(last);
+      return prev.slice(0, -1);
+    });
+  }
+
+  function redoAnnotation() {
+    setRedoStack(prev => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      setUndoStack(u => [...u.slice(-60), annotationsRef.current]);
+      setAnnotations(last);
+      return prev.slice(0, -1);
+    });
+  }
+
+  undoAnnotationRef.current = undoAnnotation;
+  redoAnnotationRef.current = redoAnnotation;
+
+  // ── Unsaved-changes navigation guard ──────────────────────────────────────
+
+  function doNavigate(nav: PendingNav) {
+    if (nav.type === "home") navigate("/");
+    else navigate(nav.path, { state: nav.routeState });
+  }
+
+  /** Navigate, but if there are unsaved modifications show the download-first modal. */
+  function maybeNavigate(nav: PendingNav) {
+    if (workingBlob) { setPendingNav(nav); return; }
+    doNavigate(nav);
+  }
 
   // Consume the pending tool hint set by router state (Home page card clicks).
   // Maps tool id strings to the appropriate panel or canvas mode.
@@ -720,7 +802,7 @@ export default function Viewer() {
       setAnnotations(prev => [...prev, {
         ...base, type: "highlight",
         x0: bb.x0, y0: bb.y0, x1: bb.x1, y1: bb.y1,
-        rects, colorIdx: hlColor, color: HIGHLIGHT_COLORS[hlColor].rgb,
+        rects, colorIdx: hlColor, color: effectiveHlColors[hlColor].rgb,
       }]);
     } else {
       setAnnotations(prev => [...prev, {
@@ -752,11 +834,11 @@ export default function Viewer() {
   // ── Annotation management ─────────────────────────────────────────────────
 
   function deleteAnnot(id: AnnotId) {
-    setAnnotations(prev => prev.filter(a => a.id !== id));
+    changeAnnotations(annotations.filter(a => a.id !== id));
   }
 
   function changeAnnotStatus(id: AnnotId, status: AnnotStatus) {
-    setAnnotations(prev => prev.map(a => a.id === id ? { ...a, status } : a));
+    changeAnnotations(annotations.map(a => a.id === id ? { ...a, status } : a));
   }
 
   // ── Drop zone ──────────────────────────────────────────────────────────────
@@ -920,8 +1002,8 @@ export default function Viewer() {
           { label: "Split PDF",              action: () => togglePanel("split"),          disabled: !hasDoc },
           { label: "Extract Pages",          action: () => togglePanel("extract"),        disabled: !hasDoc },
           { label: "Rotate / Delete Pages",  action: () => togglePanel("rotate-delete"), disabled: !hasDoc },
-          { label: "Rearrange Pages",        action: () => navigate("/rearrange", { state: { file: workingFile ?? file } }), disabled: !hasDoc },
-          { label: "Merge PDFs",             action: () => navigate("/merge", { state: { file: workingFile ?? file } }) },
+          { label: "Rearrange Pages",        action: () => maybeNavigate({ type: "route", path: "/rearrange", routeState: { file: workingFile ?? file } }), disabled: !hasDoc },
+          { label: "Merge PDFs",             action: () => maybeNavigate({ type: "route", path: "/merge",     routeState: { file: workingFile ?? file } }) },
           { type: "separator" },
           { label: "Export to Images",       action: () => togglePanel("pdf-to-images"), disabled: !hasDoc },
         ],
@@ -940,7 +1022,8 @@ export default function Viewer() {
           },
           { type: "separator" },
           { label: annotationsVisible ? "Hide annotation overlay" : "Show annotation overlay", shortcut: "Shift+H", action: () => setAnnotationsVisible(v => !v), checked: annotationsVisible, disabled: canvasMode !== "annotate" },
-          { label: "Show Thumbnails",                         action: () => setSidebarCollapsed(v => !v),    checked: !sidebarCollapsed },
+          { label: "Show Thumbnails",    action: () => setSidebarCollapsed(v => !v), checked: !sidebarCollapsed },
+          { label: "Mini-map",          action: () => setMiniMapVisible(v => !v),   checked: miniMapVisible },
           { type: "separator" },
           { label: "Annotations panel",  action: () => setRailTab("annotations"),  disabled: !hasDoc },
           { label: "Table of Contents",  action: () => setRailTab("outline"),       disabled: !hasDoc },
@@ -959,7 +1042,11 @@ export default function Viewer() {
 
       <div className="bg-stone-900 border-b border-stone-700 px-3 py-1.5 flex items-center gap-2 shrink-0 min-w-0">
         {/* Logo + Home link */}
-        <Link to="/" className="shrink-0 flex items-center gap-1.5 text-stone-400 hover:text-white transition">
+        <button
+          onClick={() => maybeNavigate({ type: "home" })}
+          title="Back to home"
+          className="shrink-0 flex items-center gap-1.5 text-stone-400 hover:text-white transition"
+        >
           <svg width="16" height="16" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <rect x="2" y="9" width="18" height="18" stroke="#d97706" strokeWidth="1.5" strokeLinejoin="round"/>
             <line x1="2"  y1="9"  x2="20" y2="27" stroke="#d97706" strokeWidth="1.5"/>
@@ -970,7 +1057,7 @@ export default function Viewer() {
             <line x1="20" y1="9"  x2="30" y2="13" stroke="#d97706" strokeWidth="1.5"/>
             <circle cx="11" cy="18" r="1.5" fill="#d97706"/>
           </svg>
-        </Link>
+        </button>
 
         <div className="w-px h-4 bg-stone-700 shrink-0" />
 
@@ -1001,6 +1088,15 @@ export default function Viewer() {
 
         {/* Right side */}
         <div className="ml-auto flex items-center gap-2 shrink-0">
+          {/* Settings */}
+          <button
+            onClick={() => setSettingsOpen(true)}
+            title="Preferences"
+            className="flex items-center gap-1 rounded-lg p-1.5 text-stone-500 hover:text-stone-300 hover:bg-stone-700 transition"
+          >
+            <SettingsIcon className="h-3.5 w-3.5" />
+          </button>
+
           {/* Author badge */}
           {editingAuthor ? (
             <input
@@ -1064,10 +1160,23 @@ export default function Viewer() {
         />
 
         {/* Center: canvas + context bars + toolbar */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden relative">
+
+          {/* Mini-map — absolute within the center column so it stays put while page scrolls */}
+          {pdf && miniMapVisible && (
+            <div className="absolute top-4 right-2 z-20" style={{ maxHeight: "calc(100% - 6rem)" }}>
+              <MiniMap
+                totalPages={pdf.numPages}
+                currentPage={currentPage}
+                annotations={annotations}
+                onGoTo={goTo}
+              />
+            </div>
+          )}
 
           {/* Canvas scroll area */}
           <div ref={canvasAreaRef} className="flex-1 overflow-auto flex flex-col items-center py-8 px-4">
+
             <div ref={canvasWrapRef} className="relative inline-block shadow-2xl rounded" style={{ lineHeight: 0 }}>
               <canvas ref={canvasRef} className="rounded block" />
 
@@ -1088,8 +1197,8 @@ export default function Viewer() {
                   page={currentPage}
                   createMode={annotateSubMode}
                   hlColorIdx={hlColor}
-                  highlightColors={HIGHLIGHT_COLORS}
-                  onAnnotationsChange={setAnnotations}
+                  highlightColors={effectiveHlColors}
+                  onAnnotationsChange={changeAnnotations}
                   textSelectActive={textSelectActive}
                   author={settings.author}
                   shapeSubType={shapeSubType}
@@ -1211,7 +1320,7 @@ export default function Viewer() {
                 {/* Highlight colour swatches */}
                 {annotateSubMode === "highlight" && (
                   <div className="flex items-center gap-1">
-                    {HIGHLIGHT_COLORS.map((c, i) => (
+                    {effectiveHlColors.map((c, i) => (
                       <button key={i} onClick={() => setHlColor(i)} title={`${c.label} (${i + 1})`}
                         className={cn("h-5 w-5 rounded-full border-2 transition",
                           hlColor === i ? "border-white scale-125" : "border-transparent")}
@@ -1273,12 +1382,23 @@ export default function Viewer() {
                   )}
                   {annotations.length > 0 && !autoSaving && (
                     <>
-                      <button onClick={() => setAnnotations(prev => prev.slice(0, -1))} title="Undo last (Ctrl+Z)"
-                        className="text-xs text-stone-500 hover:text-stone-300 transition">Undo</button>
+                      <button
+                        onClick={() => undoAnnotationRef.current()}
+                        disabled={undoStack.length === 0}
+                        title={undoStack.length > 0 ? `Undo (Ctrl+Z) — ${undoStack.length} step${undoStack.length !== 1 ? "s" : ""} available` : "Nothing to undo (Ctrl+Z)"}
+                        className="text-xs text-stone-500 hover:text-stone-300 disabled:opacity-30 transition"
+                      >Undo</button>
+                      {redoStack.length > 0 && (
+                        <button
+                          onClick={() => redoAnnotationRef.current()}
+                          title={`Redo (Ctrl+Shift+Z) — ${redoStack.length} step${redoStack.length !== 1 ? "s" : ""}`}
+                          className="text-xs text-stone-500 hover:text-stone-300 transition"
+                        >Redo</button>
+                      )}
                       {confirmClearAnnot ? (
                         <span className="flex items-center gap-1.5">
                           <span className="text-[10px] text-stone-400">Remove all?</span>
-                          <button onClick={() => { setAnnotations([]); setConfirmClearAnnot(false); }}
+                          <button onClick={() => { changeAnnotations([]); setConfirmClearAnnot(false); }}
                             className="text-xs text-red-400 hover:text-red-300 transition font-medium">Yes</button>
                           <button onClick={() => setConfirmClearAnnot(false)}
                             className="text-xs text-stone-500 hover:text-stone-300 transition">No</button>
@@ -1579,6 +1699,62 @@ export default function Viewer() {
           onClose={() => setPaletteOpen(false)}
         />
       )}
+
+      {/* ── Settings dialog ──────────────────────────────────────────────────── */}
+      {settingsOpen && (
+        <SettingsDialog
+          settings={settings}
+          onUpdate={updateSettings}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {/* ── Unsaved-changes guard modal ───────────────────────────────────────── */}
+      {pendingNav && workingBlob && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Unsaved changes"
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70"
+          onClick={e => { if (e.target === e.currentTarget) setPendingNav(null); }}
+        >
+          <div className="bg-stone-900 border border-stone-700 rounded-2xl shadow-2xl w-[380px] p-6 flex flex-col gap-5">
+            <div>
+              <h2 className="text-sm font-semibold text-white">Modified PDF — download before leaving?</h2>
+              <p className="mt-1.5 text-xs text-stone-400 leading-relaxed">
+                You have a modified version of{" "}
+                <span className="text-stone-300 font-medium">{filename}</span>{" "}
+                that hasn't been saved to disk.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  downloadBlob(workingBlob, filename);
+                  const nav = pendingNav;
+                  setPendingNav(null);
+                  setTimeout(() => doNavigate(nav), 80);
+                }}
+                className="flex items-center justify-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 px-4 py-2.5 text-xs font-semibold text-white transition shadow-lg"
+              >
+                <Download className="h-3.5 w-3.5" /> Download, then leave
+              </button>
+              <button
+                onClick={() => { const nav = pendingNav; setPendingNav(null); doNavigate(nav); }}
+                className="rounded-xl bg-stone-700 hover:bg-stone-600 border border-stone-600 px-4 py-2.5 text-xs font-medium text-stone-300 transition"
+              >
+                Leave without downloading
+              </button>
+              <button
+                onClick={() => setPendingNav(null)}
+                className="rounded-xl px-4 py-2 text-xs text-stone-500 hover:text-stone-300 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -1616,6 +1792,8 @@ export default function Viewer() {
       { id: "rotate-del",   label: "Rotate / Delete",   description: "Rotate or delete pages",        category: "Tools",      action: () => { togglePanel("rotate-delete"); setPaletteOpen(false); } },
       { id: "security",     label: "Security / Encrypt",description: "Encrypt or decrypt the PDF",    category: "Tools",      action: () => { togglePanel("security"); setPaletteOpen(false); } },
       { id: "to-images",    label: "Export to Images",  description: "Convert pages to PNG / JPEG",   category: "Tools",      action: () => { togglePanel("pdf-to-images"); setPaletteOpen(false); } },
+      { id: "minimap",      label: "Toggle mini-map",   description: "Show/hide the page-position strip", category: "Navigation", action: () => { setMiniMapVisible(v => !v); setPaletteOpen(false); } },
+      { id: "settings",     label: "Preferences",       description: "Author name, colour labels",    category: "Tools",      action: () => { setSettingsOpen(true); setPaletteOpen(false); } },
       { id: "export",       label: "Export report",     description: "Download annotations as .md",   category: "Export",     action: () => { downloadAnnotationReport(annotations, filename); setPaletteOpen(false); } },
       ...(workingBlob ? [{
         id: "download", label: "Download PDF", description: "Save modified PDF (Ctrl+S)", category: "Export",

@@ -1241,25 +1241,56 @@ export default function AnnotationLayer({
       {/* ── Multi-select bulk action bar ────────────────────────────────────── */}
       {multiselectActive && (
         <div
-          className="absolute bottom-0 left-1/2 -translate-x-1/2 mb-2 z-50 flex items-center gap-2 bg-stone-900 border border-stone-600 rounded-xl px-3 py-2 shadow-2xl pointer-events-auto"
+          className="absolute bottom-2 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-stone-900 border border-stone-600 rounded-xl px-3 py-2 shadow-2xl pointer-events-auto whitespace-nowrap"
           onMouseDown={e => e.stopPropagation()}
         >
-          <span className="text-xs text-stone-400">{selectedIds.size} selected</span>
+          <span className="text-xs text-stone-400 mr-1">{selectedIds.size} selected</span>
+
+          {/* Status bulk-change */}
+          <span className="text-[10px] text-stone-600 uppercase tracking-wide">Status</span>
+          {(["open", "resolved", "wontfix"] as AnnotStatus[]).map(s => (
+            <button
+              key={s}
+              onClick={() => {
+                const ids = new Set(selectedIds);
+                onAnnotationsChange(annotations.map(a =>
+                  ids.has(a.id) ? { ...a, status: s } as LocalAnnot : a
+                ));
+              }}
+              className={cn(
+                "px-2 py-0.5 rounded text-[10px] font-medium transition",
+                s === "resolved"
+                  ? "bg-green-900/60 text-green-300 hover:bg-green-800/60"
+                  : s === "wontfix"
+                    ? "bg-stone-700 text-stone-400 hover:bg-stone-600"
+                    : "bg-amber-900/50 text-amber-300 hover:bg-amber-800/50",
+              )}
+            >
+              {s === "wontfix" ? "Won't fix" : s.charAt(0).toUpperCase() + s.slice(1)}
+            </button>
+          ))}
+
+          <div className="w-px h-4 bg-stone-700 mx-0.5" />
+
+          {/* Delete */}
           <button
             onClick={() => {
               const ids = new Set(selectedIds);
               onAnnotationsChange(annotations.filter(a => !ids.has(a.id)));
               setSelectedIds(new Set()); setSelectedId(null); onSelectedChange?.(null);
             }}
-            className="flex items-center gap-1 rounded-lg bg-red-700 hover:bg-red-600 px-2.5 py-1 text-xs text-white transition"
+            className="flex items-center gap-1 rounded-lg bg-red-800/70 hover:bg-red-700/70 px-2.5 py-1 text-xs text-red-300 transition"
           >
-            Delete all selected
+            Delete
           </button>
+
+          {/* Deselect */}
           <button
-            onClick={() => { setSelectedIds(new Set()); }}
-            className="text-xs text-stone-500 hover:text-stone-300 transition"
+            onClick={() => setSelectedIds(new Set())}
+            className="text-stone-500 hover:text-stone-300 transition text-xs leading-none"
+            title="Deselect"
           >
-            Deselect
+            ✕
           </button>
         </div>
       )}
