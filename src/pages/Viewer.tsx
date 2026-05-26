@@ -281,7 +281,8 @@ export default function Viewer() {
         const task = page.render({
           canvasContext: ctx,
           viewport: vp,
-          annotationMode: canvasMode === "annotate" ? 0 : 1,
+          // Always 0: PDF.js annotation widgets are suppressed; we render our own overlay.
+          annotationMode: 0,
         });
         renderTaskRef.current = task;
         await task.promise;
@@ -291,7 +292,7 @@ export default function Viewer() {
 
     return () => { cancelled = true; renderTaskRef.current?.cancel(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pdf, currentPage, scale, canvasMode]);
+  }, [pdf, currentPage, scale]);
 
   // ── Build text search index when PDF loads ────────────────────────────────
   useEffect(() => {
@@ -434,8 +435,12 @@ export default function Viewer() {
         const range = sel.getRangeAt(0);
         if (!wrapEl.contains(range.commonAncestorContainer)) {
           setQuickBar(null);
+          freeRectDragRef.current = null;
           return;
         }
+        // Text selection is valid — clear drag ref so the free-rect fallback
+        // doesn't fire on the next mouseup (e.g. clicking the QuickActionBar).
+        freeRectDragRef.current = null;
 
         const wrapRect = wrapEl.getBoundingClientRect();
         const clientRects = Array.from(range.getClientRects());
@@ -1272,26 +1277,30 @@ export default function Viewer() {
                 />
               )}
 
-              {/* ── Annotate overlay ────────────────────────────────────────── */}
-              {canvasMode === "annotate" && (
-                <AnnotationLayer
-                  annotations={annotations}
-                  page={currentPage}
-                  createMode={annotateSubMode}
-                  hlColorIdx={hlColor}
-                  highlightColors={effectiveHlColors}
-                  onAnnotationsChange={changeAnnotations}
-                  textSelectActive={textSelectActive}
-                  author={settings.author}
-                  shapeSubType={shapeSubType}
-                  inkStrokeWidth={inkStrokeWidth}
-                  stampLabel={stampLabel}
-                  snippets={settings.snippets}
-                  visible={annotationsVisible}
-                  focusAnnotId={focusAnnotId}
-                  onNavigateAnnot={focusAnnotation}
-                />
-              )}
+              {/* ── Annotation overlay (always rendered) ────────────────────
+                   In annotate mode: draft annotations are fully interactive.
+                   In all other modes: only the baked read-only layer shows.
+                   PDF.js annotation widgets are suppressed (annotationMode: 0)
+                   so this overlay is always the source of truth.           ── */}
+              <AnnotationLayer
+                annotations={canvasMode === "annotate" ? annotations : []}
+                readOnlyAnnotations={bakedAnnotations}
+                page={currentPage}
+                createMode={annotateSubMode}
+                hlColorIdx={hlColor}
+                highlightColors={effectiveHlColors}
+                onAnnotationsChange={changeAnnotations}
+                textSelectActive={textSelectActive}
+                author={settings.author}
+                shapeSubType={shapeSubType}
+                inkStrokeWidth={inkStrokeWidth}
+                stampLabel={stampLabel}
+                snippets={settings.snippets}
+                visible={annotationsVisible}
+                focusAnnotId={focusAnnotId}
+                onNavigateAnnot={focusAnnotation}
+                readOnly={canvasMode !== "annotate"}
+              />
 
               {/* ── Search result highlight overlays ───────────────────────── */}
               {pageSearchRects.length > 0 && (

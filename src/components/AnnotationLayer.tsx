@@ -271,6 +271,18 @@ interface Props {
   focusAnnotId?: AnnotId | null;
   /** Called when the note popup's prev/next arrows are clicked — parent should navigate */
   onNavigateAnnot?: (id: AnnotId) => void;
+  /**
+   * Annotations already committed to the PDF blob.
+   * Rendered read-only (no drag / edit / delete) on top of the canvas.
+   * Notes still show hover-popups; all types show their visual representation.
+   */
+  readOnlyAnnotations?: LocalAnnot[];
+  /**
+   * When true the overlay is in display-only mode (e.g. view mode).
+   * Background mousedown/click handlers are disabled so the canvas
+   * receives pointer events; only note pins keep pointer-events for hover.
+   */
+  readOnly?: boolean;
 }
 
 // Only note and freetext are "comments" with status / resolution workflow.
@@ -300,6 +312,7 @@ export default function AnnotationLayer({
   shapeSubType = "rect", inkColor = [0, 0, 0], inkStrokeWidth = 2,
   stampLabel = "DRAFT", stampColor = [0.6, 0, 0],
   snippets = [], visible = true, focusAnnotId, onNavigateAnnot,
+  readOnlyAnnotations = [], readOnly = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -363,7 +376,9 @@ export default function AnnotationLayer({
   }, [selectedId, selectedIds, editingId, annotations]); // eslint-disable-line
 
   // ── Annotation helpers ────────────────────────────────────────────────────
-  const pageAnns = annotations.filter(a => a.page === page);
+  const pageAnns         = annotations.filter(a => a.page === page);
+  /** Committed (baked) annotations for this page — rendered read-only. */
+  const readOnlyPageAnns = readOnlyAnnotations.filter(a => a.page === page);
 
   /** All annotations sorted by page then vertical position — used for prev/next navigation. */
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -835,16 +850,18 @@ export default function AnnotationLayer({
   return (
     <div
       ref={containerRef}
-      className={`absolute inset-0 ${cursorClass}`}
+      className={`absolute inset-0 ${readOnly ? "cursor-default" : cursorClass}`}
       style={{
         userSelect: "none",
-        // When invisible (Shift+H), block pointer events so the canvas is clickable.
-        // In text-select mode the layer is always transparent to pointer events.
-        pointerEvents: (!visible || textSelectActive) ? "none" : "auto",
+        // In read-only mode: pointer-events none on the container so clicks/scrolls
+        // pass through to the canvas. Note pin elements override this to "auto"
+        // so CSS :hover still fires for their tooltip popups.
+        // In text-select mode: always transparent so text selection works.
+        pointerEvents: (!visible || textSelectActive || readOnly) ? "none" : "auto",
         opacity: visible ? 1 : 0,
       } as React.CSSProperties}
-      onMouseDown={textSelectActive ? undefined : onBgMouseDown}
-      onClick={textSelectActive ? undefined : onBgClick}
+      onMouseDown={(!textSelectActive && !readOnly) ? onBgMouseDown : undefined}
+      onClick={(!textSelectActive && !readOnly) ? onBgClick : undefined}
     >
 
       {/* ── SVG overlay for ink + shape ────────────────────────────────────── */}
@@ -1331,6 +1348,229 @@ export default function AnnotationLayer({
           />
         );
 
+        return null;
+      })}
+
+      {/* ── Read-only baked annotations ────────────────────────────────────────
+           These are annotations already committed to the PDF blob. They show
+           their full visual representation but cannot be edited or deleted.
+           Note pins have explicit pointer-events:auto so CSS hover works even
+           though the container has pointer-events:none in read-only mode.    ── */}
+
+      {/* SVG layer for read-only ink / shapes */}
+      {readOnlyPageAnns.some(a => a.type === "ink" || a.type === "shape") && (
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          viewBox="0 0 1 1"
+          preserveAspectRatio="none"
+          style={{ zIndex: 11, width: "100%", height: "100%" }}
+        >
+          {readOnlyPageAnns.map(ann => {
+            if (ann.type === "ink") {
+              return (
+                <g key={`ro-${ann.id}`}>
+                  {ann.strokes.map((stroke, si) => (
+                    <polyline
+                      key={si}
+                      points={stroke.map(p => `${p.x},${p.y}`).join(" ")}
+                      fill="none"
+                      stroke={svgColor(ann.color)}
+                      strokeWidth={ann.strokeWidth ?? 2}
+                      vectorEffect="non-scaling-stroke"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      opacity={0.85}
+                    />
+                  ))}
+                </g>
+              );
+            }
+            if (ann.type === "shape") {
+              const stroke = svgColor(ann.color);
+              const sw = ann.strokeWidth ?? 2;
+              const { x0, y0, x1, y1 } = ann;
+              const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+              const rx = Math.abs(x1 - x0) / 2, ry = Math.abs(y1 - y0) / 2;
+              switch (ann.shape) {
+                case "rect":
+                  return <rect key={`ro-${ann.id}`} x={Math.min(x0,x1)} y={Math.min(y0,y1)}
+                    width={Math.abs(x1-x0)} height={Math.abs(y1-y0)}
+                    fill="none" stroke={stroke} strokeWidth={sw} vectorEffect="non-scaling-stroke" />;
+                case "ellipse":
+                  return <ellipse key={`ro-${ann.id}`} cx={cx} cy={cy} rx={rx} ry={ry}
+                    fill="none" stroke={stroke} strokeWidth={sw} vectorEffect="non-scaling-stroke" />;
+                case "line":
+                  return <line key={`ro-${ann.id}`} x1={x0} y1={y0} x2={x1} y2={y1}
+                    stroke={stroke} strokeWidth={sw} vectorEffect="non-scaling-stroke" strokeLinecap="round" />;
+                case "arrow": {
+                  const pts = arrowheadPoints(x0, y0, x1, y1, sw);
+                  return (
+                    <g key={`ro-${ann.id}`}>
+                      <line x1={x0} y1={y0} x2={x1} y2={y1}
+                        stroke={stroke} strokeWidth={sw}
+                        vectorEffect="non-scaling-stroke" strokeLinecap="round" />
+                      {pts && <polygon points={pts} fill={stroke} vectorEffect="non-scaling-stroke" />}
+                    </g>
+                  );
+                }
+                default: return null;
+              }
+            }
+            return null;
+          })}
+        </svg>
+      )}
+
+      {/* Div-based read-only annotations */}
+      {readOnlyPageAnns.map(ann => {
+        /* ── Read-only Note ── */
+        if (ann.type === "note") {
+          return (
+            <div
+              key={`ro-${ann.id}`}
+              className="absolute group"
+              style={{
+                left: `${ann.x * 100}%`,
+                top:  `${ann.y * 100}%`,
+                transform: "translate(-50%,-100%)",
+                zIndex: 18,
+                // Must be auto even when container is pointer-events:none so
+                // the CSS :hover group trigger fires for the tooltip.
+                pointerEvents: "auto",
+              }}
+            >
+              <span className="text-xl leading-none select-none cursor-default">📌</span>
+              {/* Hover tooltip — same style as unselected interactive notes */}
+              <div className={cn(
+                "absolute bottom-full left-1/2 -translate-x-1/2 mb-1",
+                "hidden group-hover:block z-30 pointer-events-none",
+                "bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg",
+                "px-2 py-1.5 text-xs text-stone-800 max-w-52 whitespace-pre-wrap",
+              )}>
+                {ann.author && (
+                  <div className="text-[9px] text-stone-500 mb-0.5 font-medium">{ann.author}</div>
+                )}
+                {ann.text
+                  ? <MathText text={ann.text} />
+                  : <span className="italic text-stone-400">empty note</span>
+                }
+                {ann.tags && ann.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-0.5 mt-0.5">
+                    {ann.tags.map(t => (
+                      <span key={t} className="bg-brand-900/40 text-brand-300 text-[9px] rounded px-1 py-0">{t}</span>
+                    ))}
+                  </div>
+                )}
+                {(ann.replies?.length ?? 0) > 0 && (
+                  <div className="text-[9px] text-brand-500 mt-0.5">
+                    {ann.replies!.length} repl{ann.replies!.length > 1 ? "ies" : "y"}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        /* ── Read-only Highlight ── */
+        if (ann.type === "highlight") {
+          const c = highlightColors[ann.colorIdx] ?? highlightColors[0];
+          const rects = ann.rects ?? [{ x0: ann.x0, y0: ann.y0, x1: ann.x1, y1: ann.y1 }];
+          return (
+            <div key={`ro-${ann.id}`} className="absolute inset-0 pointer-events-none" style={{ zIndex: 14 }}>
+              {rects.map((r, i) => (
+                <div key={i} className="absolute" style={{
+                  left: `${r.x0 * 100}%`, top: `${r.y0 * 100}%`,
+                  width: `${(r.x1 - r.x0) * 100}%`, height: `${(r.y1 - r.y0) * 100}%`,
+                  backgroundColor: c.bg,
+                  border: `1px solid ${c.border}40`,
+                }} />
+              ))}
+            </div>
+          );
+        }
+
+        /* ── Read-only Underline ── */
+        if (ann.type === "underline") {
+          const rects = ann.rects ?? [{ x0: ann.x0, y0: ann.y0, x1: ann.x1, y1: ann.y1 }];
+          return (
+            <div key={`ro-${ann.id}`} className="absolute inset-0 pointer-events-none" style={{ zIndex: 14 }}>
+              {rects.map((r, i) => (
+                <div key={i} className="absolute" style={{
+                  left: `${r.x0 * 100}%`, top: `${r.y0 * 100}%`,
+                  width: `${(r.x1 - r.x0) * 100}%`, height: `${(r.y1 - r.y0) * 100}%`,
+                  borderBottom: "2px solid rgba(59,130,246,0.7)",
+                }} />
+              ))}
+            </div>
+          );
+        }
+
+        /* ── Read-only Strikethrough ── */
+        if (ann.type === "strikethrough") {
+          const rects = ann.rects ?? [{ x0: ann.x0, y0: ann.y0, x1: ann.x1, y1: ann.y1 }];
+          return (
+            <div key={`ro-${ann.id}`} className="absolute inset-0 pointer-events-none" style={{ zIndex: 14 }}>
+              {rects.map((r, i) => {
+                const midY = (r.y0 + r.y1) / 2;
+                const lineH = Math.max((r.y1 - r.y0) * 0.12, 0.003);
+                return (
+                  <div key={i} className="absolute" style={{
+                    left: `${r.x0 * 100}%`, top: `${(midY - lineH / 2) * 100}%`,
+                    width: `${(r.x1 - r.x0) * 100}%`, height: `${lineH * 100}%`,
+                    backgroundColor: "rgba(239,68,68,0.7)",
+                  }} />
+                );
+              })}
+            </div>
+          );
+        }
+
+        /* ── Read-only Freetext ── */
+        if (ann.type === "freetext") {
+          return (
+            <div key={`ro-${ann.id}`}
+              className="absolute pointer-events-none overflow-hidden"
+              style={{
+                left: `${ann.x0 * 100}%`, top: `${ann.y0 * 100}%`,
+                width: `${(ann.x1 - ann.x0) * 100}%`, height: `${(ann.y1 - ann.y0) * 100}%`,
+                backgroundColor: "rgba(255,253,210,0.92)",
+                border: "1px solid #fcd34d80",
+                zIndex: 14,
+              }}
+            >
+              <p className="p-1.5 text-xs text-stone-800 leading-snug whitespace-pre-wrap overflow-hidden">
+                {ann.text || <span className="italic text-stone-400">empty</span>}
+              </p>
+            </div>
+          );
+        }
+
+        /* ── Read-only Stamp ── */
+        if (ann.type === "stamp") {
+          const textColor = colorToCSS(ann.color);
+          return (
+            <div key={`ro-${ann.id}`}
+              className="absolute pointer-events-none flex items-center justify-center"
+              style={{
+                left: `${ann.x0 * 100}%`, top: `${ann.y0 * 100}%`,
+                width: `${(ann.x1 - ann.x0) * 100}%`, height: `${(ann.y1 - ann.y0) * 100}%`,
+                border: `2px solid ${textColor}`,
+                backgroundColor: "rgba(255,255,255,0.92)",
+                borderRadius: 3, zIndex: 14,
+                containerType: "size",
+              }}
+            >
+              <span
+                className="font-bold text-center select-none whitespace-nowrap overflow-hidden"
+                style={{ color: textColor, fontSize: "55cqh", lineHeight: 1 }}
+              >
+                {ann.label}
+              </span>
+            </div>
+          );
+        }
+
+        // Ink and shape are rendered in the SVG layer above
         return null;
       })}
 
