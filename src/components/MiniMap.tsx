@@ -19,12 +19,14 @@ interface Props {
   currentPage: number;
   annotations: LocalAnnot[];
   onGoTo: (p: number) => void;
+  /** Accent color scheme: "amber" (default/primary) or "cyan" (secondary pane) */
+  accent?: "amber" | "cyan";
 }
 
 // Minimum visible block width in px — below this we stop drawing separators
 const MIN_BLOCK_PX = 4;
 
-export default function MiniMap({ totalPages, currentPage, annotations, onGoTo }: Props) {
+export default function MiniMap({ totalPages, currentPage, annotations, onGoTo, accent = "amber" }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerW, setContainerW] = useState(0);
 
@@ -76,9 +78,10 @@ export default function MiniMap({ totalPages, currentPage, annotations, onGoTo }
             aria-current={isCurrent ? "page" : undefined}
             className={cn(
               "relative flex-1 flex items-center justify-center transition-colors",
-              "min-w-[4px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400",
+              "min-w-[4px] focus-visible:outline-none focus-visible:ring-1",
+              accent === "cyan" ? "focus-visible:ring-cyan-400" : "focus-visible:ring-amber-400",
               isCurrent
-                ? "bg-amber-500/80 hover:bg-amber-400/90"
+                ? (accent === "cyan" ? "bg-cyan-500/80 hover:bg-cyan-400/90" : "bg-amber-500/80 hover:bg-amber-400/90")
                 : "bg-stone-700 hover:bg-stone-600",
             )}
             style={{ maxWidth: blockW + gap }}
@@ -86,7 +89,10 @@ export default function MiniMap({ totalPages, currentPage, annotations, onGoTo }
             {/* Annotation pip — bottom edge */}
             {count > 0 && !isCurrent && (
               <span
-                className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-amber-400"
+                className={cn(
+                  "absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full",
+                  accent === "cyan" ? "bg-cyan-400" : "bg-amber-400",
+                )}
               />
             )}
 

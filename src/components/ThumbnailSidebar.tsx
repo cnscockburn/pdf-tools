@@ -12,9 +12,11 @@ interface Props {
   onToggle: () => void;
   /** Optional — when provided, show annotation count badges on thumbnails */
   annotations?: LocalAnnot[];
+  /** Accent color scheme: "amber" (default/primary) or "cyan" (secondary pane) */
+  accent?: "amber" | "cyan";
 }
 
-export default function ThumbnailSidebar({ file, currentPage, onSelect, collapsed, onToggle, annotations = [] }: Props) {
+export default function ThumbnailSidebar({ file, currentPage, onSelect, collapsed, onToggle, annotations = [], accent = "amber" }: Props) {
   const { thumbnails, pageCount } = usePdfThumbnails(file, 0.2);
 
   // Build per-page annotation counts
@@ -51,7 +53,7 @@ export default function ThumbnailSidebar({ file, currentPage, onSelect, collapse
                 className={cn(
                   "w-full flex flex-col items-center gap-0.5 rounded p-1 transition relative",
                   p === currentPage
-                    ? "ring-2 ring-brand-500 bg-stone-800"
+                    ? cn("ring-2 bg-stone-800", accent === "cyan" ? "ring-cyan-500" : "ring-brand-500")
                     : "hover:bg-stone-800"
                 )}
               >
@@ -69,7 +71,10 @@ export default function ThumbnailSidebar({ file, currentPage, onSelect, collapse
                   {count > 0 && (
                     <div
                       title={`${count} annotation${count !== 1 ? "s" : ""} on this page`}
-                      className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-[3px] rounded-full bg-brand-500 text-white text-[8px] font-bold flex items-center justify-center shadow leading-none"
+                      className={cn(
+                        "absolute -top-1 -right-1 min-w-[14px] h-[14px] px-[3px] rounded-full text-white text-[8px] font-bold flex items-center justify-center shadow leading-none",
+                        accent === "cyan" ? "bg-cyan-500" : "bg-brand-500",
+                      )}
                     >
                       {count > 9 ? "9+" : count}
                     </div>

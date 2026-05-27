@@ -1262,53 +1262,61 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
             )
           )}
 
-          {/* Settings */}
-          <button
-            onClick={() => setSettingsOpen(true)}
-            title="Preferences"
-            className="flex items-center gap-1 rounded-lg p-1.5 text-stone-500 hover:text-stone-300 hover:bg-stone-700 transition"
-          >
-            <SettingsIcon className="h-3.5 w-3.5" />
-          </button>
-
-          {/* Author badge */}
-          {editingAuthor ? (
-            <input
-              autoFocus
-              value={authorInput}
-              onChange={e => setAuthorInput(e.target.value)}
-              onBlur={() => { updateSettings({ author: authorInput.trim() }); setEditingAuthor(false); }}
-              onKeyDown={e => {
-                if (e.key === "Enter") { updateSettings({ author: authorInput.trim() }); setEditingAuthor(false); }
-                if (e.key === "Escape") setEditingAuthor(false);
-              }}
-              placeholder="Your name"
-              className="w-24 bg-stone-800 border border-brand-500 rounded px-2 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
-            />
-          ) : (
+          {/* Settings — primary pane only */}
+          {!isSecondaryPane && (
             <button
-              onClick={() => { setAuthorInput(settings.author); setEditingAuthor(true); }}
-              title="Set your name for annotations"
-              aria-label={settings.author ? `Author: ${settings.author}` : "Set author name"}
-              className="flex items-center gap-1 text-[10px] text-stone-500 hover:text-stone-300 transition"
+              onClick={() => setSettingsOpen(true)}
+              title="Preferences"
+              className="flex items-center gap-1 rounded-lg p-1.5 text-stone-500 hover:text-stone-300 hover:bg-stone-700 transition"
             >
-              <User className="h-3 w-3" />
-              <span className="hidden sm:inline">{settings.author || "Set name"}</span>
+              <SettingsIcon className="h-3.5 w-3.5" />
             </button>
           )}
 
-          {/* Backend status dot */}
-          <div
-            role="status"
-            aria-label={backendOk === null ? "Checking backend" : backendOk ? "Backend connected" : "Backend offline"}
-            title={backendOk === null ? "Checking backend…" : backendOk ? "Backend connected" : "Backend offline — run: cd backend && .venv\\Scripts\\uvicorn main:app --port 7342"}
-            className={cn("w-2 h-2 rounded-full shrink-0 transition-colors",
-              backendOk === null ? "bg-stone-600" : backendOk ? "bg-green-500" : "bg-red-500 animate-pulse")}
-          />
-          {rendering && <span className="text-[10px] text-stone-500 animate-pulse">Rendering…</span>}
+          {/* Author badge — primary pane only */}
+          {!isSecondaryPane && (
+            editingAuthor ? (
+              <input
+                autoFocus
+                value={authorInput}
+                onChange={e => setAuthorInput(e.target.value)}
+                onBlur={() => { updateSettings({ author: authorInput.trim() }); setEditingAuthor(false); }}
+                onKeyDown={e => {
+                  if (e.key === "Enter") { updateSettings({ author: authorInput.trim() }); setEditingAuthor(false); }
+                  if (e.key === "Escape") setEditingAuthor(false);
+                }}
+                placeholder="Your name"
+                className="w-24 bg-stone-800 border border-brand-500 rounded px-2 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
+              />
+            ) : (
+              <button
+                onClick={() => { setAuthorInput(settings.author); setEditingAuthor(true); }}
+                title="Set your name for annotations"
+                aria-label={settings.author ? `Author: ${settings.author}` : "Set author name"}
+                className="flex items-center gap-1 text-[10px] text-stone-500 hover:text-stone-300 transition"
+              >
+                <User className="h-3 w-3" />
+                <span className="hidden sm:inline">{settings.author || "Set name"}</span>
+              </button>
+            )
+          )}
 
-          {/* Download button */}
-          {workingBlob && (
+          {/* Backend status dot — primary pane only */}
+          {!isSecondaryPane && (
+            <>
+              <div
+                role="status"
+                aria-label={backendOk === null ? "Checking backend" : backendOk ? "Backend connected" : "Backend offline"}
+                title={backendOk === null ? "Checking backend…" : backendOk ? "Backend connected" : "Backend offline — run: cd backend && .venv\\Scripts\\uvicorn main:app --port 7342"}
+                className={cn("w-2 h-2 rounded-full shrink-0 transition-colors",
+                  backendOk === null ? "bg-stone-600" : backendOk ? "bg-green-500" : "bg-red-500 animate-pulse")}
+              />
+              {rendering && <span className="text-[10px] text-stone-500 animate-pulse">Rendering…</span>}
+            </>
+          )}
+
+          {/* Download button — primary pane only */}
+          {!isSecondaryPane && workingBlob && (
             <button
               onClick={() => downloadBlob(workingBlob, filename)}
               title="Download modified PDF (Ctrl+S)"
@@ -1331,6 +1339,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(c => !c)}
           annotations={[...bakedAnnotations, ...annotations]}
+          accent={isSecondaryPane ? "cyan" : "amber"}
         />
 
         {/* Center: canvas + context bars + toolbar */}
@@ -1733,6 +1742,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                 currentPage={currentPage}
                 annotations={[...bakedAnnotations, ...annotations]}
                 onGoTo={goTo}
+                accent={isSecondaryPane ? "cyan" : "amber"}
               />
             </div>
           )}
