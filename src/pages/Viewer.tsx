@@ -29,6 +29,7 @@ import MenuBar, { type MenuDef } from "../components/MenuBar";
 import { annotatePDF, redactPDF, cropPDF, checkHealth, type Annotation, type RedactRegion } from "../api/client";
 import { useSettings, useBookmarks } from "../lib/storage";
 import { downloadAnnotationReport } from "../lib/annotationReport";
+import { subscribe, publish } from "../lib/mirrorSync";
 
 type CanvasMode = "view" | "annotate" | "redact" | "crop";
 
@@ -93,9 +94,11 @@ interface ViewerProps {
   toolHint?: string;
   /** When true, this viewer is the secondary pane in side-by-side mode. Hides the right rail. */
   isSecondaryPane?: boolean;
+  /** Shared ID for mirrored side-by-side tabs. When set, annotations sync between panes. */
+  mirrorGroupId?: string;
 }
 
-export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isSecondaryPane }: ViewerProps = {}) {
+export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isSecondaryPane, mirrorGroupId }: ViewerProps = {}) {
   // ── Settings + bookmarks ──────────────────────────────────────────────────
   const { settings, updateSettings, addSnippet, removeSnippet } = useSettings();
   const { bookmarks, addBookmark, removeBookmark, renameBookmark } = useBookmarks();
@@ -155,6 +158,39 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   const [focusAnnotId, setFocusAnnotId]       = useState<AnnotId | null>(null);
   const [autoSaving, setAutoSaving]           = useState(false);
   const [annotateError, setAnnotateError]     = useState<string | null>(null);
+
+  // ── Mirror sync (same-document side-by-side) ─────────────────────────────
+  // Guards against echo: when we receive annotations from the other pane,
+  // we set this flag so the subsequent setAnnotations doesn't re-publish.
+  const mirrorReceivingRef = useRef(false);
+  const mirrorSenderIdRef = useRef(tabId ?? `viewer_${Date.now()}`);
+
+  // Subscribe to mirror channel
+  useEffect(() => {
+    if (!mirrorGroupId) return;
+    const unsub = subscribe<{ annotations: LocalAnnot[]; baked: LocalAnnot[] }>(
+      mirrorGroupId,
+      (data, senderId) => {
+        // Ignore our own broadcasts
+        if (senderId === mirrorSenderIdRef.current) return;
+        mirrorReceivingRef.current = true;
+        setAnnotations(data.annotations);
+        setBakedAnnotations(data.baked);
+        // Reset flag after React processes the state update
+        requestAnimationFrame(() => { mirrorReceivingRef.current = false; });
+      },
+    );
+    return unsub;
+  }, [mirrorGroupId]);
+
+  // Publish annotation changes to the mirror channel
+  useEffect(() => {
+    if (!mirrorGroupId || mirrorReceivingRef.current) return;
+    publish(mirrorGroupId, mirrorSenderIdRef.current, {
+      annotations,
+      baked: bakedAnnotations,
+    });
+  }, [mirrorGroupId, annotations, bakedAnnotations]);
 
   // ── Text selection / QuickActionBar ───────────────────────────────────────
   const [textSelectActive, setTextSelectActive] = useState(false);

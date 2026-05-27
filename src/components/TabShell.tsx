@@ -27,7 +27,7 @@ function TabContent({ tab, isSecondaryPane }: { tab: Tab; isSecondaryPane?: bool
     case "home":
       return <Home />;
     case "viewer":
-      return <Viewer initialFile={tab.initialFile} tabId={tab.id} toolHint={tab.toolHint} isSecondaryPane={isSecondaryPane} />;
+      return <Viewer initialFile={tab.initialFile} tabId={tab.id} toolHint={tab.toolHint} isSecondaryPane={isSecondaryPane} mirrorGroupId={tab.mirrorGroupId} />;
     case "merge":
       return <Merge initialFile={tab.initialFile} />;
     case "rearrange":
@@ -119,17 +119,28 @@ export default function TabShell() {
   const openSideBySide = useCallback((direction: SplitDirection, mode: "mirror" | "new", currentFile?: File | null) => {
     setSideBySideDirection(direction);
     const id = newTabId();
+    const mirrorGroupId = mode === "mirror" ? `mirror_${Date.now()}` : undefined;
     const tab: Tab = {
       id,
       type: "viewer",
       title: mode === "mirror" && currentFile ? currentFile.name : "Viewer",
       initialFile: mode === "mirror" && currentFile ? currentFile : undefined,
+      mirrorGroupId,
     };
-    setTabs(prev => [...prev, tab]);
+    // Tag the primary tab with the same mirrorGroupId so both panes sync
+    if (mirrorGroupId) {
+      setTabs(prev => prev.map(t =>
+        t.id === stateRef.current.activeTabId ? { ...t, mirrorGroupId } : t
+      ).concat(tab));
+    } else {
+      setTabs(prev => [...prev, tab]);
+    }
     setSideBySideTabId(id);
   }, []);
 
   const closeSideBySide = useCallback(() => {
+    // Clear mirrorGroupId from all tabs when exiting side-by-side
+    setTabs(prev => prev.map(t => t.mirrorGroupId ? { ...t, mirrorGroupId: undefined } : t));
     setSideBySideTabId(null);
   }, []);
 

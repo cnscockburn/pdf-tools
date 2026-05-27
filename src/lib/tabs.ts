@@ -24,6 +24,12 @@ export interface Tab {
    * The very first Home tab (on app launch) is NOT ephemeral.
    */
   ephemeral?: boolean;
+  /**
+   * Shared ID linking two mirrored side-by-side tabs.
+   * Both panes in a "Same Document" side-by-side share this ID,
+   * enabling annotation synchronization between them.
+   */
+  mirrorGroupId?: string;
 }
 
 export type SplitDirection = "horizontal" | "vertical";
