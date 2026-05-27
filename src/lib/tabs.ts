@@ -20,6 +20,8 @@ export interface Tab {
   toolHint?: string;
 }
 
+export type SplitDirection = "horizontal" | "vertical";
+
 export interface TabContextValue {
   tabs: Tab[];
   activeTabId: string;
@@ -31,6 +33,18 @@ export interface TabContextValue {
   switchTab: (id: string) => void;
   /** Update the display title of a tab (e.g. when a file is loaded). */
   updateTabTitle: (id: string, title: string) => void;
+
+  // ── Split view ──────────────────────────────────────────────────────────
+  /** The id of the tab in the secondary (right/bottom) split pane, or null. */
+  splitTabId: string | null;
+  /** Direction of the split: horizontal = side-by-side, vertical = top/bottom. */
+  splitDirection: SplitDirection;
+  /** Enter split view: opens a new viewer tab in the secondary pane. */
+  splitView: (direction: SplitDirection, opts?: { file?: File }) => void;
+  /** Close split view, keeping the active tab. */
+  closeSplit: () => void;
+  /** Whether split view is currently active. */
+  isSplit: boolean;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

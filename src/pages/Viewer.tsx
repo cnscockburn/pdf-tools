@@ -138,7 +138,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp }: V
   const pendingToolRef = useRef<string | null>(null);
 
   // ── Tab navigation ─────────────────────────────────────────────────────────
-  const { openTab, updateTabTitle } = useTabContext();
+  const { openTab, updateTabTitle, splitView, closeSplit, isSplit } = useTabContext();
 
   // ── Annotations ────────────────────────────────────────────────────────────
   const [annotations, setAnnotations]         = useState<LocalAnnot[]>([]);
@@ -233,8 +233,9 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp }: V
     workingBlob:   null as Blob | null,
     filename:      "",
     selectedRedact: null as string | null,
+    isSplit:       false,
   });
-  kbRef.current = { currentPage, pdf, workingBlob, filename, selectedRedact };
+  kbRef.current = { currentPage, pdf, workingBlob, filename, selectedRedact, isSplit };
   annotationsRef.current = annotations;
 
   // ── Effective highlight colors (user-labelled palette) ───────────────────
@@ -610,6 +611,12 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp }: V
         }
         if (e.key === "+" || e.key === "=") { e.preventDefault(); setScale(s => parseFloat(Math.min(s + 0.2, 4).toFixed(2))); return; }
         if (e.key === "-")                  { e.preventDefault(); setScale(s => parseFloat(Math.max(s - 0.2, 0.5).toFixed(2))); return; }
+        if (e.key === "\\") {
+          e.preventDefault();
+          if (kbRef.current.isSplit) closeSplit();
+          else splitView("horizontal");
+          return;
+        }
       }
 
       if (e.key === "Escape") {
@@ -1125,6 +1132,10 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp }: V
           { label: "Annotations panel",  action: () => setRailTab("annotations"),  disabled: !hasDoc },
           { label: "Table of Contents",  action: () => setRailTab("outline"),       disabled: !hasDoc },
           { label: "Bookmarks",          action: () => setRailTab("bookmarks"),     disabled: !hasDoc },
+          { type: "separator" },
+          { label: "Split Right",         shortcut: "Ctrl+\\",  action: () => splitView("horizontal") },
+          { label: "Split Down",                                action: () => splitView("vertical") },
+          ...(isSplit ? [{ label: "Close Split",                action: () => closeSplit() }] : []),
         ],
       },
     ];
@@ -1921,6 +1932,12 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp }: V
       ...(workingBlob ? [{
         id: "download", label: "Download PDF", description: "Save modified PDF (Ctrl+S)", category: "Export",
         action: () => { downloadBlob(workingBlob, filename); setPaletteOpen(false); },
+      }] : []),
+      { id: "split-right",  label: "Split Right",       description: "Open a second viewer pane (Ctrl+\\)", category: "View", action: () => { splitView("horizontal"); setPaletteOpen(false); } },
+      { id: "split-down",   label: "Split Down",        description: "Open a second viewer pane below",     category: "View", action: () => { splitView("vertical"); setPaletteOpen(false); } },
+      ...(isSplit ? [{
+        id: "close-split", label: "Close Split", description: "Return to single pane", category: "View",
+        action: () => { closeSplit(); setPaletteOpen(false); },
       }] : []),
     ];
   }

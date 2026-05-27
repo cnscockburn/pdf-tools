@@ -12,6 +12,11 @@ const mockCtx: TabContextValue = {
   closeTab: vi.fn(),
   switchTab: vi.fn(),
   updateTabTitle: vi.fn(),
+  splitTabId: null,
+  splitDirection: "horizontal",
+  splitView: vi.fn(),
+  closeSplit: vi.fn(),
+  isSplit: false,
 };
 
 function renderCard(to: "merge" | "viewer" = "merge") {

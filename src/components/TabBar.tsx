@@ -28,12 +28,13 @@ const TAB_ICONS: Record<TabType, React.ReactNode> = {
 interface Props {
   tabs: Tab[];
   activeTabId: string;
+  splitTabId?: string | null;
   onSwitch: (id: string) => void;
   onClose: (id: string) => void;
   onNewTab: () => void;
 }
 
-export default function TabBar({ tabs, activeTabId, onSwitch, onClose, onNewTab }: Props) {
+export default function TabBar({ tabs, activeTabId, splitTabId, onSwitch, onClose, onNewTab }: Props) {
   // Global keyboard shortcuts for tab management
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -82,6 +83,7 @@ export default function TabBar({ tabs, activeTabId, onSwitch, onClose, onNewTab 
     >
       {tabs.map(tab => {
         const active = tab.id === activeTabId;
+        const inSplit = tab.id === splitTabId;
         return (
           <button
             key={tab.id}
@@ -94,12 +96,18 @@ export default function TabBar({ tabs, activeTabId, onSwitch, onClose, onNewTab 
               "min-w-0 max-w-[180px] shrink-0",
               active
                 ? "text-white bg-stone-800"
-                : "text-stone-500 hover:text-stone-300 hover:bg-stone-800/50",
+                : inSplit
+                  ? "text-stone-300 bg-stone-800/70"
+                  : "text-stone-500 hover:text-stone-300 hover:bg-stone-800/50",
             )}
           >
             {/* Active indicator — bottom amber line */}
             {active && (
               <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500" />
+            )}
+            {/* Split indicator — bottom cyan line */}
+            {inSplit && !active && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500" />
             )}
 
             {/* Icon */}
