@@ -1,15 +1,16 @@
 import { useState } from "react";
-import { useLocation } from "react-router-dom";
 import Layout from "../components/Layout";
 import FileDropZone from "../components/FileDropZone";
 import ProcessButton from "../components/ProcessButton";
 import { mergePDFs } from "../api/client";
 import { downloadBlob } from "../lib/utils";
 
-export default function Merge() {
-  const location = useLocation();
-  const seedFile = (location.state as { file?: File } | null)?.file ?? null;
-  const [files, setFiles] = useState<File[]>(seedFile ? [seedFile] : []);
+interface MergeProps {
+  initialFile?: File;
+}
+
+export default function Merge({ initialFile }: MergeProps = {}) {
+  const [files, setFiles] = useState<File[]>(initialFile ? [initialFile] : []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

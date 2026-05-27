@@ -1,8 +1,8 @@
 import { useCallback, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
 import { useDropzone } from "react-dropzone";
 import { Layers, Scissors, Minimize2, EyeOff, LayoutGrid, FileImage } from "lucide-react";
 import { cn } from "../lib/utils";
+import { useTabContext, type TabType } from "../lib/tabs";
 import striaLogo from "../assets/stria-logo.png";
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
@@ -12,7 +12,7 @@ type ToolDef = {
   title: string;
   description: string;
   icon: React.ReactNode;
-  href?: string;       // navigate directly (no file needed)
+  tabType?: TabType;   // open a new tab of this type (no file needed)
   needsFile?: true;    // open file picker → viewer with tool pre-selected
   toolHint?: string;   // panel id or mode to activate once file loads
 };
@@ -23,7 +23,7 @@ const TOOLS: ToolDef[] = [
     title: "Merge",
     description: "Combine multiple PDFs into one document",
     icon: <Layers className="h-[18px] w-[18px]" />,
-    href: "/merge",
+    tabType: "merge",
   },
   {
     id: "split",
@@ -54,29 +54,29 @@ const TOOLS: ToolDef[] = [
     title: "Organize",
     description: "Reorder, rotate, and remove pages",
     icon: <LayoutGrid className="h-[18px] w-[18px]" />,
-    href: "/rearrange",
+    tabType: "rearrange",
   },
   {
     id: "convert",
     title: "Convert",
     description: "Turn images into a single PDF",
     icon: <FileImage className="h-[18px] w-[18px]" />,
-    href: "/images-to-pdf",
+    tabType: "images-to-pdf",
   },
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Home() {
-  const navigate = useNavigate();
+  const { openTab } = useTabContext();
   const fileRef        = useRef<HTMLInputElement>(null);
   const pendingToolRef = useRef<string | null>(null);
 
   // Drop zone — opens a PDF in the viewer (no tool hint, just open the file)
   const onDrop = useCallback((files: File[]) => {
     const f = files[0];
-    if (f) navigate("/viewer", { state: { file: f } });
-  }, [navigate]);
+    if (f) openTab("viewer", { file: f });
+  }, [openTab]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -95,7 +95,7 @@ export default function Home() {
     const f = e.target.files?.[0];
     if (f) {
       const tool = pendingToolRef.current;
-      navigate("/viewer", { state: { file: f, ...(tool ? { tool } : {}) } });
+      openTab("viewer", { file: f, ...(tool ? { toolHint: tool } : {}) });
     }
     pendingToolRef.current = null;
     e.target.value = "";
@@ -185,8 +185,12 @@ export default function Home() {
                 </div>
               );
 
-              if (tool.href) {
-                return <Link key={tool.id} to={tool.href} className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50">{row}</Link>;
+              if (tool.tabType) {
+                return (
+                  <button key={tool.id} onClick={() => openTab(tool.tabType!)} className="w-full text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50">
+                    {row}
+                  </button>
+                );
               }
               return (
                 <button key={tool.id} onClick={() => openToolFilePicker(tool.toolHint)} className="w-full text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50">

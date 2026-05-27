@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
 import {
   DndContext,
   closestCenter,
@@ -46,9 +45,12 @@ function SortablePage({ id, thumb, label }: { id: string; thumb?: string; label:
   );
 }
 
-export default function Rearrange() {
-  const location = useLocation();
-  const [file, setFile] = useState<File | null>((location.state as { file?: File } | null)?.file ?? null);
+interface RearrangeProps {
+  initialFile?: File;
+}
+
+export default function Rearrange({ initialFile }: RearrangeProps = {}) {
+  const [file, setFile] = useState<File | null>(initialFile ?? null);
   const [order, setOrder] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

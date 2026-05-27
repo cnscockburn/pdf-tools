@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { useLocation, useNavigate, Link } from "react-router-dom";
+import { useTabContext } from "../lib/tabs";
 import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { useDropzone } from "react-dropzone";
@@ -87,7 +87,13 @@ interface PageText {
   viewport: { width: number; height: number; convertToViewportPoint: (x: number, y: number) => [number, number] };
 }
 
-export default function Viewer() {
+interface ViewerProps {
+  initialFile?: File;
+  tabId?: string;
+  toolHint?: string;
+}
+
+export default function Viewer({ initialFile, tabId, toolHint: toolHintProp }: ViewerProps = {}) {
   // ── Settings + bookmarks ──────────────────────────────────────────────────
   const { settings, updateSettings, addSnippet, removeSnippet } = useSettings();
   const { bookmarks, addBookmark, removeBookmark, renameBookmark } = useBookmarks();
@@ -131,8 +137,8 @@ export default function Viewer() {
   // ── Pending tool: activated when a PDF loads (from Home page card clicks) ─
   const pendingToolRef = useRef<string | null>(null);
 
-  // ── Router navigation ──────────────────────────────────────────────────────
-  const navigate = useNavigate();
+  // ── Tab navigation ─────────────────────────────────────────────────────────
+  const { openTab, updateTabTitle } = useTabContext();
 
   // ── Annotations ────────────────────────────────────────────────────────────
   const [annotations, setAnnotations]         = useState<LocalAnnot[]>([]);
@@ -198,7 +204,7 @@ export default function Viewer() {
   // ── Unsaved-changes navigation guard ──────────────────────────────────────
   type PendingNav =
     | { type: "home" }
-    | { type: "route"; path: string; routeState?: object };
+    | { type: "tab"; tabType: "merge" | "rearrange" | "images-to-pdf"; file?: File };
   const [pendingNav, setPendingNav] = useState<PendingNav | null>(null);
 
   // ── Multi-level undo / redo ────────────────────────────────────────────────
@@ -213,7 +219,7 @@ export default function Viewer() {
   const canvasWrapRef = useRef<HTMLDivElement>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const renderTaskRef = useRef<RenderTask | null>(null);
-  const location      = useLocation();
+  // (location removed — initial file/tool come from props)
   /** Tracks drag-start for the rect-fallback mode (when textSelectActive=true but no text selected) */
   const freeRectDragRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -252,13 +258,17 @@ export default function Viewer() {
     return new File([workingBlob], filename, { type: "application/pdf" });
   }, [file, workingBlob, filename]);
 
-  // ── Load from router state ────────────────────────────────────────────────
+  // ── Load from tab props ───────────────────────────────────────────────────
   useEffect(() => {
-    const state = location.state as { file?: File; tool?: string } | null;
-    if (state?.tool) pendingToolRef.current = state.tool;
-    if (state?.file) loadFile(state.file);
+    if (toolHintProp) pendingToolRef.current = toolHintProp;
+    if (initialFile) loadFile(initialFile);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Sync tab title with filename ─────────────────────────────────────────
+  useEffect(() => {
+    if (tabId && filename) updateTabTitle(tabId, filename);
+  }, [tabId, filename, updateTabTitle]);
 
   // ── PDF canvas render ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -753,8 +763,11 @@ export default function Viewer() {
   // ── Unsaved-changes navigation guard ──────────────────────────────────────
 
   function doNavigate(nav: PendingNav) {
-    if (nav.type === "home") navigate("/");
-    else navigate(nav.path, { state: nav.routeState });
+    if (nav.type === "home") {
+      openTab("home");
+    } else {
+      openTab(nav.tabType, { file: nav.file });
+    }
   }
 
   /** Navigate, but show the guard modal when there is unsaved work. */
@@ -1019,9 +1032,9 @@ export default function Viewer() {
     return (
       <div className="min-h-screen bg-stone-800 flex flex-col">
         <div className="bg-stone-900 border-b border-stone-700 px-4 py-3 flex items-center gap-3">
-          <Link to="/" className="text-xs text-stone-400 hover:text-white flex items-center gap-1 transition">
+          <button onClick={() => openTab("home")} className="text-xs text-stone-400 hover:text-white flex items-center gap-1 transition">
             <ChevronLeft className="h-4 w-4" /> All tools
-          </Link>
+          </button>
         </div>
         <div className="flex-1 flex items-center justify-center p-8">
           <div {...getRootProps()} className={cn(
@@ -1086,8 +1099,8 @@ export default function Viewer() {
           { label: "Split PDF",              action: () => togglePanel("split"),          disabled: !hasDoc },
           { label: "Extract Pages",          action: () => togglePanel("extract"),        disabled: !hasDoc },
           { label: "Rotate / Delete Pages",  action: () => togglePanel("rotate-delete"), disabled: !hasDoc },
-          { label: "Rearrange Pages",        action: () => maybeNavigate({ type: "route", path: "/rearrange", routeState: { file: workingFile ?? file } }), disabled: !hasDoc },
-          { label: "Merge PDFs",             action: () => maybeNavigate({ type: "route", path: "/merge",     routeState: { file: workingFile ?? file } }) },
+          { label: "Rearrange Pages",        action: () => maybeNavigate({ type: "tab", tabType: "rearrange", file: workingFile ?? file ?? undefined }), disabled: !hasDoc },
+          { label: "Merge PDFs",             action: () => maybeNavigate({ type: "tab", tabType: "merge", file: workingFile ?? file ?? undefined }) },
           { type: "separator" },
           { label: "Export to Images",       action: () => togglePanel("pdf-to-images"), disabled: !hasDoc },
         ],
@@ -1132,7 +1145,7 @@ export default function Viewer() {
       <div className="bg-stone-900 border-b border-stone-700 px-3 py-1.5 flex items-center gap-2 shrink-0 min-w-0">
         {/* Logo + Home link */}
         <button
-          onClick={() => maybeNavigate({ type: "home" })}
+          onClick={() => openTab("home")}
           title="Back to home"
           className="shrink-0 flex items-center gap-1.5 text-stone-400 hover:text-white transition"
         >

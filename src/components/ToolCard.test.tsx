@@ -1,13 +1,22 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
 import { FileText } from "lucide-react";
 import ToolCard from "./ToolCard";
+import { TabContext, type TabContextValue } from "../lib/tabs";
 
-// ToolCard uses useNavigate so it must be wrapped in MemoryRouter
-function renderCard(to = "/merge") {
+// ToolCard uses useTabContext so it must be wrapped in TabContext.Provider
+const mockCtx: TabContextValue = {
+  tabs: [],
+  activeTabId: "",
+  openTab: vi.fn(() => "mock-id"),
+  closeTab: vi.fn(),
+  switchTab: vi.fn(),
+  updateTabTitle: vi.fn(),
+};
+
+function renderCard(to: "merge" | "viewer" = "merge") {
   return render(
-    <MemoryRouter>
+    <TabContext.Provider value={mockCtx}>
       <ToolCard
         icon={FileText}
         title="Merge PDFs"
@@ -15,7 +24,7 @@ function renderCard(to = "/merge") {
         to={to}
         color="bg-brand-500"
       />
-    </MemoryRouter>
+    </TabContext.Provider>
   );
 }
 

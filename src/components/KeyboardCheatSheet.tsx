@@ -42,6 +42,13 @@ const SHORTCUTS: Entry[] = [
   { key: "+ / =",          desc: "Zoom in" },
   { key: "−",              desc: "Zoom out" },
 
+  { section: "Tabs" },
+  { key: "Ctrl+T",         desc: "New tab" },
+  { key: "Ctrl+W",         desc: "Close tab" },
+  { key: "Ctrl+Tab",       desc: "Next tab" },
+  { key: "Ctrl+Shift+Tab", desc: "Previous tab" },
+  { key: "Ctrl+1 – 9",     desc: "Jump to tab by position" },
+
   { section: "Panels & Global" },
   { key: "Shift+H",        desc: "Show / hide all annotations" },
   { key: "Ctrl+F",         desc: "Search in document" },
