@@ -8,7 +8,7 @@ import {
   MessageSquare, EyeOff, Crop,
   Stamp, Loader2, Highlighter, Type, Pencil, Check, X, Download,
   Underline, Strikethrough, Search, HelpCircle, User,
-  PenLine, Square, Command, Settings as SettingsIcon,
+  PenLine, Square, Command, Settings as SettingsIcon, Columns,
 } from "lucide-react";
 import { cn, downloadBlob } from "../lib/utils";
 import ThumbnailSidebar from "../components/ThumbnailSidebar";
@@ -91,9 +91,11 @@ interface ViewerProps {
   initialFile?: File;
   tabId?: string;
   toolHint?: string;
+  /** When true, this viewer is the secondary pane in side-by-side mode. Hides the right rail. */
+  isSecondaryPane?: boolean;
 }
 
-export default function Viewer({ initialFile, tabId, toolHint: toolHintProp }: ViewerProps = {}) {
+export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isSecondaryPane }: ViewerProps = {}) {
   // ── Settings + bookmarks ──────────────────────────────────────────────────
   const { settings, updateSettings, addSnippet, removeSnippet } = useSettings();
   const { bookmarks, addBookmark, removeBookmark, renameBookmark } = useBookmarks();
@@ -138,7 +140,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp }: V
   const pendingToolRef = useRef<string | null>(null);
 
   // ── Tab navigation ─────────────────────────────────────────────────────────
-  const { openTab, updateTabTitle, splitView, closeSplit, isSplit } = useTabContext();
+  const { openTab, updateTabTitle, openSideBySide, closeSideBySide, isSideBySide } = useTabContext();
 
   // ── Annotations ────────────────────────────────────────────────────────────
   const [annotations, setAnnotations]         = useState<LocalAnnot[]>([]);
@@ -233,9 +235,9 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp }: V
     workingBlob:   null as Blob | null,
     filename:      "",
     selectedRedact: null as string | null,
-    isSplit:       false,
+    isSideBySide:  false,
   });
-  kbRef.current = { currentPage, pdf, workingBlob, filename, selectedRedact, isSplit };
+  kbRef.current = { currentPage, pdf, workingBlob, filename, selectedRedact, isSideBySide };
   annotationsRef.current = annotations;
 
   // ── Effective highlight colors (user-labelled palette) ───────────────────
@@ -613,8 +615,8 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp }: V
         if (e.key === "-")                  { e.preventDefault(); setScale(s => parseFloat(Math.max(s - 0.2, 0.5).toFixed(2))); return; }
         if (e.key === "\\") {
           e.preventDefault();
-          if (kbRef.current.isSplit) closeSplit();
-          else splitView("horizontal");
+          if (kbRef.current.isSideBySide) closeSideBySide();
+          else openSideBySide("horizontal", "new");
           return;
         }
       }
@@ -1133,9 +1135,9 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp }: V
           { label: "Table of Contents",  action: () => setRailTab("outline"),       disabled: !hasDoc },
           { label: "Bookmarks",          action: () => setRailTab("bookmarks"),     disabled: !hasDoc },
           { type: "separator" },
-          { label: "Split Right",         shortcut: "Ctrl+\\",  action: () => splitView("horizontal") },
-          { label: "Split Down",                                action: () => splitView("vertical") },
-          ...(isSplit ? [{ label: "Close Split",                action: () => closeSplit() }] : []),
+          { label: "Side by Side — Same Document", shortcut: "Ctrl+\\",  action: () => openSideBySide("horizontal", "mirror", workingFile ?? file), disabled: !hasDoc },
+          { label: "Side by Side — New Document",                        action: () => openSideBySide("horizontal", "new") },
+          ...(isSideBySide ? [{ label: "Close Side by Side",             action: () => closeSideBySide() }] : []),
         ],
       },
     ];
@@ -1201,6 +1203,29 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp }: V
 
         {/* Right side */}
         <div className="ml-auto flex items-center gap-2 shrink-0">
+          {/* Side by side toggle */}
+          {!isSecondaryPane && !!pdf && (
+            isSideBySide ? (
+              <button
+                onClick={() => closeSideBySide()}
+                title="Close side by side (Ctrl+\)"
+                className="flex items-center gap-1.5 rounded-lg p-1.5 text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 transition"
+              >
+                <Columns className="h-3.5 w-3.5" />
+                <span className="text-[10px] font-medium hidden sm:inline">Side by Side</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => openSideBySide("horizontal", "mirror", workingFile ?? file)}
+                title="View side by side (Ctrl+\)"
+                className="flex items-center gap-1.5 rounded-lg p-1.5 text-stone-500 hover:text-stone-300 hover:bg-stone-700 transition"
+              >
+                <Columns className="h-3.5 w-3.5" />
+                <span className="text-[10px] font-medium hidden sm:inline">Side by Side</span>
+              </button>
+            )
+          )}
+
           {/* Settings */}
           <button
             onClick={() => setSettingsOpen(true)}
@@ -1766,8 +1791,9 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp }: V
 
         </div>
 
-        {/* Right: utility panel (opened via palette) OR persistent navigation rail */}
-        {panelTool ? (
+        {/* Right: utility panel (opened via palette) OR persistent navigation rail.
+             Hidden in the secondary side-by-side pane to save space. */}
+        {!isSecondaryPane && (panelTool ? (
           <RightPanel
             tool={panelTool}
             file={(workingFile ?? file)!}
@@ -1798,7 +1824,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp }: V
             activeTab={railTab}
             onTabChange={setRailTab}
           />
-        )}
+        ))}
 
       </div>
 
@@ -1933,11 +1959,11 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp }: V
         id: "download", label: "Download PDF", description: "Save modified PDF (Ctrl+S)", category: "Export",
         action: () => { downloadBlob(workingBlob, filename); setPaletteOpen(false); },
       }] : []),
-      { id: "split-right",  label: "Split Right",       description: "Open a second viewer pane (Ctrl+\\)", category: "View", action: () => { splitView("horizontal"); setPaletteOpen(false); } },
-      { id: "split-down",   label: "Split Down",        description: "Open a second viewer pane below",     category: "View", action: () => { splitView("vertical"); setPaletteOpen(false); } },
-      ...(isSplit ? [{
-        id: "close-split", label: "Close Split", description: "Return to single pane", category: "View",
-        action: () => { closeSplit(); setPaletteOpen(false); },
+      { id: "sbs-same",     label: "Side by Side — Same Document", description: "View this document in two panes (Ctrl+\\)", category: "View", action: () => { openSideBySide("horizontal", "mirror", workingFile ?? file); setPaletteOpen(false); } },
+      { id: "sbs-new",      label: "Side by Side — New Document",  description: "Open another document alongside",          category: "View", action: () => { openSideBySide("horizontal", "new"); setPaletteOpen(false); } },
+      ...(isSideBySide ? [{
+        id: "close-sbs", label: "Close Side by Side", description: "Return to single pane", category: "View",
+        action: () => { closeSideBySide(); setPaletteOpen(false); },
       }] : []),
     ];
   }

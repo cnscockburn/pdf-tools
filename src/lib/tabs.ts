@@ -18,6 +18,12 @@ export interface Tab {
   initialFile?: File;
   /** For Viewer tabs: pre-select a tool panel or mode on load. */
   toolHint?: string;
+  /**
+   * Whether this Home tab is "ephemeral" — created by Ctrl+T or the + button.
+   * Ephemeral Home tabs auto-close when the user opens something from them.
+   * The very first Home tab (on app launch) is NOT ephemeral.
+   */
+  ephemeral?: boolean;
 }
 
 export type SplitDirection = "horizontal" | "vertical";
@@ -34,17 +40,21 @@ export interface TabContextValue {
   /** Update the display title of a tab (e.g. when a file is loaded). */
   updateTabTitle: (id: string, title: string) => void;
 
-  // ── Split view ──────────────────────────────────────────────────────────
-  /** The id of the tab in the secondary (right/bottom) split pane, or null. */
-  splitTabId: string | null;
-  /** Direction of the split: horizontal = side-by-side, vertical = top/bottom. */
-  splitDirection: SplitDirection;
-  /** Enter split view: opens a new viewer tab in the secondary pane. */
-  splitView: (direction: SplitDirection, opts?: { file?: File }) => void;
-  /** Close split view, keeping the active tab. */
-  closeSplit: () => void;
-  /** Whether split view is currently active. */
-  isSplit: boolean;
+  // ── Side by side ────────────────────────────────────────────────────────
+  /** The id of the tab in the secondary (right/bottom) pane, or null. */
+  sideBySideTabId: string | null;
+  /** Direction: horizontal = left/right, vertical = top/bottom. */
+  sideBySideDirection: SplitDirection;
+  /**
+   * Open a second pane alongside the active tab.
+   * - mode "mirror": duplicates the current file into the second pane.
+   * - mode "new": opens an empty viewer in the second pane.
+   */
+  openSideBySide: (direction: SplitDirection, mode: "mirror" | "new", currentFile?: File | null) => void;
+  /** Close the side-by-side pane, keeping the active tab. */
+  closeSideBySide: () => void;
+  /** Whether side-by-side is currently active. */
+  isSideBySide: boolean;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

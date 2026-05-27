@@ -5,11 +5,13 @@
  * simultaneously; inactive tabs are hidden via display:none so their full
  * React state tree (PDF, annotations, scroll, mode) is preserved.
  *
- * Split view: two tabs can be displayed simultaneously side by side (horizontal)
- * or stacked (vertical). Each pane is a fully independent tab with its own
- * toolbar, sidebar, and state. The active tab receives keyboard focus.
+ * Side by side: two tabs can be displayed simultaneously — left/right
+ * (horizontal) or top/bottom (vertical). Each pane is a fully independent tab.
+ *
+ * Ephemeral Home tabs: Home tabs created via Ctrl+T or "+" auto-close when
+ * the user opens something from them. The initial Home tab persists.
  */
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { TabContext, newTabId, defaultTabTitle, type Tab, type TabType, type TabContextValue, type SplitDirection } from "../lib/tabs";
 import TabBar from "./TabBar";
 import Home from "../pages/Home";
@@ -20,12 +22,12 @@ import ImagesToPDF from "../pages/ImagesToPDF";
 
 // ── Tab content renderer ─────────────────────────────────────────────────────
 
-function TabContent({ tab }: { tab: Tab }) {
+function TabContent({ tab, isSecondaryPane }: { tab: Tab; isSecondaryPane?: boolean }) {
   switch (tab.type) {
     case "home":
       return <Home />;
     case "viewer":
-      return <Viewer initialFile={tab.initialFile} tabId={tab.id} toolHint={tab.toolHint} />;
+      return <Viewer initialFile={tab.initialFile} tabId={tab.id} toolHint={tab.toolHint} isSecondaryPane={isSecondaryPane} />;
     case "merge":
       return <Merge initialFile={tab.initialFile} />;
     case "rearrange":
@@ -39,19 +41,23 @@ function TabContent({ tab }: { tab: Tab }) {
 
 // ── Shell ────────────────────────────────────────────────────────────────────
 
-function makeHomeTab(): Tab {
-  return { id: newTabId(), type: "home", title: "Home" };
+function makeHomeTab(ephemeral = false): Tab {
+  return { id: newTabId(), type: "home", title: "Home", ephemeral };
 }
 
 export default function TabShell() {
-  const [tabs, setTabs] = useState<Tab[]>([makeHomeTab()]);
+  const [tabs, setTabs] = useState<Tab[]>([makeHomeTab(false)]);
   const [activeTabId, setActiveTabId] = useState(tabs[0].id);
 
-  // ── Split view state ───────────────────────────────────────────────────────
-  const [splitTabId, setSplitTabId] = useState<string | null>(null);
-  const [splitDirection, setSplitDirection] = useState<SplitDirection>("horizontal");
+  // ── Side by side state ─────────────────────────────────────────────────────
+  const [sideBySideTabId, setSideBySideTabId] = useState<string | null>(null);
+  const [sideBySideDirection, setSideBySideDirection] = useState<SplitDirection>("horizontal");
 
-  const isSplit = splitTabId !== null && tabs.some(t => t.id === splitTabId);
+  const isSideBySide = sideBySideTabId !== null && tabs.some(t => t.id === sideBySideTabId);
+
+  // Ref to current activeTabId + tabs for use inside callbacks
+  const stateRef = useRef({ activeTabId, tabs });
+  stateRef.current = { activeTabId, tabs };
 
   const openTab = useCallback((type: TabType, opts?: { file?: File; toolHint?: string; title?: string }) => {
     const id = newTabId();
@@ -62,21 +68,32 @@ export default function TabShell() {
       initialFile: opts?.file,
       toolHint: opts?.toolHint,
     };
-    setTabs(prev => [...prev, tab]);
+
+    const { activeTabId: currentActive, tabs: currentTabs } = stateRef.current;
+    const activeTab = currentTabs.find(t => t.id === currentActive);
+
+    setTabs(prev => {
+      let next = [...prev, tab];
+      // If the currently active tab is an ephemeral Home tab, remove it
+      if (activeTab?.ephemeral && activeTab.type === "home") {
+        next = next.filter(t => t.id !== activeTab.id);
+      }
+      return next;
+    });
     setActiveTabId(id);
     return id;
   }, []);
 
   const closeTab = useCallback((id: string) => {
-    // If closing the split tab, exit split mode
-    setSplitTabId(prev => prev === id ? null : prev);
+    // If closing the side-by-side tab, exit side-by-side mode
+    setSideBySideTabId(prev => prev === id ? null : prev);
 
     setTabs(prev => {
       const idx = prev.findIndex(t => t.id === id);
       if (idx < 0) return prev;
       const next = prev.filter(t => t.id !== id);
       if (next.length === 0) {
-        const home = makeHomeTab();
+        const home = makeHomeTab(false);
         setActiveTabId(home.id);
         return [home];
       }
@@ -97,36 +114,39 @@ export default function TabShell() {
     setTabs(prev => prev.map(t => t.id === id ? { ...t, title } : t));
   }, []);
 
-  // ── Split view actions ─────────────────────────────────────────────────────
+  // ── Side by side actions ───────────────────────────────────────────────────
 
-  const splitView = useCallback((direction: SplitDirection, opts?: { file?: File }) => {
-    setSplitDirection(direction);
-    // Open a new viewer tab in the split pane
+  const openSideBySide = useCallback((direction: SplitDirection, mode: "mirror" | "new", currentFile?: File | null) => {
+    setSideBySideDirection(direction);
     const id = newTabId();
     const tab: Tab = {
       id,
       type: "viewer",
-      title: opts?.file?.name ?? "Viewer",
-      initialFile: opts?.file,
+      title: mode === "mirror" && currentFile ? currentFile.name : "Viewer",
+      initialFile: mode === "mirror" && currentFile ? currentFile : undefined,
     };
     setTabs(prev => [...prev, tab]);
-    setSplitTabId(id);
+    setSideBySideTabId(id);
   }, []);
 
-  const closeSplit = useCallback(() => {
-    setSplitTabId(null);
+  const closeSideBySide = useCallback(() => {
+    setSideBySideTabId(null);
+  }, []);
+
+  // ── "New tab" handler — creates ephemeral Home tabs ────────────────────────
+  const handleNewTab = useCallback(() => {
+    const id = newTabId();
+    const tab = makeHomeTab(true); // ephemeral
+    tab.id = id;
+    setTabs(prev => [...prev, tab]);
+    setActiveTabId(id);
   }, []);
 
   const ctx = useMemo<TabContextValue>(() => ({
     tabs, activeTabId, openTab, closeTab, switchTab, updateTabTitle,
-    splitTabId, splitDirection, splitView, closeSplit, isSplit,
+    sideBySideTabId, sideBySideDirection, openSideBySide, closeSideBySide, isSideBySide,
   }), [tabs, activeTabId, openTab, closeTab, switchTab, updateTabTitle,
-       splitTabId, splitDirection, splitView, closeSplit, isSplit]);
-
-  // Determine which tab ids are visible
-  const visibleIds = new Set<string>();
-  visibleIds.add(activeTabId);
-  if (isSplit && splitTabId) visibleIds.add(splitTabId);
+       sideBySideTabId, sideBySideDirection, openSideBySide, closeSideBySide, isSideBySide]);
 
   return (
     <TabContext.Provider value={ctx}>
@@ -134,18 +154,18 @@ export default function TabShell() {
         <TabBar
           tabs={tabs}
           activeTabId={activeTabId}
-          splitTabId={isSplit ? splitTabId : null}
+          sideBySideTabId={isSideBySide ? sideBySideTabId : null}
           onSwitch={switchTab}
           onClose={closeTab}
-          onNewTab={() => openTab("home")}
+          onNewTab={handleNewTab}
         />
 
         {/* ── Content area ─────────────────────────────────────────────────── */}
-        {isSplit && splitTabId ? (
-          // Split view: two panes visible
+        {isSideBySide && sideBySideTabId ? (
+          // Side by side: two panes visible
           <div
             className="flex-1 flex overflow-hidden"
-            style={{ flexDirection: splitDirection === "horizontal" ? "row" : "column" }}
+            style={{ flexDirection: sideBySideDirection === "horizontal" ? "row" : "column" }}
           >
             {/* Primary pane (active tab) */}
             <div className="flex-1 relative overflow-hidden min-w-0 min-h-0">
@@ -163,21 +183,21 @@ export default function TabShell() {
             {/* Divider */}
             <div
               className={
-                splitDirection === "horizontal"
+                sideBySideDirection === "horizontal"
                   ? "w-px bg-stone-700 shrink-0"
                   : "h-px bg-stone-700 shrink-0"
               }
             />
 
-            {/* Secondary pane (split tab) */}
+            {/* Secondary pane */}
             <div className="flex-1 relative overflow-hidden min-w-0 min-h-0">
               {tabs.map(tab => (
                 <div
                   key={tab.id}
                   className="absolute inset-0 flex flex-col"
-                  style={{ display: tab.id === splitTabId ? "flex" : "none" }}
+                  style={{ display: tab.id === sideBySideTabId ? "flex" : "none" }}
                 >
-                  <TabContent tab={tab} />
+                  <TabContent tab={tab} isSecondaryPane />
                 </div>
               ))}
             </div>

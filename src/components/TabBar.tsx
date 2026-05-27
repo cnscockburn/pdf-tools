@@ -28,13 +28,13 @@ const TAB_ICONS: Record<TabType, React.ReactNode> = {
 interface Props {
   tabs: Tab[];
   activeTabId: string;
-  splitTabId?: string | null;
+  sideBySideTabId?: string | null;
   onSwitch: (id: string) => void;
   onClose: (id: string) => void;
   onNewTab: () => void;
 }
 
-export default function TabBar({ tabs, activeTabId, splitTabId, onSwitch, onClose, onNewTab }: Props) {
+export default function TabBar({ tabs, activeTabId, sideBySideTabId, onSwitch, onClose, onNewTab }: Props) {
   // Global keyboard shortcuts for tab management
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -83,7 +83,7 @@ export default function TabBar({ tabs, activeTabId, splitTabId, onSwitch, onClos
     >
       {tabs.map(tab => {
         const active = tab.id === activeTabId;
-        const inSplit = tab.id === splitTabId;
+        const inSplit = tab.id === sideBySideTabId;
         return (
           <button
             key={tab.id}
@@ -105,7 +105,7 @@ export default function TabBar({ tabs, activeTabId, splitTabId, onSwitch, onClos
             {active && (
               <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500" />
             )}
-            {/* Split indicator — bottom cyan line */}
+            {/* Side-by-side indicator — bottom cyan line */}
             {inSplit && !active && (
               <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500" />
             )}
