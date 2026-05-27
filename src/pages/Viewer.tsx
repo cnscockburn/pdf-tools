@@ -160,10 +160,14 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   const [annotateError, setAnnotateError]     = useState<string | null>(null);
 
   // ── Mirror sync (same-document side-by-side) ─────────────────────────────
-  // Guards against echo: when we receive annotations from the other pane,
-  // we set this flag so the subsequent setAnnotations doesn't re-publish.
-  const mirrorReceivingRef = useRef(false);
+  // Uses a monotonic version counter instead of a boolean flag to prevent echo.
+  // When we receive data from the other pane, we bump `mirrorRecvVersion`.
+  // The publish effect checks whether the version changed since its last run —
+  // if so, the current annotations came from a remote update and should not be
+  // re-broadcast. This is immune to React batching / timing races.
   const mirrorSenderIdRef = useRef(tabId ?? `viewer_${Date.now()}`);
+  const mirrorRecvVersionRef = useRef(0);
+  const mirrorLastPublishedVersionRef = useRef(0);
 
   // Subscribe to mirror channel
   useEffect(() => {
@@ -173,11 +177,9 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
       (data, senderId) => {
         // Ignore our own broadcasts
         if (senderId === mirrorSenderIdRef.current) return;
-        mirrorReceivingRef.current = true;
+        mirrorRecvVersionRef.current += 1;
         setAnnotations(data.annotations);
         setBakedAnnotations(data.baked);
-        // Reset flag after React processes the state update
-        requestAnimationFrame(() => { mirrorReceivingRef.current = false; });
       },
     );
     return unsub;
@@ -185,7 +187,12 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
 
   // Publish annotation changes to the mirror channel
   useEffect(() => {
-    if (!mirrorGroupId || mirrorReceivingRef.current) return;
+    if (!mirrorGroupId) return;
+    // Skip if the current state came from a mirror receive (version bumped)
+    if (mirrorRecvVersionRef.current !== mirrorLastPublishedVersionRef.current) {
+      mirrorLastPublishedVersionRef.current = mirrorRecvVersionRef.current;
+      return;
+    }
     publish(mirrorGroupId, mirrorSenderIdRef.current, {
       annotations,
       baked: bakedAnnotations,

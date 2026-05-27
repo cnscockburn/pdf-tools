@@ -43,15 +43,31 @@ The Vite dev server proxies `/api/*` → `http://localhost:7342`.
 
 ## Features
 
-| Tool | Route |
+| Tool | Description |
 |---|---|
-| PDF Viewer | `/viewer` |
-| Merge PDFs | `/merge` |
-| Split PDF | `/split` |
-| Rearrange Pages | `/rearrange` |
-| Rotate / Delete Pages | `/rotate-delete` |
-| Extract Pages | `/extract` |
-| Images → PDF | `/images-to-pdf` |
+| PDF Viewer | Full document reviewer with annotations, search, redact, crop |
+| Merge PDFs | Combine multiple files into one document |
+| Split PDF | Divide a PDF into separate files by page range |
+| Rearrange Pages | Reorder, rotate, and remove pages |
+| Images to PDF | Turn images into a single PDF |
+
+### Tabbed Documents
+
+Every tool opens in its own tab. Tabs persist their full React state (loaded PDF, annotations, scroll position, mode) even when inactive. Switch freely between multiple open documents without losing work.
+
+- `Ctrl+T` new tab, `Ctrl+W` close, `Ctrl+Tab` / `Ctrl+Shift+Tab` cycle
+- `Ctrl+1`-`9` jump to tab by position
+- Middle-click a tab to close it
+- Ephemeral Home tabs auto-close when you open something from them
+
+### Side by Side
+
+View two documents (or the same document twice) side by side:
+
+- **Same Document**: duplicates the current PDF into a second pane with synchronized annotations; markup in one pane appears in the other
+- **New Document**: opens an independent viewer alongside the current one
+- The secondary pane uses cyan accents (vs. amber for the primary) for visual distinction
+- Toggle via the toolbar button, `View` menu, command palette, or `Ctrl+\`
 
 ### PDF Viewer / Annotator
 
@@ -86,9 +102,15 @@ pnpm tauri build
 ```
 Tauri window (WebView2)
     ↕ HTTP on localhost:5173 (dev) / embedded (prod)
-React + Vite frontend
+React + Vite frontend (tab-based navigation, no router)
     ↕ /api/* proxied to :7342
 FastAPI Python server
     ↕ in-process
 PyMuPDF (fitz) — all PDF operations
 ```
+
+### Frontend structure
+
+- `TabShell` is the top-level component; all pages mount simultaneously (inactive ones hidden via `display:none` to preserve state)
+- `TabContext` provides `openTab` / `closeTab` / `switchTab` to all components
+- Side-by-side mode renders two tab panes; mirror mode syncs annotations via a lightweight pub/sub channel (`mirrorSync.ts`)

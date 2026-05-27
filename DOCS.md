@@ -72,9 +72,7 @@ This opens a native desktop window instead of a browser tab. The Python server s
 
 ### PDF Viewer
 
-**Route:** `/viewer`
-
-Open and read any PDF file entirely in your browser — nothing is uploaded anywhere.
+Open and read any PDF file entirely in your browser — nothing is uploaded anywhere. Opens as a tab; each viewer tab preserves its full state independently.
 
 | Control | Action |
 |---|---|
@@ -95,14 +93,14 @@ Open and read any PDF file entirely in your browser — nothing is uploaded anyw
 - `Ctrl+F` — search in document
 - `Ctrl+S` — download PDF
 - `Ctrl+Shift+P` — command palette
+- `Ctrl+\` — toggle side by side view
 - `?` — keyboard cheat sheet
 - **Continuous scroll:** scrolling past the edge of a page advances to the next/previous page automatically
+- **Side by side:** view the same document in two panes (shared annotations) or two different documents. Secondary pane uses cyan accents for visual distinction
 
 ---
 
 ### Merge PDFs
-
-**Route:** `/merge`
 
 Combine two or more PDF files into a single PDF in the order you add them.
 
@@ -119,8 +117,6 @@ Combine two or more PDF files into a single PDF in the order you add them.
 ---
 
 ### Split PDF
-
-**Route:** `/split`
 
 Break a single PDF into multiple separate files.
 
@@ -140,8 +136,6 @@ When multiple ranges are specified the download is a `.zip` archive. A single ra
 
 ### Rearrange Pages
 
-**Route:** `/rearrange`
-
 Drag and drop page thumbnails into any order.
 
 1. Drop a PDF onto the drop zone
@@ -154,8 +148,6 @@ Drag and drop page thumbnails into any order.
 ---
 
 ### Rotate / Delete Pages
-
-**Route:** `/rotate-delete`
 
 Two tools in one — select pages from the thumbnail grid and either rotate them or delete them.
 
@@ -176,8 +168,6 @@ Two tools in one — select pages from the thumbnail grid and either rotate them
 
 ### Extract Pages
 
-**Route:** `/extract`
-
 Pull a subset of pages from a PDF into a new file.
 
 1. Drop a PDF
@@ -188,8 +178,6 @@ Pull a subset of pages from a PDF into a new file.
 ---
 
 ### Images to PDF
-
-**Route:** `/images-to-pdf`
 
 Convert one or more images into a PDF where each image becomes one page.
 
@@ -232,9 +220,13 @@ Convert one or more images into a PDF where each image becomes one page.
 
 | File | Purpose |
 |---|---|
+| `src/lib/tabs.ts` | Tab types, context, helpers (replaces React Router) |
+| `src/lib/mirrorSync.ts` | Pub/sub for annotation sync between mirrored panes |
+| `src/components/TabShell.tsx` | Top-level shell: tab state, side-by-side layout |
+| `src/components/TabBar.tsx` | Tab strip UI with keyboard shortcuts |
+| `src/pages/Viewer.tsx` | PDF viewer/annotator (largest component) |
 | `src/api/client.ts` | All HTTP calls to the backend (typed) |
 | `src/components/PageThumbnailGrid.tsx` | PDF.js thumbnail renderer + `usePdfThumbnails` hook |
-| `src/components/FileDropZone.tsx` | Reusable file drop target |
 | `src/components/Layout.tsx` | Page shell with back button + header |
 | `backend/services/pdf_engine.py` | All PyMuPDF operations |
 | `backend/routers/*.py` | FastAPI route handlers (thin — delegate to `pdf_engine`) |
@@ -338,21 +330,21 @@ export async function compressPDF(file: File, quality: string): Promise<Blob> {
 
 ### Step 4 — React page
 
-Create `src/pages/Compress.tsx` using the existing pages as a template — drop zone, options, process button, error display.
+Create `src/pages/Compress.tsx` using the existing pages as a template — drop zone, options, process button, error display. Accept an `initialFile?: File` prop for tab integration.
 
-### Step 5 — Wire up routing
+### Step 5 — Wire up the tab system
 
-In `src/App.tsx`:
-```tsx
-import Compress from "./pages/Compress";
-// ...
-<Route path="/compress" element={<Compress />} />
-```
-
-In `src/pages/Home.tsx`, add a card to the `tools` array:
-```tsx
-{ icon: Minimize2, title: "Compress PDF", description: "Reduce file size", to: "/compress", color: "bg-yellow-500" }
-```
+1. Add `"compress"` to the `TabType` union in `src/lib/tabs.ts`:
+   ```ts
+   export type TabType = "home" | "viewer" | "merge" | "rearrange" | "images-to-pdf" | "compress";
+   ```
+2. Add a case in `TabContent` inside `src/components/TabShell.tsx`:
+   ```tsx
+   case "compress":
+     return <Compress initialFile={tab.initialFile} />;
+   ```
+3. In `src/pages/Home.tsx`, add a card to the tools list with `tabType: "compress"`.
+4. Add an icon entry in `TAB_ICONS` in `src/components/TabBar.tsx`.
 
 ---
 

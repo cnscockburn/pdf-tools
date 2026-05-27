@@ -139,18 +139,20 @@ export default function TabShell() {
   }, []);
 
   const closeSideBySide = useCallback(() => {
-    // Clear mirrorGroupId from all tabs when exiting side-by-side
-    setTabs(prev => prev.map(t => t.mirrorGroupId ? { ...t, mirrorGroupId: undefined } : t));
+    const secondaryId = sideBySideTabId;
+    // Remove the secondary tab and clear mirrorGroupId from the primary
+    setTabs(prev => prev
+      .filter(t => t.id !== secondaryId)
+      .map(t => t.mirrorGroupId ? { ...t, mirrorGroupId: undefined } : t)
+    );
     setSideBySideTabId(null);
-  }, []);
+  }, [sideBySideTabId]);
 
   // ── "New tab" handler — creates ephemeral Home tabs ────────────────────────
   const handleNewTab = useCallback(() => {
-    const id = newTabId();
     const tab = makeHomeTab(true); // ephemeral
-    tab.id = id;
     setTabs(prev => [...prev, tab]);
-    setActiveTabId(id);
+    setActiveTabId(tab.id);
   }, []);
 
   const ctx = useMemo<TabContextValue>(() => ({
@@ -200,13 +202,12 @@ export default function TabShell() {
               }
             />
 
-            {/* Secondary pane */}
+            {/* Secondary pane — only render the side-by-side tab */}
             <div className="flex-1 relative overflow-hidden min-w-0 min-h-0">
-              {tabs.map(tab => (
+              {tabs.filter(tab => tab.id === sideBySideTabId).map(tab => (
                 <div
                   key={tab.id}
                   className="absolute inset-0 flex flex-col"
-                  style={{ display: tab.id === sideBySideTabId ? "flex" : "none" }}
                 >
                   <TabContent tab={tab} isSecondaryPane />
                 </div>

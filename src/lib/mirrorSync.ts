@@ -24,11 +24,16 @@ export function subscribe<T>(groupId: string, listener: Listener<T>): () => void
   };
 }
 
-/** Publish data to all subscribers in a mirror group except the sender. */
+/** Publish data to all subscribers in a mirror group. Passes senderId so listeners can ignore their own broadcasts. */
 export function publish<T>(groupId: string, senderId: string, data: T): void {
   const set = channels.get(groupId);
   if (!set) return;
   for (const listener of set) {
     listener(data, senderId);
   }
+}
+
+/** Clear all channels. Used in tests only. */
+export function _clearAll(): void {
+  channels.clear();
 }

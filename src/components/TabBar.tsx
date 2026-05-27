@@ -85,14 +85,16 @@ export default function TabBar({ tabs, activeTabId, sideBySideTabId, onSwitch, o
         const active = tab.id === activeTabId;
         const inSplit = tab.id === sideBySideTabId;
         return (
-          <button
+          <div
             key={tab.id}
             role="tab"
+            tabIndex={0}
             aria-selected={active}
             onClick={() => onSwitch(tab.id)}
+            onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSwitch(tab.id); } }}
             onAuxClick={e => { if (e.button === 1) { e.preventDefault(); onClose(tab.id); } }}
             className={cn(
-              "group relative flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors",
+              "group relative flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors cursor-pointer",
               "min-w-0 max-w-[180px] shrink-0",
               active
                 ? "text-white bg-stone-800"
@@ -119,8 +121,8 @@ export default function TabBar({ tabs, activeTabId, sideBySideTabId, onSwitch, o
             <span className="truncate">{tab.title}</span>
 
             {/* Close button */}
-            <span
-              role="button"
+            <button
+              type="button"
               aria-label={`Close ${tab.title}`}
               onClick={e => { e.stopPropagation(); onClose(tab.id); }}
               className={cn(
@@ -131,8 +133,8 @@ export default function TabBar({ tabs, activeTabId, sideBySideTabId, onSwitch, o
               )}
             >
               <X className="h-2.5 w-2.5" />
-            </span>
-          </button>
+            </button>
+          </div>
         );
       })}
 
@@ -140,6 +142,7 @@ export default function TabBar({ tabs, activeTabId, sideBySideTabId, onSwitch, o
       <button
         onClick={onNewTab}
         title="New tab (Ctrl+T)"
+        aria-label="New tab"
         className="shrink-0 px-2.5 py-2 text-stone-600 hover:text-stone-300 hover:bg-stone-800/50 transition-colors"
       >
         <Plus className="h-3.5 w-3.5" />

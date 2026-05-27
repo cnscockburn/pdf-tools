@@ -1,23 +1,27 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { FileText } from "lucide-react";
 import ToolCard from "./ToolCard";
 import { TabContext, type TabContextValue } from "../lib/tabs";
 
 // ToolCard uses useTabContext so it must be wrapped in TabContext.Provider
-const mockCtx: TabContextValue = {
-  tabs: [],
-  activeTabId: "",
-  openTab: vi.fn(() => "mock-id"),
-  closeTab: vi.fn(),
-  switchTab: vi.fn(),
-  updateTabTitle: vi.fn(),
-  sideBySideTabId: null,
-  sideBySideDirection: "horizontal",
-  openSideBySide: vi.fn(),
-  closeSideBySide: vi.fn(),
-  isSideBySide: false,
-};
+let mockCtx: TabContextValue;
+
+beforeEach(() => {
+  mockCtx = {
+    tabs: [],
+    activeTabId: "",
+    openTab: vi.fn(() => "mock-id"),
+    closeTab: vi.fn(),
+    switchTab: vi.fn(),
+    updateTabTitle: vi.fn(),
+    sideBySideTabId: null,
+    sideBySideDirection: "horizontal",
+    openSideBySide: vi.fn(),
+    closeSideBySide: vi.fn(),
+    isSideBySide: false,
+  };
+});
 
 function renderCard(to: "merge" | "viewer" = "merge") {
   return render(
@@ -65,5 +69,17 @@ describe("ToolCard", () => {
     const btn = screen.getByRole("button");
     btn.focus();
     expect(document.activeElement).toBe(btn);
+  });
+
+  it("calls openTab with correct tab type on click", () => {
+    renderCard("merge");
+    fireEvent.click(screen.getByRole("button"));
+    expect(mockCtx.openTab).toHaveBeenCalledWith("merge");
+  });
+
+  it("calls openTab with viewer type when to='viewer'", () => {
+    renderCard("viewer");
+    fireEvent.click(screen.getByRole("button"));
+    expect(mockCtx.openTab).toHaveBeenCalledWith("viewer");
   });
 });

@@ -7,22 +7,29 @@
 import katex from "katex";
 import "katex/dist/katex.min.css";
 
+/** Escape HTML entities to prevent XSS in fallback paths. */
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 function renderMath(raw: string): { html: string; hasLatex: boolean } {
-  if (!raw.includes("$")) return { html: raw, hasLatex: false };
+  if (!raw.includes("$")) return { html: escapeHtml(raw), hasLatex: false };
 
   let hasLatex = false;
+  // First escape the entire string, then replace LaTeX delimiters with rendered output.
+  // We work on the raw string for regex matching, but escape fallback output.
   const html = raw
     // Block math: $$...$$
     .replace(/\$\$([\s\S]+?)\$\$/g, (_, expr) => {
       hasLatex = true;
       try   { return katex.renderToString(expr.trim(), { displayMode: true, throwOnError: false }); }
-      catch { return `$$${expr}$$`; }
+      catch { return `$$${escapeHtml(expr)}$$`; }
     })
     // Inline math: $...$
     .replace(/\$([^$\n]+?)\$/g, (_, expr) => {
       hasLatex = true;
       try   { return katex.renderToString(expr.trim(), { displayMode: false, throwOnError: false }); }
-      catch { return `$${expr}$`; }
+      catch { return `$${escapeHtml(expr)}$`; }
     });
 
   return { html, hasLatex };
