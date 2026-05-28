@@ -452,10 +452,18 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
                 fill_color=(1, 1, 1),
                 align=fitz.TEXT_ALIGN_CENTER,
             )
-            # set_border must come before update() so the AP stream is generated
-            # with the border included. Width 1.5pt ≈ 2px CSS border.
+            # Width 1.5pt ≈ 2px CSS border.
             a.set_border(width=1.5)
-            a.set_colors(stroke=color)   # border colour; fill is already (1,1,1) above
+            # PyMuPDF raises ValueError if set_colors() is called on a FreeText
+            # annotation, and border_color= in add_freetext_annot is gated behind
+            # rich_text=True.  Write the "C" (colour) array directly into the PDF
+            # annotation dict instead — this is what set_colors() does for other
+            # types, just without the FreeText guard.
+            try:
+                r, g, b = float(color[0]), float(color[1]), float(color[2])
+                page.parent.xref_set_key(a.xref, "C", f"[{r:.4f} {g:.4f} {b:.4f}]")
+            except Exception:
+                pass  # non-critical — coloured text still identifies the stamp
             a.update()
 
     return _save(doc)
