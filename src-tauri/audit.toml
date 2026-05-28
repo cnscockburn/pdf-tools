@@ -1,0 +1,44 @@
+# cargo audit configuration for Stria PDF Toolkit
+# Run with: cargo audit
+#
+# All advisories listed here have been reviewed and accepted.
+# Every entry includes a rationale so future maintainers can re-evaluate.
+#
+# Last reviewed: 2026-05-28
+
+[advisories]
+ignore = [
+    # ── GTK3 / GLib Linux-only bindings ──────────────────────────────────────
+    # Tauri carries these crates for cross-platform support, but Stria is a
+    # Windows-only app.  These crates are NOT compiled or linked when building
+    # for Windows (cfg(target_os = "linux") guards).  All are "unmaintained"
+    # warnings from the gtk-rs project moving to GTK4, with no CVE.
+    "RUSTSEC-2024-0411",   # gdkwayland-sys — unmaintained (GTK3)
+    "RUSTSEC-2024-0412",   # gdk — unmaintained (GTK3)
+    "RUSTSEC-2024-0413",   # atk — unmaintained (GTK3)
+    "RUSTSEC-2024-0414",   # gdkx11-sys — unmaintained (GTK3)
+    "RUSTSEC-2024-0415",   # gtk — unmaintained (GTK3)
+    "RUSTSEC-2024-0416",   # atk-sys — unmaintained (GTK3)
+    "RUSTSEC-2024-0417",   # gdkx11 — unmaintained (GTK3)
+    "RUSTSEC-2024-0418",   # gdk-sys — unmaintained (GTK3)
+    "RUSTSEC-2024-0419",   # gtk3-macros — unmaintained (GTK3)
+    "RUSTSEC-2024-0420",   # gtk-sys — unmaintained (GTK3)
+
+    # glib unsoundness (RUSTSEC-2024-0429): Iterator impl for VariantStrIter.
+    # Linux/GLib only — not compiled on Windows.  Track upstream glib fix.
+    "RUSTSEC-2024-0429",
+
+    # proc-macro-error (RUSTSEC-2024-0370): unmaintained, used via gtk3-macros.
+    # Same Linux-only path.  No exploitable code path on Windows.
+    "RUSTSEC-2024-0370",
+
+    # ── unic-* Unicode crates ─────────────────────────────────────────────────
+    # Used transitively by urlpattern → tauri-utils for URL pattern matching.
+    # All marked "unmaintained" with no CVE; no unsafe code in the hot path.
+    # Tauri maintainers are tracking replacement (see tauri-utils roadmap).
+    "RUSTSEC-2025-0075",   # unic-char-range
+    "RUSTSEC-2025-0080",   # unic-common
+    "RUSTSEC-2025-0081",   # unic-char-property
+    "RUSTSEC-2025-0098",   # unic-ucd-version
+    "RUSTSEC-2025-0100",   # unic-ucd-ident
+]

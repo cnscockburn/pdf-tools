@@ -16,3 +16,13 @@ dev = ["ruff"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.bandit]
+# Scan production code only; exclude the venv, scratch tests, and integration test scripts.
+# Test scripts intentionally call urllib.request.urlopen against a hardcoded 127.0.0.1
+# address — B310 (url open) is a false positive in that context.
+exclude_dirs = [".venv", "tests"]
+skips = []
+
+[tool.bandit.assert_used]
+skips = ["*_test.py", "*test_*.py"]

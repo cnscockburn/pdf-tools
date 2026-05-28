@@ -50,7 +50,7 @@ def post_multipart(url: str, fields: dict[str, str], file_bytes: bytes, file_nam
         method="POST",
     )
     try:
-        resp = urllib.request.urlopen(req, timeout=30)
+        resp = urllib.request.urlopen(req, timeout=30)  # nosec B310 — hardcoded 127.0.0.1 test server
         return resp.status, resp.read(), dict(resp.headers)
     except urllib.error.HTTPError as e:
         return e.code, e.read(), dict(e.headers) if e.headers else {}
@@ -68,7 +68,7 @@ def check(name: str, cond: bool, detail: str = "") -> None:
 # ── /api/health ───────────────────────────────────────────────────────────────
 print("== health ==")
 try:
-    with urllib.request.urlopen(f"{BASE}/health", timeout=3) as r:
+    with urllib.request.urlopen(f"{BASE}/health", timeout=3) as r:  # nosec B310 — hardcoded 127.0.0.1
         check("health endpoint responds 200", r.status == 200)
 except Exception as e:
     print(f"  Backend unreachable at {BASE}: {e}")
