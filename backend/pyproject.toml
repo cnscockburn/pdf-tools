@@ -7,7 +7,7 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     "python-multipart>=0.0.9",
     "PyMuPDF>=1.24",
-    "pikepdf>=9.0",
+    "pikepdf>=10.7.2",
     "Pillow>=10.0",
 ]
 
