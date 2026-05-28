@@ -1575,10 +1575,12 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                     return (
                       <button key={m} onClick={() => setAnnotateSubMode(m)}
                         title={`${label} (${key})`}
+                        aria-pressed={active}
                         className={cn("flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/60",
                           active ? "bg-brand-600 text-white" : "text-stone-400 hover:bg-stone-700 hover:text-stone-200")}>
                         {icon}
                         <span className="hidden sm:inline">{label}</span>
+                        <kbd className={cn("hidden sm:inline shrink-0 rounded border px-[3px] py-px text-[8px] font-mono leading-none", active ? "border-white/25 bg-white/10 text-white/60" : "border-stone-600/60 bg-stone-800 text-stone-500")}>{key}</kbd>
                       </button>
                     );
                   })}
@@ -1597,10 +1599,12 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                     return (
                       <button key={m} onClick={() => setAnnotateSubMode(m)}
                         title={`${label} (${key})`}
+                        aria-pressed={active}
                         className={cn("flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/60",
                           active ? "bg-brand-600 text-white" : "text-stone-400 hover:bg-stone-700 hover:text-stone-200")}>
                         {icon}
                         <span className="hidden sm:inline">{label}</span>
+                        <kbd className={cn("hidden sm:inline shrink-0 rounded border px-[3px] py-px text-[8px] font-mono leading-none", active ? "border-white/25 bg-white/10 text-white/60" : "border-stone-600/60 bg-stone-800 text-stone-500")}>{key}</kbd>
                       </button>
                     );
                   })}
@@ -1615,10 +1619,12 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                     return (
                       <button onClick={() => setAnnotateSubMode("stamp")}
                         title="Stamp (P)"
+                        aria-pressed={active}
                         className={cn("flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/60",
                           active ? "bg-brand-600 text-white" : "text-stone-400 hover:bg-stone-700 hover:text-stone-200")}>
                         <Stamp className="h-3.5 w-3.5" />
                         <span className="hidden sm:inline">Stamp</span>
+                        <kbd className={cn("hidden sm:inline shrink-0 rounded border px-[3px] py-px text-[8px] font-mono leading-none", active ? "border-white/25 bg-white/10 text-white/60" : "border-stone-600/60 bg-stone-800 text-stone-500")}>P</kbd>
                       </button>
                     );
                   })()}
@@ -1644,9 +1650,11 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                     <div className="flex items-center gap-0.5">
                       {(["rect", "ellipse", "line", "arrow"] as ShapeSubType[]).map(s => (
                         <button key={s} onClick={() => setShapeSubType(s)}
+                          title={s === "rect" ? "Rectangle" : s === "ellipse" ? "Ellipse" : s === "line" ? "Straight line" : "Arrow"}
+                          aria-pressed={shapeSubType === s}
                           className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium transition capitalize",
                             shapeSubType === s ? "bg-brand-600 text-white" : "text-stone-400 hover:bg-stone-700 hover:text-stone-200")}>
-                          {s}
+                          {s === "rect" ? "Rect" : s}
                         </button>
                       ))}
                     </div>
@@ -1656,9 +1664,11 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                   <>
                     <div className="w-px h-5 bg-stone-700 shrink-0 mx-0.5" />
                     <div className="flex items-center gap-1">
+                      <span className="text-[9px] text-stone-600 mr-0.5 select-none">Width</span>
                       {[1, 2, 4, 8].map(w => (
                         <button key={w} onClick={() => setInkStrokeWidth(w)}
-                          title={`${w}px stroke`}
+                          title={`${w}px stroke width`}
+                          aria-pressed={inkStrokeWidth === w}
                           className={cn("w-6 h-6 rounded flex items-center justify-center text-[10px] transition",
                             inkStrokeWidth === w ? "bg-brand-600 text-white" : "text-stone-400 hover:bg-stone-700")}>
                           {w}
@@ -1688,6 +1698,8 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                     <span className="flex items-center gap-1 text-xs text-brand-400">
                       <Loader2 className="h-3 w-3 animate-spin" /> Saving…
                     </span>
+                  ) : annotations.length === 0 ? (
+                    <span className="text-[10px] text-stone-600 italic">Click the page to annotate</span>
                   ) : (
                     <span className="text-[10px] text-stone-500 tabular-nums">
                       {annotations.length}{annotations.length !== 1 ? " annotations" : " annotation"}
@@ -1713,11 +1725,11 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                       )}
                       {confirmClearAnnot ? (
                         <span className="flex items-center gap-1.5">
-                          <span className="text-[10px] text-stone-400">Remove all?</span>
+                          <span className="text-[10px] text-stone-400">Clear all {annotations.length}?</span>
                           <button onClick={() => { changeAnnotations([]); setConfirmClearAnnot(false); }}
-                            className="text-[10px] text-red-400 hover:text-red-300 transition font-medium">Yes</button>
+                            className="text-[10px] text-red-400 hover:text-red-300 transition font-medium">Clear</button>
                           <button onClick={() => setConfirmClearAnnot(false)}
-                            className="text-[10px] text-stone-500 hover:text-stone-300 transition">No</button>
+                            className="text-[10px] text-stone-500 hover:text-stone-300 transition">Keep</button>
                         </span>
                       ) : (
                         <button onClick={() => setConfirmClearAnnot(true)}
