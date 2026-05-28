@@ -8,7 +8,7 @@
  */
 import { useEffect } from "react";
 import {
-  Home, FileText, Layers, LayoutGrid, FileImage, Plus, X,
+  Home, FileText, Layers, LayoutGrid, FileImage, Plus, X, Settings,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import type { Tab, TabType } from "../lib/tabs";
@@ -32,9 +32,10 @@ interface Props {
   onSwitch: (id: string) => void;
   onClose: (id: string) => void;
   onNewTab: () => void;
+  onOpenSettings: () => void;
 }
 
-export default function TabBar({ tabs, activeTabId, sideBySideTabId, onSwitch, onClose, onNewTab }: Props) {
+export default function TabBar({ tabs, activeTabId, sideBySideTabId, onSwitch, onClose, onNewTab, onOpenSettings }: Props) {
   // Global keyboard shortcuts for tab management
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -146,6 +147,19 @@ export default function TabBar({ tabs, activeTabId, sideBySideTabId, onSwitch, o
         className="shrink-0 px-2.5 py-2 text-stone-600 hover:text-stone-300 hover:bg-stone-800/50 transition-colors"
       >
         <Plus className="h-3.5 w-3.5" />
+      </button>
+
+      {/* Spacer — pushes settings gear to the right */}
+      <div className="flex-1" />
+
+      {/* Settings gear — always visible, accessible from any tab */}
+      <button
+        onClick={onOpenSettings}
+        title="Preferences"
+        aria-label="Open preferences"
+        className="shrink-0 px-2.5 py-2 text-stone-600 hover:text-stone-300 hover:bg-stone-800/50 transition-colors"
+      >
+        <Settings className="h-3.5 w-3.5" />
       </button>
     </div>
   );

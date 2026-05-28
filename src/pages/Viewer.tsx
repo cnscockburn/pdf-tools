@@ -23,11 +23,12 @@ import QuickActionBar from "../components/QuickActionBar";
 import SearchBar, { type SearchResult } from "../components/SearchBar";
 import KeyboardCheatSheet from "../components/KeyboardCheatSheet";
 import CommandPalette, { type PaletteCommand } from "../components/CommandPalette";
-import SettingsDialog from "../components/SettingsDialog";
+// SettingsDialog is now rendered by TabShell; Viewer only calls openSettings() from context.
 import MiniMap from "../components/MiniMap";
 import MenuBar, { type MenuDef } from "../components/MenuBar";
 import { annotatePDF, redactPDF, cropPDF, checkHealth, type Annotation, type RedactRegion } from "../api/client";
-import { useSettings, useBookmarks } from "../lib/storage";
+import { useBookmarks } from "../lib/storage";
+import { useSettingsContext } from "../lib/settingsContext";
 import { downloadAnnotationReport } from "../lib/annotationReport";
 import { subscribe, publish } from "../lib/mirrorSync";
 
@@ -99,8 +100,8 @@ interface ViewerProps {
 }
 
 export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isSecondaryPane, mirrorGroupId }: ViewerProps = {}) {
-  // ── Settings + bookmarks ──────────────────────────────────────────────────
-  const { settings, updateSettings, addSnippet, removeSnippet } = useSettings();
+  // ── Settings (from shell-level context) + bookmarks ──────────────────────
+  const { settings, updateSettings, addSnippet, removeSnippet, openSettings } = useSettingsContext();
   const { bookmarks, addBookmark, removeBookmark, renameBookmark } = useBookmarks();
   const [editingAuthor, setEditingAuthor] = useState(false);
   const [authorInput, setAuthorInput]     = useState("");
@@ -120,18 +121,24 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   const [editingFilename, setEditingFilename] = useState(false);
   const [filenameInput, setFilenameInput]     = useState("");
 
-  // ── Layout ─────────────────────────────────────────────────────────────────
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // ── Layout — initial states read from settings defaults ───────────────────
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => !(settings.thumbnailsOpenDefault ?? false),
+  );
   const [panelTool, setPanelTool] = useState<PanelTool>(null);
   const [railTab, setRailTab] = useState<RailTab>("annotations");
 
   // ── Canvas modes ───────────────────────────────────────────────────────────
   const [canvasMode, setCanvasMode]           = useState<CanvasMode>("view");
   const [annotateSubMode, setAnnotateSubMode] = useState<CreateMode>("note");
-  const [hlColor, setHlColor]                 = useState(0);
+  const [hlColor, setHlColor]                 = useState<number>(
+    () => settings.defaultHighlightColor ?? 0,
+  );
   const [shapeSubType, setShapeSubType]       = useState<ShapeSubType>("rect");
   const [stampLabel, setStampLabel]           = useState(STAMP_LABELS[0]);
-  const [inkStrokeWidth, setInkStrokeWidth]   = useState(2);
+  const [inkStrokeWidth, setInkStrokeWidth]   = useState<number>(
+    () => settings.defaultInkWidth ?? 2,
+  );
 
   // ── Command palette ────────────────────────────────────────────────────────
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -216,8 +223,11 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   // ── Keyboard cheat sheet ──────────────────────────────────────────────────
   const [cheatSheetOpen, setCheatSheetOpen] = useState(false);
 
-  // ── Settings dialog ────────────────────────────────────────────────────────
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  // ── Default fit mode — applied once after each new PDF loads ─────────────
+  // fitOnLoadRef stores the desired fit mode during the first render cycle
+  // after loadFile().  The render useEffect consumes it (sets to null) so it
+  // only fires once per file load, preventing an update loop.
+  const fitOnLoadRef = useRef<import("../lib/storage").FitMode | null>(null);
 
   // ── Mini-map visibility ────────────────────────────────────────────────────
   const [miniMapVisible, setMiniMapVisible] = useState(true);
@@ -360,6 +370,25 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
         await task.promise;
       } catch { /* RenderingCancelledException is expected */ }
       finally { if (!cancelled) setRendering(false); }
+
+      // ── Apply default fit mode once per file load ─────────────────────────
+      // fitOnLoadRef is set in loadFile() and consumed here on first render so
+      // subsequent scale changes do not re-trigger it (no update loop).
+      if (!cancelled && fitOnLoadRef.current && canvasAreaRef.current && canvasRef.current) {
+        const fitMode = fitOnLoadRef.current;
+        fitOnLoadRef.current = null; // consume — only fires once per load
+        if (fitMode !== "actual") {
+          const w  = canvasAreaRef.current.clientWidth  - 64;
+          const h  = canvasAreaRef.current.clientHeight - 64;
+          const pw = canvasRef.current.width  / scale;
+          const ph = canvasRef.current.height / scale;
+          const fitted =
+            fitMode === "width"
+              ? parseFloat(Math.max(0.5, Math.min(w / pw, 4)).toFixed(2))
+              : parseFloat(Math.max(0.5, Math.min(Math.min(w / pw, h / ph), 4)).toFixed(2));
+          if (fitted !== scale) setScale(fitted);
+        }
+      }
     })();
 
     return () => { cancelled = true; renderTaskRef.current?.cancel(); };
@@ -762,6 +791,8 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     const buf = await f.arrayBuffer();
     const doc = await pdfjsLib.getDocument({ data: buf }).promise;
     setPdf(doc);
+    // Schedule default fit mode application for the first render of this PDF
+    fitOnLoadRef.current = settings.defaultFitMode ?? "width";
     // Activate any pending tool hint (from Home page card clicks)
     activatePendingTool();
   }
@@ -1218,13 +1249,8 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     ];
   }
 
-  const uiScale = settings.uiScale ?? 1;
-
   return (
-    <div
-      className="h-screen flex flex-col bg-stone-800 overflow-hidden"
-      style={uiScale !== 1 ? { zoom: uiScale } as React.CSSProperties : undefined}
-    >
+    <div className="h-full flex flex-col bg-stone-800 overflow-hidden">
 
       {/* ── Top bar ───────────────────────────────────────────────────────────── */}
       {/* Hidden dropzone input — triggered via openFilePicker() from File menu */}
@@ -1304,7 +1330,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           {/* Settings — primary pane only */}
           {!isSecondaryPane && (
             <button
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => openSettings()}
               title="Preferences"
               className="flex items-center gap-1 rounded-lg p-1.5 text-stone-500 hover:text-stone-300 hover:bg-stone-700 transition"
             >
@@ -2002,15 +2028,6 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
         />
       )}
 
-      {/* ── Settings dialog ──────────────────────────────────────────────────── */}
-      {settingsOpen && (
-        <SettingsDialog
-          settings={settings}
-          onUpdate={updateSettings}
-          onClose={() => setSettingsOpen(false)}
-        />
-      )}
-
       {/* ── Unsaved-changes guard modal ───────────────────────────────────────── */}
       {pendingNav && (workingBlob || annotations.length > 0) && (
         <div
@@ -2096,7 +2113,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
       { id: "security",     label: "Security / Encrypt",description: "Encrypt or decrypt the PDF",    category: "Tools",      action: () => { togglePanel("security"); setPaletteOpen(false); } },
       { id: "to-images",    label: "Export to Images",  description: "Convert pages to PNG / JPEG",   category: "Tools",      action: () => { togglePanel("pdf-to-images"); setPaletteOpen(false); } },
       { id: "minimap",      label: "Toggle mini-map",   description: "Show/hide the page-position strip", category: "Navigation", action: () => { setMiniMapVisible(v => !v); setPaletteOpen(false); } },
-      { id: "settings",     label: "Preferences",       description: "Author name, colour labels",    category: "Tools",      action: () => { setSettingsOpen(true); setPaletteOpen(false); } },
+      { id: "settings",     label: "Preferences",       description: "Author name, colour labels",    category: "Tools",      action: () => { openSettings(); setPaletteOpen(false); } },
       { id: "export",       label: "Export report",     description: "Download annotations as .md",   category: "Export",     action: () => { downloadAnnotationReport([...bakedAnnotations, ...annotations], filename); setPaletteOpen(false); } },
       ...(workingBlob ? [{
         id: "download", label: "Download PDF", description: "Save modified PDF (Ctrl+S)", category: "Export",

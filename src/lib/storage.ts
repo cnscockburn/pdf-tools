@@ -14,6 +14,7 @@ export interface UserBookmark {
 }
 
 export type UiScale = 1 | 1.25 | 1.5;
+export type FitMode = "width" | "page" | "actual";
 
 export interface Settings {
   /** Display name stamped on new annotations. */
@@ -28,6 +29,33 @@ export interface Settings {
   colorLabels: [string, string, string, string];
   /** Global UI zoom factor — 1 = 100%, 1.25 = 125%, 1.5 = 150%. */
   uiScale: UiScale;
+
+  // ── Document defaults ───────────────────────────────────────────────────────
+  /**
+   * How the PDF is scaled when first opened.
+   * "width"  — fit to container width (best for wide monitors / two-column papers)
+   * "page"   — fit entire page in view (best for portrait documents)
+   * "actual" — open at 100% scale
+   */
+  defaultFitMode: FitMode;
+  /** Whether the thumbnail sidebar opens automatically when a PDF is loaded. */
+  thumbnailsOpenDefault: boolean;
+
+  // ── Annotation defaults ─────────────────────────────────────────────────────
+  /**
+   * Pre-selected highlight colour index (0-3 = Yellow / Cyan / Green / Pink).
+   * Matches colorLabels index order.
+   */
+  defaultHighlightColor: 0 | 1 | 2 | 3;
+  /** Default ink annotation stroke width in CSS px (stored; displayed ÷ 2 as PDF pts). */
+  defaultInkWidth: number;
+
+  // ── Accessibility ───────────────────────────────────────────────────────────
+  /**
+   * When true, all CSS transitions and animations are disabled app-wide.
+   * Auto-initialised from prefers-reduced-motion on first launch.
+   */
+  reduceMotion: boolean;
 }
 
 // ── Persistence ──────────────────────────────────────────────────────────────
@@ -38,7 +66,21 @@ const BOOKMARKS_KEY = "pdf-tools-bookmarks";
 export const DEFAULT_COLOR_LABELS: [string, string, string, string] = ["Yellow", "Cyan", "Green", "Pink"];
 
 function defaults(): Settings {
-  return { author: "", snippets: [], colorLabels: [...DEFAULT_COLOR_LABELS], uiScale: 1.25 };
+  const prefersReduced =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return {
+    author: "",
+    snippets: [],
+    colorLabels: [...DEFAULT_COLOR_LABELS],
+    uiScale: 1.25,
+    defaultFitMode: "width",
+    thumbnailsOpenDefault: false,
+    defaultHighlightColor: 0,
+    defaultInkWidth: 2,
+    reduceMotion: prefersReduced,
+  };
 }
 
 export function loadSettings(): Settings {
@@ -60,6 +102,17 @@ export function loadSettings(): Settings {
         uiScale: ([1, 1.25, 1.5] as UiScale[]).includes(parsed.uiScale as UiScale)
           ? (parsed.uiScale as UiScale)
           : d.uiScale,
+        defaultFitMode: (["width", "page", "actual"] as FitMode[]).includes(parsed.defaultFitMode as FitMode)
+          ? (parsed.defaultFitMode as FitMode)
+          : d.defaultFitMode,
+        thumbnailsOpenDefault: parsed.thumbnailsOpenDefault ?? d.thumbnailsOpenDefault,
+        defaultHighlightColor: ([0, 1, 2, 3] as const).includes(parsed.defaultHighlightColor as 0)
+          ? (parsed.defaultHighlightColor as 0 | 1 | 2 | 3)
+          : d.defaultHighlightColor,
+        defaultInkWidth: typeof parsed.defaultInkWidth === "number" && parsed.defaultInkWidth > 0
+          ? parsed.defaultInkWidth
+          : d.defaultInkWidth,
+        reduceMotion: parsed.reduceMotion ?? d.reduceMotion,
       };
     }
   } catch { /* ignore */ }

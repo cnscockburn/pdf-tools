@@ -13,8 +13,11 @@
  */
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { TabContext, newTabId, defaultTabTitle, type Tab, type TabType, type TabContextValue, type SplitDirection } from "../lib/tabs";
+import { SettingsContext, type SettingsContextValue } from "../lib/settingsContext";
+import { useSettings } from "../lib/storage";
 import { getCliFile, listenForFileOpen } from "../lib/tauriFileOpen";
 import TabBar from "./TabBar";
+import SettingsDialog from "./SettingsDialog";
 import Home from "../pages/Home";
 import Viewer from "../pages/Viewer";
 import Merge from "../pages/Merge";
@@ -47,6 +50,18 @@ function makeHomeTab(ephemeral = false): Tab {
 }
 
 export default function TabShell() {
+  // ── Settings — single source of truth for the whole app ───────────────────
+  const { settings, updateSettings, addSnippet, removeSnippet } = useSettings();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const openSettings  = useCallback(() => setSettingsOpen(true),  []);
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
+
+  // Apply reduce-motion class to <html> globally
+  useEffect(() => {
+    document.documentElement.classList.toggle("reduce-motion", settings.reduceMotion ?? false);
+  }, [settings.reduceMotion]);
+
+  // ── Tab state ──────────────────────────────────────────────────────────────
   const [tabs, setTabs] = useState<Tab[]>([makeHomeTab(false)]);
   const [activeTabId, setActiveTabId] = useState(tabs[0].id);
 
@@ -169,14 +184,23 @@ export default function TabShell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const ctx = useMemo<TabContextValue>(() => ({
+  const tabCtx = useMemo<TabContextValue>(() => ({
     tabs, activeTabId, openTab, closeTab, switchTab, updateTabTitle,
     sideBySideTabId, sideBySideDirection, openSideBySide, closeSideBySide, isSideBySide,
   }), [tabs, activeTabId, openTab, closeTab, switchTab, updateTabTitle,
        sideBySideTabId, sideBySideDirection, openSideBySide, closeSideBySide, isSideBySide]);
 
+  const settingsCtx = useMemo<SettingsContextValue>(() => ({
+    settings, updateSettings, addSnippet, removeSnippet,
+    settingsOpen, openSettings, closeSettings,
+  }), [settings, updateSettings, addSnippet, removeSnippet,
+      settingsOpen, openSettings, closeSettings]);
+
+  const uiScale = settings.uiScale ?? 1;
+
   return (
-    <TabContext.Provider value={ctx}>
+    <SettingsContext.Provider value={settingsCtx}>
+    <TabContext.Provider value={tabCtx}>
       <div className="h-screen flex flex-col overflow-hidden">
         <TabBar
           tabs={tabs}
@@ -185,14 +209,18 @@ export default function TabShell() {
           onSwitch={switchTab}
           onClose={closeTab}
           onNewTab={handleNewTab}
+          onOpenSettings={openSettings}
         />
 
-        {/* ── Content area ─────────────────────────────────────────────────── */}
+        {/* ── Content area — uiScale zoom applied here so every page scales ── */}
         {isSideBySide && sideBySideTabId ? (
           // Side by side: two panes visible
           <div
             className="flex-1 flex overflow-hidden"
-            style={{ flexDirection: sideBySideDirection === "horizontal" ? "row" : "column" }}
+            style={{
+              flexDirection: sideBySideDirection === "horizontal" ? "row" : "column",
+              ...(uiScale !== 1 ? { zoom: uiScale } as React.CSSProperties : {}),
+            }}
           >
             {/* Primary pane (active tab) */}
             <div className="flex-1 relative overflow-hidden min-w-0 min-h-0">
@@ -230,7 +258,10 @@ export default function TabShell() {
           </div>
         ) : (
           // Single view
-          <div className="flex-1 relative overflow-hidden">
+          <div
+            className="flex-1 relative overflow-hidden"
+            style={uiScale !== 1 ? { zoom: uiScale } as React.CSSProperties : undefined}
+          >
             {tabs.map(tab => (
               <div
                 key={tab.id}
@@ -243,6 +274,17 @@ export default function TabShell() {
           </div>
         )}
       </div>
+
+      {/* ── Preferences dialog — rendered at shell level, accessible everywhere */}
+      {settingsOpen && (
+        <SettingsDialog
+          settings={settings}
+          onUpdate={updateSettings}
+          onClose={closeSettings}
+        />
+      )}
+
     </TabContext.Provider>
+    </SettingsContext.Provider>
   );
 }

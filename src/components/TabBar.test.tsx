@@ -16,6 +16,7 @@ function renderBar(overrides: Partial<Parameters<typeof TabBar>[0]> = {}) {
     onSwitch: vi.fn(),
     onClose: vi.fn(),
     onNewTab: vi.fn(),
+    onOpenSettings: vi.fn(),
   };
   return { ...render(<TabBar {...defaults} {...overrides} />), ...defaults, ...overrides };
 }
@@ -71,6 +72,7 @@ describe("TabBar", () => {
         onSwitch={vi.fn()}
         onClose={vi.fn()}
         onNewTab={vi.fn()}
+        onOpenSettings={vi.fn()}
       />
     );
     // The side-by-side tab should have a cyan bottom indicator

@@ -113,7 +113,7 @@ export default function Home() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-stone-50 overflow-hidden">
+    <div className="h-full flex flex-col bg-stone-50 overflow-hidden">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="shrink-0 h-11 bg-white border-b border-stone-200 px-6 flex items-center gap-3">
