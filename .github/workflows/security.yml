@@ -76,7 +76,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install bandit
-        run: pip install bandit[toml]
+        # bandit-sarif-formatter is required for -f sarif; it is not bundled
+        # with bandit itself.
+        run: pip install "bandit[toml]" bandit-sarif-formatter
       - name: Run bandit
         run: |
           bandit -r backend \
@@ -153,7 +155,18 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install backend deps
-        run: pip install -r backend/requirements.txt 2>/dev/null || pip install -e "backend/.[dev]"
+        # Install deps directly from pyproject.toml fields — avoids the
+        # setuptools flat-layout error triggered by `pip install -e` when
+        # multiple top-level packages (routers/, services/) are present.
+        run: |
+          pip install \
+            "fastapi>=0.115" \
+            "uvicorn[standard]>=0.30" \
+            "python-multipart>=0.0.9" \
+            "PyMuPDF>=1.24" \
+            "pikepdf>=9.0" \
+            "Pillow>=10.0" \
+            pytest
       - name: Run tests
         run: |
           cd backend

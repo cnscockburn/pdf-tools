@@ -17,12 +17,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 let capturedUrl: string = "";
 let capturedInit: RequestInit | undefined = undefined;
 
-function makeMockFetch(status: number, body: BodyInit | Blob = new Blob()) {
+function makeMockFetch(status: number, body: string = "%PDF-1.4") {
   return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     capturedUrl = typeof input === "string" ? input : (input as Request).url ?? String(input);
     capturedInit = init;
-    const blob = body instanceof Blob ? body : new Blob([body as string]);
-    return new Response(blob, {
+    // Pass a string (not a Blob) so the Response constructor doesn't call
+    // blob.stream() — that method is absent in the jsdom environment shipped
+    // with Vite 6 / vitest 4.
+    return new Response(body, {
       status,
       headers: { "Content-Type": "application/pdf" },
     });
@@ -93,7 +95,7 @@ describe("API client: endpoint URLs", () => {
   beforeEach(() => {
     capturedUrl = "";
     capturedInit = undefined;
-    vi.stubGlobal("fetch", makeMockFetch(200, new Blob(["%PDF"], { type: "application/pdf" })));
+    vi.stubGlobal("fetch", makeMockFetch(200, "%PDF"));
   });
 
   afterEach(() => vi.unstubAllGlobals());
@@ -161,7 +163,7 @@ describe("API client: endpoint URLs", () => {
 
 describe("API client: annotatePDF sends annotations JSON", () => {
   it("serializes annotations array as form field", async () => {
-    vi.stubGlobal("fetch", makeMockFetch(200, new Blob(["%PDF"])));
+    vi.stubGlobal("fetch", makeMockFetch(200, "%PDF"));
     const { annotatePDF } = await import("./client");
     const ann = [{ type: "note" as const, page: 1, x: 0.5, y: 0.3, text: "hi" }];
     await annotatePDF(makeFile(), ann);
@@ -173,7 +175,7 @@ describe("API client: annotatePDF sends annotations JSON", () => {
   });
 
   it("sends method POST", async () => {
-    vi.stubGlobal("fetch", makeMockFetch(200, new Blob(["%PDF"])));
+    vi.stubGlobal("fetch", makeMockFetch(200, "%PDF"));
     const { annotatePDF } = await import("./client");
     await annotatePDF(makeFile(), []);
     expect(capturedInit?.method).toBe("POST");
