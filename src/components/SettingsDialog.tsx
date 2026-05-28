@@ -170,7 +170,7 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
   const inputCls = cn(
     "w-full bg-stone-800 border border-stone-600 rounded-lg px-3 py-2",
     "text-sm text-white placeholder-stone-600 focus:outline-none",
-    "focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition",
+    "focus:border-brand-500 focus:ring-1 focus:ring-brand-500/30 transition",
   );
 
   return (
@@ -181,7 +181,7 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/65"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-stone-900 border border-stone-700 rounded-2xl shadow-2xl w-[440px] max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="bg-stone-900 border border-stone-700 rounded-2xl shadow-2xl w-[440px] max-w-[90vw] max-h-[90vh] flex flex-col overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-stone-700 shrink-0">
@@ -282,7 +282,7 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
                     className={cn(
                       "flex-1 flex flex-col items-center gap-1.5 py-2 rounded-lg border transition-colors",
                       hlDefault === i
-                        ? "border-amber-500 bg-stone-800"
+                        ? "border-brand-500 bg-stone-800"
                         : "border-stone-700 bg-stone-800/50 hover:border-stone-500",
                     )}
                   >
@@ -294,7 +294,7 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
                       {labels[i] || DEFAULT_COLOR_LABELS[i]}
                     </span>
                     {hlDefault === i && (
-                      <span className="text-[9px] text-amber-500 font-medium">default</span>
+                      <span className="text-[9px] text-brand-500 font-medium">default</span>
                     )}
                   </button>
                 ))}
@@ -313,7 +313,7 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
                     className={cn(
                       "flex-1 flex flex-col items-center gap-1.5 py-2.5 rounded-lg border transition-colors",
                       inkWidth === w
-                        ? "border-amber-500 bg-stone-800"
+                        ? "border-brand-500 bg-stone-800"
                         : "border-stone-700 bg-stone-800/50 hover:border-stone-500",
                     )}
                   >
@@ -358,7 +358,7 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
                       className={cn(
                         "flex-1 bg-stone-800 border border-stone-600 rounded-lg px-2.5 py-1.5",
                         "text-xs text-white placeholder-stone-600 focus:outline-none",
-                        "focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition",
+                        "focus:border-brand-500 focus:ring-1 focus:ring-brand-500/30 transition",
                       )}
                     />
                   </div>

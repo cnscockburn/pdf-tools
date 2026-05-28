@@ -106,7 +106,7 @@ export default function TabBar({ tabs, activeTabId, sideBySideTabId, onSwitch, o
           >
             {/* Active indicator — bottom amber line */}
             {active && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500" />
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500" />
             )}
             {/* Side-by-side indicator — bottom cyan line */}
             {inSplit && !active && (
@@ -114,7 +114,7 @@ export default function TabBar({ tabs, activeTabId, sideBySideTabId, onSwitch, o
             )}
 
             {/* Icon */}
-            <span className={cn("shrink-0", active ? "text-amber-500" : "text-stone-600 group-hover:text-stone-400")}>
+            <span className={cn("shrink-0", active ? "text-brand-500" : "text-stone-600 group-hover:text-stone-400")}>
               {TAB_ICONS[tab.type]}
             </span>
 

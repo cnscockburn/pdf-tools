@@ -63,9 +63,9 @@ export default function BookmarksPanel({ bookmarks, currentPage, onGoTo, onDelet
             <div
               key={b.id}
               className={cn(
-                "group flex items-center gap-2 py-2 hover:bg-[#3c3836] transition border-l-2",
+                "group flex items-center gap-2 py-2 hover:bg-stone-800 transition border-l-2",
                 b.page === currentPage
-                  ? "bg-[#3c3836] border-[#d97706]"
+                  ? "bg-stone-800 border-brand-500"
                   : "border-transparent"
               )}
               style={{ paddingLeft: b.page === currentPage ? "10px" : "12px", paddingRight: "12px" }}

@@ -193,7 +193,7 @@ export default function AnnotationsListPanel({
     return (
       <div
         key={ann.id}
-        className="group flex items-start gap-2 px-3 py-2 hover:bg-[#3c3836] transition cursor-pointer"
+        className="group flex items-start gap-2 px-3 py-2 hover:bg-stone-800 transition cursor-pointer"
         onClick={handleRowClick}
       >
         {/* Type icon */}
@@ -292,7 +292,7 @@ export default function AnnotationsListPanel({
             onClick={() => { togglePage(pageKey); onGoTo(page); }}
             className={cn(
               "w-full flex items-center gap-1.5 px-3 py-1.5 text-left text-xs font-semibold transition sticky top-0 z-10",
-              isCurrent ? "text-[#d97706]" : "text-stone-400 hover:bg-[#3c3836]",
+              isCurrent ? "text-brand-500" : "text-stone-400 hover:bg-stone-800",
             )}
             style={isCurrent
               ? { backgroundColor: "#3c3836", borderLeft: "2px solid #d97706" }

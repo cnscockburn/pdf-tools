@@ -29,7 +29,7 @@ export default function ThumbnailSidebar({ file, currentPage, onSelect, collapse
   return (
     <div
       className={cn(
-        "relative flex-shrink-0 flex flex-col bg-stone-900 border-r border-stone-700 transition-all duration-200",
+        "relative flex-shrink-0 flex flex-col bg-stone-900 border-r border-stone-700 transition-[width] duration-200 overflow-hidden",
         collapsed ? "w-8" : "w-40"
       )}
     >

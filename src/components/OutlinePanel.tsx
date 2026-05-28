@@ -57,7 +57,7 @@ function OutlineNode({ node, pdf, depth, onGoTo, currentPage }: NodeProps) {
     <div>
       <button
         onClick={handleClick}
-        className="w-full flex items-center gap-1.5 py-2 pr-3 text-left hover:bg-[#3c3836] transition group"
+        className="w-full flex items-center gap-1.5 py-2 pr-3 text-left hover:bg-stone-800 transition group"
         style={{ paddingLeft: `${12 + depth * 12}px` }}
       >
         <span className="shrink-0 text-stone-600">

@@ -69,11 +69,11 @@ export default function KeyboardCheatSheet({ onClose }: Props) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-stone-900 border border-stone-700 rounded-2xl shadow-2xl w-[460px] max-h-[80vh] overflow-hidden flex flex-col">
+      <div className="bg-stone-900 border border-stone-700 rounded-2xl shadow-2xl w-[460px] max-w-[90vw] max-h-[80vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-stone-700 shrink-0">
           <span className="text-sm font-semibold text-white tracking-tight">Keyboard shortcuts</span>
-          <button onClick={onClose} className="text-stone-400 hover:text-white transition">
+          <button onClick={onClose} aria-label="Close keyboard shortcuts" className="text-stone-400 hover:text-white transition rounded p-0.5 hover:bg-stone-700 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/50">
             <X className="h-4 w-4" />
           </button>
         </div>

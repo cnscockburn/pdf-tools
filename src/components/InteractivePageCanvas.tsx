@@ -143,8 +143,8 @@ export default function InteractivePageCanvas({
             left: `${current.x0 * 100}%`, top: `${current.y0 * 100}%`,
             width: `${(current.x1 - current.x0) * 100}%`,
             height: `${(current.y1 - current.y0) * 100}%`,
-            border: "2px dashed #3b82f6",
-            backgroundColor: "rgba(59,130,246,0.12)",
+            border: "2px dashed #d97706",
+            backgroundColor: "rgba(217,119,6,0.10)",
           }}
         />
       )}

@@ -134,16 +134,16 @@ export default function Home() {
               {...getRootProps()}
               className={cn(
                 "w-full flex flex-col items-center justify-center gap-5 rounded-2xl",
-                "border-2 border-dashed transition-all duration-200 cursor-pointer",
+                "border-2 border-dashed transition-colors duration-200 cursor-pointer",
                 "py-14 px-8",
                 isDragActive
-                  ? "border-amber-400 bg-[#fffbeb] scale-[1.005]"
+                  ? "border-brand-500 bg-[#fffbeb] scale-[1.005]"
                   : "border-stone-300 bg-white hover:border-[#d4c5a0] hover:shadow-sm"
               )}
             >
               <input {...getInputProps()} />
               <svg
-                className={cn("h-11 w-11 transition-colors duration-200", isDragActive ? "text-amber-500" : "text-stone-300")}
+                className={cn("h-11 w-11 transition-colors duration-200", isDragActive ? "text-brand-500" : "text-stone-300")}
                 viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5"
                 aria-hidden="true"
               >
@@ -191,7 +191,7 @@ export default function Home() {
                   onClick={handleClick}
                   className={cn(
                     "group flex items-center gap-3 px-3.5 py-3 rounded-xl text-left",
-                    "transition-all duration-150 ease-out",
+                    "transition-[border-color,box-shadow] duration-150 ease-out",
                     "bg-white border border-stone-200",
                     "hover:border-stone-300 hover:shadow-sm",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50",

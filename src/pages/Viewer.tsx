@@ -1445,7 +1445,12 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                 };
               }}
             >
-              <canvas ref={canvasRef} className="rounded block" />
+              <canvas
+                ref={canvasRef}
+                role="img"
+                aria-label={`${filename || "Document"} — page ${currentPage}${pdf ? ` of ${pdf.numPages}` : ""}`}
+                className="rounded block"
+              />
 
               {/* ── Text layer (always in annotate mode) ────────────────────── */}
               {canvasMode === "annotate" && pdf && (
@@ -1854,7 +1859,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           {!annotationsVisible && (
             <div className="shrink-0 px-4 pb-1 flex justify-center">
               <div className="flex items-center gap-2 bg-stone-900/90 border border-stone-600/60 rounded-lg px-3 py-1.5 text-xs text-stone-400">
-                <EyeOff className="h-3 w-3 shrink-0 text-amber-500" />
+                <EyeOff className="h-3 w-3 shrink-0 text-brand-500" />
                 <span>
                   Annotations hidden
                   {canvasMode === "annotate" && annotations.length > 0 && (
@@ -1863,7 +1868,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                 </span>
                 <button
                   onClick={() => setAnnotationsVisible(true)}
-                  className="ml-1 text-amber-400 hover:text-amber-200 font-medium transition"
+                  className="ml-1 text-brand-500 hover:text-brand-400 font-medium transition"
                 >Show</button>
               </div>
             </div>
@@ -2049,7 +2054,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70"
           onClick={e => { if (e.target === e.currentTarget) setPendingNav(null); }}
         >
-          <div className="bg-stone-900 border border-stone-700 rounded-2xl shadow-2xl w-[380px] p-6 flex flex-col gap-5">
+          <div className="bg-stone-900 border border-stone-700 rounded-2xl shadow-2xl w-[380px] max-w-[90vw] p-6 flex flex-col gap-5">
             <div>
               <h2 className="text-sm font-semibold text-white">Modified PDF — download before leaving?</h2>
               <p className="mt-1.5 text-xs text-stone-400 leading-relaxed">

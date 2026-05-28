@@ -21,10 +21,10 @@ export default function FileDropZone({ files, onFiles, multiple = false, accept,
       <div
         {...getRootProps()}
         className={cn(
-          "border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all duration-200",
+          "border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors duration-200",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50",
           isDragActive
-            ? "border-amber-400 bg-[#fffbeb] scale-[1.01]"
+            ? "border-brand-500 bg-[#fffbeb] scale-[1.01]"
             : "border-stone-300 hover:border-[#d4c5a0] hover:bg-stone-50"
         )}
         tabIndex={0}
@@ -32,7 +32,7 @@ export default function FileDropZone({ files, onFiles, multiple = false, accept,
         aria-label={label ?? "Drop file here or click to browse"}
       >
         <input {...getInputProps()} />
-        <UploadCloud className={cn("mx-auto mb-3 h-10 w-10 transition-colors duration-200", isDragActive ? "text-amber-500" : "text-stone-400")} />
+        <UploadCloud className={cn("mx-auto mb-3 h-10 w-10 transition-colors duration-200", isDragActive ? "text-brand-500" : "text-stone-400")} />
         <p className="text-sm font-medium text-stone-700">
           {isDragActive ? "Drop here" : label ?? "Drop PDF here or click to browse"}
         </p>
