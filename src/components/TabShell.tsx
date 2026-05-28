@@ -11,8 +11,9 @@
  * Ephemeral Home tabs: Home tabs created via Ctrl+T or "+" auto-close when
  * the user opens something from them. The initial Home tab persists.
  */
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { TabContext, newTabId, defaultTabTitle, type Tab, type TabType, type TabContextValue, type SplitDirection } from "../lib/tabs";
+import { getCliFile, listenForFileOpen } from "../lib/tauriFileOpen";
 import TabBar from "./TabBar";
 import Home from "../pages/Home";
 import Viewer from "../pages/Viewer";
@@ -153,6 +154,19 @@ export default function TabShell() {
     const tab = makeHomeTab(true); // ephemeral
     setTabs(prev => [...prev, tab]);
     setActiveTabId(tab.id);
+  }, []);
+
+  // ── Open file passed via CLI args ("Open with Stria" from Explorer) ────────
+  useEffect(() => {
+    getCliFile().then(file => {
+      if (file) openTab("viewer", { file, title: file.name });
+    });
+    // Listen for files opened from a second instance (single-instance plugin)
+    const unlisten = listenForFileOpen(file => {
+      openTab("viewer", { file, title: file.name });
+    });
+    return unlisten;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const ctx = useMemo<TabContextValue>(() => ({

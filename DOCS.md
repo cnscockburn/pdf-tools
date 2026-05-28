@@ -97,6 +97,7 @@ Open and read any PDF file entirely in your browser — nothing is uploaded anyw
 - `?` — keyboard cheat sheet
 - **Continuous scroll:** scrolling past the edge of a page advances to the next/previous page automatically
 - **Side by side:** view the same document in two panes (shared annotations) or two different documents. Secondary pane uses cyan accents for visual distinction
+- **First-run hints:** on first use, a compact hint bar below the top bar surfaces key shortcuts (`?`, `A`, `Ctrl+\`). Dismisses permanently via the close button. The empty state also shows discoverable keyboard shortcuts.
 
 ---
 
@@ -106,13 +107,14 @@ Combine two or more PDF files into a single PDF in the order you add them.
 
 1. Drop your first PDF onto the drop zone (or click to browse)
 2. Drop additional PDFs — each one appears in the list below
-3. Remove any file you don't want with the **Remove** link
-4. Click **Merge N files** — `merged.pdf` downloads automatically
+3. **Drag** the grip handle on each row to reorder files (output follows top-to-bottom order)
+4. Remove any file you don't want with the **Remove** link
+5. Click **Merge N files** — `merged.pdf` downloads automatically
 
 **Notes:**
 - There is no limit on the number of files
 - Page order in the output follows the list order top-to-bottom
-- File drag-and-drop into the list for reordering is not yet implemented — remove and re-add to change order
+- A workflow indicator at the top shows your progress: Add files → Arrange order → Download
 
 ---
 
@@ -140,8 +142,9 @@ Drag and drop page thumbnails into any order.
 
 1. Drop a PDF onto the drop zone
 2. Wait for thumbnails to render (rendered locally in your browser using PDF.js)
-3. Drag pages into the order you want — the label shows `p.{original} → {new position}`
-4. Click **Save reordered PDF** — the result downloads automatically
+3. Drag pages into the order you want — the label shows `p.{original} → {new position}` (unchanged pages show just the number)
+4. Use **Reset to original order** if you want to start over
+5. Click **Save reordered PDF** — the result downloads automatically (button is disabled until pages have been moved)
 
 **Tip:** For large PDFs thumbnail rendering may take a few seconds. The app renders progressively so you can start rearranging before all thumbnails appear.
 

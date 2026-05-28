@@ -1,6 +1,9 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
-import { Layers, Scissors, Minimize2, EyeOff, LayoutGrid, FileImage } from "lucide-react";
+import {
+  Layers, Scissors, Minimize2, EyeOff, LayoutGrid, FileImage,
+  Keyboard, Columns, MessageSquare,
+} from "lucide-react";
 import { cn } from "../lib/utils";
 import { useTabContext, type TabType } from "../lib/tabs";
 import striaLogo from "../assets/stria-logo.png";
@@ -12,57 +15,65 @@ type ToolDef = {
   title: string;
   description: string;
   icon: React.ReactNode;
-  tabType?: TabType;   // open a new tab of this type (no file needed)
-  needsFile?: true;    // open file picker → viewer with tool pre-selected
-  toolHint?: string;   // panel id or mode to activate once file loads
+  tabType?: TabType;
+  needsFile?: true;
+  toolHint?: string;
 };
 
 const TOOLS: ToolDef[] = [
   {
     id: "merge",
     title: "Merge",
-    description: "Combine multiple PDFs into one document",
-    icon: <Layers className="h-[18px] w-[18px]" />,
+    description: "Combine multiple PDFs into one",
+    icon: <Layers className="h-[15px] w-[15px]" />,
     tabType: "merge",
   },
   {
     id: "split",
     title: "Split",
-    description: "Divide a PDF into separate files by page range",
-    icon: <Scissors className="h-[18px] w-[18px]" />,
+    description: "Divide by page range",
+    icon: <Scissors className="h-[15px] w-[15px]" />,
     needsFile: true,
     toolHint: "split",
   },
   {
     id: "compress",
     title: "Compress",
-    description: "Reduce file size without visible quality loss",
-    icon: <Minimize2 className="h-[18px] w-[18px]" />,
+    description: "Reduce file size",
+    icon: <Minimize2 className="h-[15px] w-[15px]" />,
     needsFile: true,
     toolHint: "compress",
   },
   {
     id: "redact",
     title: "Redact",
-    description: "Permanently remove sensitive content",
-    icon: <EyeOff className="h-[18px] w-[18px]" />,
+    description: "Remove sensitive content",
+    icon: <EyeOff className="h-[15px] w-[15px]" />,
     needsFile: true,
     toolHint: "redact",
   },
   {
     id: "organize",
     title: "Organize",
-    description: "Reorder, rotate, and remove pages",
-    icon: <LayoutGrid className="h-[18px] w-[18px]" />,
+    description: "Reorder, rotate, delete pages",
+    icon: <LayoutGrid className="h-[15px] w-[15px]" />,
     tabType: "rearrange",
   },
   {
     id: "convert",
-    title: "Convert",
-    description: "Turn images into a single PDF",
-    icon: <FileImage className="h-[18px] w-[18px]" />,
+    title: "Images to PDF",
+    description: "Turn images into a PDF",
+    icon: <FileImage className="h-[15px] w-[15px]" />,
     tabType: "images-to-pdf",
   },
+];
+
+// ── Capability hints shown beneath the drop zone ─────────────────────────────
+
+const CAPABILITIES = [
+  { icon: <MessageSquare className="h-3 w-3" />, text: "8 annotation types with undo/redo" },
+  { icon: <Keyboard className="h-3 w-3" />,      text: "Keyboard-first: press ? for shortcuts" },
+  { icon: <Columns className="h-3 w-3" />,        text: "Side-by-side document comparison" },
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -72,7 +83,9 @@ export default function Home() {
   const fileRef        = useRef<HTMLInputElement>(null);
   const pendingToolRef = useRef<string | null>(null);
 
-  // Drop zone — opens a PDF in the viewer (no tool hint, just open the file)
+  // Set window title
+  useEffect(() => { document.title = "Stria"; }, []);
+
   const onDrop = useCallback((files: File[]) => {
     const f = files[0];
     if (f) openTab("viewer", { file: f });
@@ -84,8 +97,6 @@ export default function Home() {
     multiple: false,
   });
 
-  // Tool cards that need a file: store the tool hint, open the picker, then
-  // navigate to the viewer with both the file and the tool hint in router state.
   function openToolFilePicker(toolHint?: string) {
     pendingToolRef.current = toolHint ?? null;
     fileRef.current?.click();
@@ -105,100 +116,113 @@ export default function Home() {
     <div className="h-screen flex flex-col bg-stone-50 overflow-hidden">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="shrink-0 h-12 bg-white border-b border-stone-200 px-6 flex items-center gap-3">
-        <img src={striaLogo} alt="" aria-hidden="true" className="h-7 w-auto object-contain" />
+      <header className="shrink-0 h-11 bg-white border-b border-stone-200 px-6 flex items-center gap-3">
+        <img src={striaLogo} alt="" aria-hidden="true" className="h-6 w-auto object-contain" />
         <div className="leading-none">
-          <p className="text-[16px] font-semibold text-stone-900 tracking-[-0.01em] leading-[1.25]">Stria</p>
-          <p className="text-[12px] text-stone-400 leading-[1.25] mt-0.5">PDF toolkit</p>
+          <p className="text-[15px] font-semibold text-stone-900 tracking-[-0.01em] leading-[1.25]">Stria</p>
         </div>
+        <span className="text-[11px] text-stone-400 ml-1">Local PDF toolkit</span>
       </header>
 
       {/* ── Body ───────────────────────────────────────────────────────────── */}
-      <div className="flex-1 grid overflow-hidden" style={{ gridTemplateColumns: "1fr 1fr" }}>
+      <div className="flex-1 flex flex-col items-center justify-center overflow-auto px-6 py-10">
+        <div className="w-full max-w-2xl flex flex-col items-center gap-8">
 
-        {/* Left — file intake ───────────────────────────────────────────── */}
-        <div className="bg-white border-r border-stone-200 flex flex-col p-8 gap-5 overflow-hidden">
-          <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-[0.08em]">Open a file</p>
-
-          {/* Drop zone */}
-          <div
-            {...getRootProps()}
-            className={cn(
-              "flex-1 flex flex-col items-center justify-center gap-4 rounded-xl",
-              "border-2 border-dashed transition-all duration-200 cursor-pointer",
-              isDragActive
-                ? "border-amber-400 bg-[#fffbeb] scale-[1.01]"
-                : "border-stone-300 bg-stone-50 hover:border-[#d4c5a0] hover:bg-white"
-            )}
-          >
-            <input {...getInputProps()} />
-            <svg
-              className={cn("h-12 w-12 transition-colors duration-200", isDragActive ? "text-amber-500" : "text-stone-300")}
-              viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5"
-              aria-hidden="true"
+          {/* ── Primary: file intake ──────────────────────────────────────── */}
+          <div className="w-full">
+            <div
+              {...getRootProps()}
+              className={cn(
+                "w-full flex flex-col items-center justify-center gap-5 rounded-2xl",
+                "border-2 border-dashed transition-all duration-200 cursor-pointer",
+                "py-14 px-8",
+                isDragActive
+                  ? "border-amber-400 bg-[#fffbeb] scale-[1.005]"
+                  : "border-stone-300 bg-white hover:border-[#d4c5a0] hover:shadow-sm"
+              )}
             >
-              <path d="M10 38V18l10-12h18v32H10z" strokeLinejoin="round"/>
-              <path d="M20 6v12h18M22 28l6-6 6 6M28 22v10" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <div className="text-center px-4">
-              <p className="text-sm font-semibold text-stone-700">
-                {isDragActive ? "Drop the PDF here" : "Drop a PDF, or click to browse"}
-              </p>
-              <p className="mt-1 text-xs text-stone-400">Opens in the review workspace with all tools available</p>
+              <input {...getInputProps()} />
+              <svg
+                className={cn("h-11 w-11 transition-colors duration-200", isDragActive ? "text-amber-500" : "text-stone-300")}
+                viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5"
+                aria-hidden="true"
+              >
+                <path d="M10 38V18l10-12h18v32H10z" strokeLinejoin="round"/>
+                <path d="M20 6v12h18M22 28l6-6 6 6M28 22v10" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <div className="text-center">
+                <p className="text-sm font-semibold text-stone-700">
+                  {isDragActive ? "Drop the PDF here" : "Open a PDF to start reviewing"}
+                </p>
+                <p className="mt-1.5 text-xs text-stone-400">
+                  Drop a file, or click to browse
+                </p>
+              </div>
+            </div>
+
+            {/* Capability hints */}
+            <div className="flex items-center justify-center gap-5 mt-4">
+              {CAPABILITIES.map((cap, i) => (
+                <span key={i} className="flex items-center gap-1.5 text-[11px] text-stone-400">
+                  <span className="text-stone-300">{cap.icon}</span>
+                  {cap.text}
+                </span>
+              ))}
             </div>
           </div>
 
-          <p className="text-[11px] text-stone-400 leading-relaxed">
-            Files never leave your machine. All processing runs locally via the bundled backend.
-          </p>
-        </div>
+          {/* ── Divider ──────────────────────────────────────────────────── */}
+          <div className="w-full flex items-center gap-3">
+            <div className="flex-1 h-px bg-stone-200" />
+            <span className="text-[10px] font-medium text-stone-400 uppercase tracking-[0.1em]">or use a tool directly</span>
+            <div className="flex-1 h-px bg-stone-200" />
+          </div>
 
-        {/* Right — tool list ────────────────────────────────────────────── */}
-        <div className="overflow-auto p-8 flex flex-col gap-4">
-          <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-[0.08em]">Document tools</p>
-
-          <nav className="flex flex-col gap-0.5" aria-label="Document tools">
+          {/* ── Secondary: tool grid ─────────────────────────────────────── */}
+          <div className="w-full grid grid-cols-3 gap-2">
             {TOOLS.map(tool => {
-              const row = (
-                <div
+              const handleClick = tool.tabType
+                ? () => openTab(tool.tabType!)
+                : () => openToolFilePicker(tool.toolHint);
+
+              return (
+                <button
+                  key={tool.id}
+                  onClick={handleClick}
                   className={cn(
-                    "group flex items-center gap-3.5 px-3.5 py-3 rounded-xl cursor-pointer",
+                    "group flex items-center gap-3 px-3.5 py-3 rounded-xl text-left",
                     "transition-all duration-150 ease-out",
-                    "hover:bg-white hover:shadow-sm",
+                    "bg-white border border-stone-200",
+                    "hover:border-stone-300 hover:shadow-sm",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50",
                   )}
                 >
                   <div className={cn(
-                    "shrink-0 w-9 h-9 rounded-lg flex items-center justify-center",
+                    "shrink-0 w-8 h-8 rounded-lg flex items-center justify-center",
                     "bg-stone-100 text-stone-400 transition-colors duration-150",
                     "group-hover:bg-amber-50 group-hover:text-amber-600",
                   )}>
                     {tool.icon}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-stone-700 group-hover:text-stone-900 transition-colors duration-150">
+                    <p className="text-[12px] font-semibold text-stone-700 group-hover:text-stone-900 transition-colors duration-150 leading-tight">
                       {tool.title}
                     </p>
-                    <p className="text-[11px] text-stone-400 leading-snug mt-0.5">
+                    <p className="text-[10px] text-stone-400 leading-snug mt-0.5">
                       {tool.description}
                     </p>
                   </div>
-                </div>
-              );
-
-              if (tool.tabType) {
-                return (
-                  <button key={tool.id} onClick={() => openTab(tool.tabType!)} className="w-full text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50">
-                    {row}
-                  </button>
-                );
-              }
-              return (
-                <button key={tool.id} onClick={() => openToolFilePicker(tool.toolHint)} className="w-full text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50">
-                  {row}
                 </button>
               );
             })}
-          </nav>
+          </div>
+
+          {/* ── Privacy footer ────────────────────────────────────────────── */}
+          <p className="text-[10px] text-stone-400 text-center leading-relaxed">
+            Everything runs on your machine. Documents are never uploaded, cached, or retained after you close them.
+            <br />
+            Your preferences and name persist between sessions; your files do not.
+          </p>
         </div>
       </div>
 

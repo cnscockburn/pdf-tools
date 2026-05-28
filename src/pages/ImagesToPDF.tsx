@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import Layout from "../components/Layout";
 import FileDropZone from "../components/FileDropZone";
 import ProcessButton from "../components/ProcessButton";
@@ -10,9 +10,15 @@ export default function ImagesToPDF() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Stable object URLs for image previews — revoked on unmount and when files change
+  // Stable object URLs for image previews — revoked when files change or on unmount.
+  // We track the previous URL set in a ref so cleanup revokes the *old* URLs, not the new ones.
   const thumbUrls = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
-  useEffect(() => () => { thumbUrls.forEach(URL.revokeObjectURL); }, [thumbUrls]);
+  const prevThumbUrlsRef = useRef<string[]>([]);
+  useEffect(() => {
+    const prev = prevThumbUrlsRef.current;
+    prevThumbUrlsRef.current = thumbUrls;
+    return () => { prev.forEach(URL.revokeObjectURL); };
+  }, [thumbUrls]);
 
   function removeFile(idx: number) {
     setFiles((prev) => prev.filter((_, i) => i !== idx));
@@ -26,7 +32,7 @@ export default function ImagesToPDF() {
       const blob = await imagesToPDF(files);
       downloadBlob(blob, "images.pdf");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unknown error");
+      setError(e instanceof Error ? e.message : "Conversion failed. Check that all files are valid images.");
     } finally {
       setLoading(false);
     }
@@ -46,8 +52,11 @@ export default function ImagesToPDF() {
 
         {files.length > 0 && (
           <div className="rounded-xl border border-stone-200 bg-white divide-y divide-stone-100 overflow-hidden">
-            <div className="px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wide">
-              {files.length} image{files.length !== 1 ? "s" : ""} to convert
+            <div className="px-4 py-2.5 flex items-center justify-between bg-stone-50/50">
+              <span className="text-[10px] font-medium text-stone-400 uppercase tracking-wide">
+                {files.length} image{files.length !== 1 ? "s" : ""} — {files.length} page{files.length !== 1 ? "s" : ""} in output
+              </span>
+              <span className="text-[10px] text-stone-400">Top to bottom = page order</span>
             </div>
             {files.map((f, i) => (
               <div key={i} className="flex items-center gap-3 px-4 py-3">

@@ -2,6 +2,7 @@ use std::net::TcpStream;
 use std::process::{Child, Command};
 use std::sync::Mutex;
 use std::time::Duration;
+use tauri::{Emitter, Manager};
 
 const BACKEND_PORT: u16 = 7342;
 
@@ -49,6 +50,30 @@ fn sidecar_path() -> std::path::PathBuf {
     base.join(name)
 }
 
+/// Read a file from disk and return it as a Tauri response.
+/// Used by the frontend to load files passed via CLI args or file associations.
+#[tauri::command]
+fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
+    std::fs::read(&path).map_err(|e| format!("Failed to read {}: {}", path, e))
+}
+
+/// Get the file path passed as a CLI argument (e.g. "Open with" from Explorer).
+/// Returns None if no file argument was provided.
+#[tauri::command]
+fn get_cli_file_path() -> Option<String> {
+    let args: Vec<String> = std::env::args().collect();
+    // The first arg is the exe itself; the second (if any) is the file path.
+    // Skip args that look like flags (start with - or /).
+    args.iter()
+        .skip(1)
+        .find(|a| !a.starts_with('-') && !a.starts_with('/'))
+        .filter(|a| {
+            let lower = a.to_lowercase();
+            lower.ends_with(".pdf")
+        })
+        .cloned()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // In release mode, spawn the bundled Python sidecar server.
@@ -69,6 +94,23 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            // When a second instance is launched, find the PDF path in its args
+            // and emit an event so the frontend can open it in a new tab.
+            if let Some(path) = args.iter()
+                .skip(1)
+                .find(|a| !a.starts_with('-') && !a.starts_with('/'))
+                .filter(|a| a.to_lowercase().ends_with(".pdf"))
+            {
+                let _ = app.emit("open-file", path.clone());
+            }
+            // Focus the existing window
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+        }))
+        .invoke_handler(tauri::generate_handler![read_file_bytes, get_cli_file_path])
         .manage(BackendServer(Mutex::new(backend)))
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -76,7 +76,7 @@ function toApiAnnotations(localAnns: LocalAnnot[]): Annotation[] {
 
 type RedactBox = { id: string; page: number; x0: number; y0: number; x1: number; y1: number };
 let _rid = 0;
-const newRid = () => `r${++_rid}`;
+const newRid = () => `r${++_rid}_${Math.random().toString(36).slice(2, 6)}`;
 
 type CropSel = { x0: number; y0: number; x1: number; y1: number };
 
@@ -222,6 +222,15 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   // ── Mini-map visibility ────────────────────────────────────────────────────
   const [miniMapVisible, setMiniMapVisible] = useState(true);
 
+  // ── First-run hint (shows once, dismissed permanently via localStorage) ────
+  const [showFirstRunHint, setShowFirstRunHint] = useState(() => {
+    try { return !localStorage.getItem("stria:viewer-onboarded"); } catch { return true; }
+  });
+  function dismissFirstRunHint() {
+    setShowFirstRunHint(false);
+    try { localStorage.setItem("stria:viewer-onboarded", "1"); } catch { /* noop */ }
+  }
+
   // ── Backend health ─────────────────────────────────────────────────────────
   const [backendOk, setBackendOk] = useState<boolean | null>(null);
 
@@ -315,6 +324,13 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   useEffect(() => {
     if (tabId && filename) updateTabTitle(tabId, filename);
   }, [tabId, filename, updateTabTitle]);
+
+  // ── Sync window title (Tauri / browser tab) ──────────────────────────────
+  useEffect(() => {
+    if (!isSecondaryPane) {
+      document.title = filename ? `${filename} — Stria` : "Stria";
+    }
+  }, [filename, isSecondaryPane]);
 
   // ── PDF canvas render ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -432,8 +448,9 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchIdx, searchResults]);
 
-  // ── Backend health check ──────────────────────────────────────────────────
+  // ── Backend health check (primary pane only — avoids N parallel polls) ────
   useEffect(() => {
+    if (isSecondaryPane) return;
     let cancelled = false;
     async function check() {
       const ok = await checkHealth();
@@ -442,7 +459,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     check();
     const id = setInterval(check, 15_000);
     return () => { cancelled = true; clearInterval(id); };
-  }, []);
+  }, [isSecondaryPane]);
 
   // ── Text selection → QuickActionBar ──────────────────────────────────────
   useEffect(() => {
@@ -1088,15 +1105,30 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
             <ChevronLeft className="h-4 w-4" /> All tools
           </button>
         </div>
-        <div className="flex-1 flex items-center justify-center p-8">
+        <div className="flex-1 flex flex-col items-center justify-center p-8 gap-6">
           <div {...getRootProps()} className={cn(
-            "border-2 border-dashed rounded-2xl p-16 text-center cursor-pointer transition-all max-w-sm w-full",
-            isDragActive ? "border-brand-400 bg-stone-700" : "border-stone-500 hover:border-brand-400 hover:bg-stone-700"
+            "border-2 border-dashed rounded-2xl p-14 text-center cursor-pointer transition-all max-w-md w-full",
+            isDragActive ? "border-brand-400 bg-stone-700" : "border-stone-600 hover:border-brand-400 hover:bg-stone-700/50"
           )}>
             <input {...getInputProps()} />
-            <UploadCloud className="mx-auto mb-3 h-12 w-12 text-stone-400" />
-            <p className="font-medium text-stone-300">{isDragActive ? "Drop PDF here" : "Open a PDF to get started"}</p>
-            <p className="mt-1 text-sm text-stone-500">Click or drag and drop</p>
+            <UploadCloud className="mx-auto mb-3 h-10 w-10 text-stone-500" />
+            <p className="font-medium text-stone-300">{isDragActive ? "Drop PDF here" : "Open a PDF to start reviewing"}</p>
+            <p className="mt-1 text-xs text-stone-500">Drop a file, or click to browse</p>
+          </div>
+
+          {/* Capability hints — discoverable features */}
+          <div className="flex flex-col items-center gap-2 max-w-sm">
+            {[
+              { key: "?", desc: "Keyboard shortcuts for every action" },
+              { key: "A", desc: "Annotate with highlights, notes, ink, shapes, stamps" },
+              { key: "Ctrl+\\", desc: "Side-by-side document comparison" },
+              { key: "Ctrl+F", desc: "Search within the document" },
+            ].map(({ key, desc }) => (
+              <div key={key} className="flex items-center gap-2.5 w-full">
+                <kbd className="shrink-0 rounded border border-stone-600 bg-stone-700 px-1.5 py-0.5 text-[10px] font-mono text-stone-400 min-w-[2.5rem] text-center">{key}</kbd>
+                <span className="text-[11px] text-stone-500">{desc}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -1352,6 +1384,22 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
         {/* Center: canvas + context bars + toolbar */}
         <div className="flex-1 flex flex-col overflow-hidden">
 
+          {/* First-run hint — dismissible, shows once */}
+          {showFirstRunHint && !isSecondaryPane && (
+            <div className="shrink-0 flex items-center gap-3 px-4 py-1.5 bg-stone-900/80 border-b border-stone-700/50 text-[10px] text-stone-400">
+              <span className="flex items-center gap-4">
+                <span>Press <kbd className="rounded border border-stone-600 bg-stone-700 px-1 py-px font-mono text-stone-300">?</kbd> for shortcuts</span>
+                <span className="w-px h-3 bg-stone-700" />
+                <span>Press <kbd className="rounded border border-stone-600 bg-stone-700 px-1 py-px font-mono text-stone-300">A</kbd> to annotate</span>
+                <span className="w-px h-3 bg-stone-700" />
+                <span><kbd className="rounded border border-stone-600 bg-stone-700 px-1 py-px font-mono text-stone-300">Ctrl+\</kbd> side by side</span>
+              </span>
+              <button onClick={dismissFirstRunHint} className="ml-auto text-stone-500 hover:text-stone-300 transition" aria-label="Dismiss tips">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+
           {/* Canvas scroll area */}
           <div ref={canvasAreaRef} className="flex-1 overflow-auto flex flex-col items-center py-8 px-4">
 
@@ -1486,98 +1534,141 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
 
           {canvasMode === "annotate" && (
             <div className="shrink-0 px-4 pb-2 flex justify-center">
-              <div className="flex flex-wrap items-center gap-2 bg-stone-900 border border-stone-700 rounded-xl px-3 py-2 shadow-lg w-full max-w-3xl">
-                {/* Sub-mode */}
-                <div className="flex gap-1 flex-wrap">
+              <div className="flex flex-wrap items-center gap-1.5 bg-stone-900 border border-stone-700 rounded-xl px-3 py-2 shadow-lg w-full max-w-4xl">
+
+                {/* ── Mode groups ─────────────────────────────────────────── */}
+                {/* Group 1: Text markup */}
+                <div className="flex gap-0.5">
                   {([
                     { m: "note"          as CreateMode, icon: <MessageSquare className="h-3.5 w-3.5" />, label: "Note",      key: "A" },
                     { m: "highlight"     as CreateMode, icon: <Highlighter   className="h-3.5 w-3.5" />, label: "Highlight", key: "H" },
                     { m: "underline"     as CreateMode, icon: <Underline     className="h-3.5 w-3.5" />, label: "Underline", key: "U" },
                     { m: "strikethrough" as CreateMode, icon: <Strikethrough className="h-3.5 w-3.5" />, label: "Strike",    key: "S" },
-                    { m: "freetext"      as CreateMode, icon: <Type          className="h-3.5 w-3.5" />, label: "Text",      key: "T" },
-                    { m: "ink"           as CreateMode, icon: <PenLine       className="h-3.5 w-3.5" />, label: "Draw",      key: "I" },
-                    { m: "shape"         as CreateMode, icon: <Square        className="h-3.5 w-3.5" />, label: "Shape",     key: "G" },
-                    { m: "stamp"         as CreateMode, icon: <Stamp         className="h-3.5 w-3.5" />, label: "Stamp",     key: "P" },
                   ]).map(({ m, icon, label, key }) => {
                     const active = annotateSubMode === m;
                     return (
                       <button key={m} onClick={() => setAnnotateSubMode(m)}
-                        title={`${label}${key ? ` (${key})` : ""}`}
-                        className={cn("flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition",
-                          active ? "bg-brand-600 text-white" : "bg-stone-700 text-stone-300 hover:bg-stone-600")}>
-                        {icon} {label}
-                        {key && (
-                          <kbd className={cn(
-                            "ml-0.5 rounded border px-1 py-0 text-[9px] font-mono leading-4 transition",
-                            active ? "border-white/25 bg-white/10 text-white/70" : "border-stone-600 bg-stone-800 text-stone-500"
-                          )}>{key}</kbd>
-                        )}
+                        title={`${label} (${key})`}
+                        className={cn("flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition",
+                          active ? "bg-brand-600 text-white" : "text-stone-400 hover:bg-stone-700 hover:text-stone-200")}>
+                        {icon}
+                        <span className="hidden sm:inline">{label}</span>
                       </button>
                     );
                   })}
                 </div>
-                {/* Highlight colour swatches */}
+
+                <div className="w-px h-5 bg-stone-700 shrink-0 mx-0.5" />
+
+                {/* Group 2: Drawing & text */}
+                <div className="flex gap-0.5">
+                  {([
+                    { m: "freetext" as CreateMode, icon: <Type    className="h-3.5 w-3.5" />, label: "Text",  key: "T" },
+                    { m: "ink"      as CreateMode, icon: <PenLine className="h-3.5 w-3.5" />, label: "Draw",  key: "I" },
+                    { m: "shape"    as CreateMode, icon: <Square  className="h-3.5 w-3.5" />, label: "Shape", key: "G" },
+                  ]).map(({ m, icon, label, key }) => {
+                    const active = annotateSubMode === m;
+                    return (
+                      <button key={m} onClick={() => setAnnotateSubMode(m)}
+                        title={`${label} (${key})`}
+                        className={cn("flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition",
+                          active ? "bg-brand-600 text-white" : "text-stone-400 hover:bg-stone-700 hover:text-stone-200")}>
+                        {icon}
+                        <span className="hidden sm:inline">{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="w-px h-5 bg-stone-700 shrink-0 mx-0.5" />
+
+                {/* Group 3: Stamp */}
+                <div className="flex gap-0.5">
+                  {(() => {
+                    const active = annotateSubMode === "stamp";
+                    return (
+                      <button onClick={() => setAnnotateSubMode("stamp")}
+                        title="Stamp (P)"
+                        className={cn("flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition",
+                          active ? "bg-brand-600 text-white" : "text-stone-400 hover:bg-stone-700 hover:text-stone-200")}>
+                        <Stamp className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Stamp</span>
+                      </button>
+                    );
+                  })()}
+                </div>
+
+                {/* ── Contextual options (inline, after a divider) ────────── */}
                 {annotateSubMode === "highlight" && (
-                  <div className="flex items-center gap-1">
-                    {effectiveHlColors.map((c, i) => (
-                      <button key={i} onClick={() => setHlColor(i)} title={`${c.label} (${i + 1})`}
-                        className={cn("h-5 w-5 rounded-full border-2 transition",
-                          hlColor === i ? "border-white scale-125" : "border-transparent")}
-                        style={{ background: c.bg }} />
-                    ))}
-                  </div>
+                  <>
+                    <div className="w-px h-5 bg-stone-700 shrink-0 mx-0.5" />
+                    <div className="flex items-center gap-1">
+                      {effectiveHlColors.map((c, i) => (
+                        <button key={i} onClick={() => setHlColor(i)} title={`${c.label} (${i + 1})`}
+                          className={cn("h-5 w-5 rounded-full border-2 transition",
+                            hlColor === i ? "border-white scale-110" : "border-transparent hover:border-stone-500")}
+                          style={{ background: c.bg }} />
+                      ))}
+                    </div>
+                  </>
                 )}
-                {/* Shape sub-type */}
                 {annotateSubMode === "shape" && (
-                  <div className="flex items-center gap-1">
-                    {(["rect", "ellipse", "line", "arrow"] as ShapeSubType[]).map(s => (
-                      <button key={s} onClick={() => setShapeSubType(s)}
-                        className={cn("px-2 py-0.5 rounded text-[10px] font-medium transition",
-                          shapeSubType === s ? "bg-brand-600 text-white" : "bg-stone-700 text-stone-400 hover:bg-stone-600")}>
-                        {s}
-                      </button>
-                    ))}
-                  </div>
+                  <>
+                    <div className="w-px h-5 bg-stone-700 shrink-0 mx-0.5" />
+                    <div className="flex items-center gap-0.5">
+                      {(["rect", "ellipse", "line", "arrow"] as ShapeSubType[]).map(s => (
+                        <button key={s} onClick={() => setShapeSubType(s)}
+                          className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium transition capitalize",
+                            shapeSubType === s ? "bg-brand-600 text-white" : "text-stone-400 hover:bg-stone-700 hover:text-stone-200")}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </>
                 )}
-                {/* Ink stroke width */}
                 {annotateSubMode === "ink" && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-stone-500">Width</span>
-                    {[1, 2, 4, 8].map(w => (
-                      <button key={w} onClick={() => setInkStrokeWidth(w)}
-                        className={cn("rounded border px-1.5 py-0.5 text-[10px] transition",
-                          inkStrokeWidth === w ? "border-brand-500 text-brand-300" : "border-stone-600 text-stone-400 hover:border-stone-500")}>
-                        {w}px
-                      </button>
-                    ))}
-                  </div>
+                  <>
+                    <div className="w-px h-5 bg-stone-700 shrink-0 mx-0.5" />
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 4, 8].map(w => (
+                        <button key={w} onClick={() => setInkStrokeWidth(w)}
+                          title={`${w}px stroke`}
+                          className={cn("w-6 h-6 rounded flex items-center justify-center text-[10px] transition",
+                            inkStrokeWidth === w ? "bg-brand-600 text-white" : "text-stone-400 hover:bg-stone-700")}>
+                          {w}
+                        </button>
+                      ))}
+                    </div>
+                  </>
                 )}
-                {/* Stamp label */}
                 {annotateSubMode === "stamp" && (
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {STAMP_LABELS.map(l => (
-                      <button key={l} onClick={() => setStampLabel(l)}
-                        className={cn("px-2 py-0.5 rounded text-[10px] font-bold tracking-wide transition",
-                          stampLabel === l ? "bg-red-800 text-red-200" : "bg-stone-700 text-stone-400 hover:bg-stone-600")}>
-                        {l}
-                      </button>
-                    ))}
-                  </div>
+                  <>
+                    <div className="w-px h-5 bg-stone-700 shrink-0 mx-0.5" />
+                    <div className="flex items-center gap-0.5 flex-wrap">
+                      {STAMP_LABELS.map(l => (
+                        <button key={l} onClick={() => setStampLabel(l)}
+                          className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide transition",
+                            stampLabel === l ? "bg-red-800 text-red-200" : "text-stone-500 hover:bg-stone-700 hover:text-stone-300")}>
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                  </>
                 )}
-                {/* Controls */}
+
+                {/* ── Right: status + actions ─────────────────────────────── */}
                 <div className="flex items-center gap-2 ml-auto">
                   {autoSaving ? (
                     <span className="flex items-center gap-1 text-xs text-brand-400">
                       <Loader2 className="h-3 w-3 animate-spin" /> Saving…
                     </span>
                   ) : (
-                    <span className="text-xs text-stone-500">
-                      {annotations.length} annotation{annotations.length !== 1 ? "s" : ""}
-                      {annotations.length > 0 && <span className="text-stone-600 ml-1">· saved on Done / Esc</span>}
+                    <span className="text-[10px] text-stone-500 tabular-nums">
+                      {annotations.length}{annotations.length !== 1 ? " annotations" : " annotation"}
                     </span>
                   )}
                   {annotateError && (
-                    <span className="text-xs text-red-400 max-w-56 truncate cursor-help" title={annotateError}>⚠ {annotateError}</span>
+                    <span className="text-[10px] text-red-400 max-w-40 truncate cursor-help" title={annotateError}>⚠ {annotateError}</span>
                   )}
                   {annotations.length > 0 && !autoSaving && (
                     <>
@@ -1585,44 +1676,43 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                         onClick={() => undoAnnotationRef.current()}
                         disabled={undoStack.length === 0}
                         title={undoStack.length > 0 ? `Undo (Ctrl+Z) — ${undoStack.length} step${undoStack.length !== 1 ? "s" : ""} available` : "Nothing to undo (Ctrl+Z)"}
-                        className="text-xs text-stone-500 hover:text-stone-300 disabled:opacity-30 transition"
+                        className="text-[10px] text-stone-500 hover:text-stone-300 disabled:opacity-30 transition"
                       >Undo</button>
                       {redoStack.length > 0 && (
                         <button
                           onClick={() => redoAnnotationRef.current()}
                           title={`Redo (Ctrl+Shift+Z) — ${redoStack.length} step${redoStack.length !== 1 ? "s" : ""}`}
-                          className="text-xs text-stone-500 hover:text-stone-300 transition"
+                          className="text-[10px] text-stone-500 hover:text-stone-300 transition"
                         >Redo</button>
                       )}
                       {confirmClearAnnot ? (
                         <span className="flex items-center gap-1.5">
                           <span className="text-[10px] text-stone-400">Remove all?</span>
                           <button onClick={() => { changeAnnotations([]); setConfirmClearAnnot(false); }}
-                            className="text-xs text-red-400 hover:text-red-300 transition font-medium">Yes</button>
+                            className="text-[10px] text-red-400 hover:text-red-300 transition font-medium">Yes</button>
                           <button onClick={() => setConfirmClearAnnot(false)}
-                            className="text-xs text-stone-500 hover:text-stone-300 transition">No</button>
+                            className="text-[10px] text-stone-500 hover:text-stone-300 transition">No</button>
                         </span>
                       ) : (
                         <button onClick={() => setConfirmClearAnnot(true)}
-                          className="text-xs text-stone-500 hover:text-stone-300 transition">Clear all</button>
+                          className="text-[10px] text-stone-500 hover:text-stone-300 transition">Clear</button>
                       )}
                     </>
                   )}
                   {annotateError && annotations.length > 0 && (
                     <button onClick={() => autoSaveAnnotations("view")} disabled={autoSaving}
-                      className="flex items-center gap-1 rounded-lg bg-brand-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-50 transition">
-                      <Check className="h-3 w-3" /> Retry Save
+                      className="flex items-center gap-1 rounded-md bg-brand-500 px-2 py-1 text-[11px] font-semibold text-white hover:bg-brand-600 disabled:opacity-50 transition">
+                      <Check className="h-3 w-3" /> Retry
                     </button>
                   )}
 
-                  {/* Done — visible save-and-exit button */}
                   <button
                     onClick={() => switchMode("view")}
                     disabled={autoSaving}
                     title="Save annotations and return to view mode (Esc)"
-                    className="flex items-center gap-1.5 rounded-lg bg-stone-600 hover:bg-stone-500 border border-stone-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50 transition ml-1"
+                    className="flex items-center gap-1 rounded-md bg-stone-600 hover:bg-stone-500 border border-stone-500 px-2.5 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50 transition"
                   >
-                    <Check className="h-3.5 w-3.5" /> Done
+                    <Check className="h-3 w-3" /> Done
                   </button>
                 </div>
               </div>

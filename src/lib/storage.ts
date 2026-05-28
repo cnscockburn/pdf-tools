@@ -38,7 +38,7 @@ const BOOKMARKS_KEY = "pdf-tools-bookmarks";
 export const DEFAULT_COLOR_LABELS: [string, string, string, string] = ["Yellow", "Cyan", "Green", "Pink"];
 
 function defaults(): Settings {
-  return { author: "", snippets: [], colorLabels: [...DEFAULT_COLOR_LABELS], uiScale: 1 };
+  return { author: "", snippets: [], colorLabels: [...DEFAULT_COLOR_LABELS], uiScale: 1.25 };
 }
 
 export function loadSettings(): Settings {

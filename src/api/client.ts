@@ -1,4 +1,12 @@
-const BASE = "/api";
+/**
+ * In dev mode, Vite's proxy forwards /api → http://localhost:7342/api.
+ * In production Tauri builds, the frontend is served from tauri://localhost
+ * so we need to hit the sidecar server directly.
+ */
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+const BASE = isTauri && import.meta.env.PROD
+  ? "http://127.0.0.1:7342/api"
+  : "/api";
 
 async function handleResponse(res: Response): Promise<Blob> {
   if (!res.ok) {

@@ -84,7 +84,7 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
       const blob = await reorderPages(file, order);
       downloadBlob(blob, `reordered_${file.name}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unknown error");
+      setError(e instanceof Error ? e.message : "Reorder failed. Check that the PDF is valid.");
     } finally {
       setLoading(false);
     }
@@ -101,20 +101,34 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
         />
 
         {file && order.length > 0 && (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={order.map(String)} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-3">
-                {order.map((pageNum, idx) => (
-                  <SortablePage
-                    key={pageNum}
-                    id={String(pageNum)}
-                    thumb={thumbnails[pageNum - 1]}
-                    label={`p.${pageNum} → ${idx + 1}`}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
+          <>
+            {/* Status bar */}
+            <div className="flex items-center justify-between text-[10px] text-stone-400">
+              <span>{pageCount} page{pageCount !== 1 ? "s" : ""} — drag to rearrange</span>
+              {order.some((p, i) => p !== i + 1) && (
+                <button
+                  onClick={() => setOrder(Array.from({ length: pageCount }, (_, i) => i + 1))}
+                  className="text-amber-600 hover:text-amber-500 transition-colors"
+                >
+                  Reset to original order
+                </button>
+              )}
+            </div>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={order.map(String)} strategy={rectSortingStrategy}>
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-3">
+                  {order.map((pageNum, idx) => (
+                    <SortablePage
+                      key={pageNum}
+                      id={String(pageNum)}
+                      thumb={thumbnails[pageNum - 1]}
+                      label={pageNum === idx + 1 ? `${pageNum}` : `p.${pageNum} → ${idx + 1}`}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </>
         )}
 
         {error && (
@@ -123,7 +137,12 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
           </p>
         )}
 
-        <ProcessButton onClick={handleApply} loading={loading} disabled={!file || order.length === 0} label="Save reordered PDF" />
+        <ProcessButton
+          onClick={handleApply}
+          loading={loading}
+          disabled={!file || order.length === 0 || order.every((p, i) => p === i + 1)}
+          label={order.every((p, i) => p === i + 1) ? "Rearrange pages to enable save" : "Save reordered PDF"}
+        />
       </div>
     </Layout>
   );
