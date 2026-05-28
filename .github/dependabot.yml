@@ -1,0 +1,37 @@
+version: 2
+
+updates:
+  # ── JavaScript / TypeScript ──────────────────────────────────────────────────
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+
+  # ── Rust / Cargo ─────────────────────────────────────────────────────────────
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+      day: monday
+    ignore:
+      # glib 0.20.0 fixes RUSTSEC-2024-0429 (VariantStrIter unsoundness) but
+      # 0.20.x is part of the GTK4 Rust bindings — a completely different crate
+      # tree from what Tauri 2 uses on Linux (GTK3).  Every crate in the chain
+      # (gtk, gdk, gdkwayland, atk, …) has `glib = "^0.18"`, so the upgrade is
+      # blocked until Tauri migrates to GTK4 upstream.
+      #
+      # The advisory is already suppressed in src-tauri/audit.toml with rationale
+      # (Windows-only build; Linux GTK3 bindings are never compiled or linked).
+      # Ignore here so Dependabot does not keep reopening the unfixable alert.
+      - dependency-name: glib
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
+
+  # ── Python ───────────────────────────────────────────────────────────────────
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday

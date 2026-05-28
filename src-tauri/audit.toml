@@ -25,7 +25,12 @@ ignore = [
     "RUSTSEC-2024-0420",   # gtk-sys — unmaintained (GTK3)
 
     # glib unsoundness (RUSTSEC-2024-0429): Iterator impl for VariantStrIter.
-    # Linux/GLib only — not compiled on Windows.  Track upstream glib fix.
+    # Fixed in glib 0.20.0, but 0.20.x is part of the GTK4 Rust binding tree.
+    # Tauri 2's Linux support uses GTK3; every crate in that chain (gtk, gdk,
+    # gdkwayland, atk, ...) pins `glib = "^0.18"`, so `cargo update -p glib`
+    # cannot move past 0.18.x until Tauri migrates to GTK4 upstream.
+    # Not compiled on Windows (cfg(target_os = "linux") guards throughout).
+    # Dependabot is configured to stop reopening this alert (.github/dependabot.yml).
     "RUSTSEC-2024-0429",
 
     # proc-macro-error (RUSTSEC-2024-0370): unmaintained, used via gtk3-macros.
