@@ -1138,25 +1138,25 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
         </div>
         <div className="flex-1 flex flex-col items-center justify-center p-8 gap-6">
           <div {...getRootProps()} className={cn(
-            "border-2 border-dashed rounded-2xl p-14 text-center cursor-pointer transition-all max-w-md w-full",
-            isDragActive ? "border-brand-400 bg-stone-700" : "border-stone-600 hover:border-brand-400 hover:bg-stone-700/50"
+            "border-2 border-dashed rounded-2xl p-14 text-center cursor-pointer transition-colors max-w-md w-full",
+            isDragActive ? "border-brand-500 bg-stone-700" : "border-stone-600 hover:border-stone-500 hover:bg-stone-700/40"
           )}>
             <input {...getInputProps()} />
-            <UploadCloud className="mx-auto mb-3 h-10 w-10 text-stone-500" />
+            <UploadCloud className={cn("mx-auto mb-3 h-10 w-10 transition-colors", isDragActive ? "text-brand-500" : "text-stone-500")} />
             <p className="font-medium text-stone-300">{isDragActive ? "Drop PDF here" : "Open a PDF to start reviewing"}</p>
             <p className="mt-1 text-xs text-stone-500">Drop a file, or click to browse</p>
           </div>
 
           {/* Capability hints — discoverable features */}
-          <div className="flex flex-col items-center gap-2 max-w-sm">
+          <div className="flex flex-col items-center gap-2 max-w-sm w-full">
             {[
-              { key: "?", desc: "Keyboard shortcuts for every action" },
-              { key: "A", desc: "Annotate with highlights, notes, ink, shapes, stamps" },
-              { key: "Ctrl+\\", desc: "Side-by-side document comparison" },
-              { key: "Ctrl+F", desc: "Search within the document" },
+              { key: "Ctrl+K", desc: "Command palette — find any tool or action" },
+              { key: "A",      desc: "Annotate: highlights, notes, ink, shapes, stamps" },
+              { key: "Ctrl+\\", desc: "Compare two documents side by side" },
+              { key: "?",      desc: "Browse all keyboard shortcuts" },
             ].map(({ key, desc }) => (
               <div key={key} className="flex items-center gap-2.5 w-full">
-                <kbd className="shrink-0 rounded border border-stone-600 bg-stone-700 px-1.5 py-0.5 text-[10px] font-mono text-stone-400 min-w-[2.5rem] text-center">{key}</kbd>
+                <kbd className="shrink-0 rounded border border-stone-600 bg-stone-700 px-1.5 py-0.5 text-[10px] font-mono text-stone-400 min-w-[3rem] text-center">{key}</kbd>
                 <span className="text-[11px] text-stone-500">{desc}</span>
               </div>
             ))}
@@ -1414,11 +1414,11 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           {showFirstRunHint && !isSecondaryPane && (
             <div className="shrink-0 flex items-center gap-3 px-4 py-1.5 bg-stone-900/80 border-b border-stone-700/50 text-[10px] text-stone-400">
               <span className="flex items-center gap-4">
-                <span>Press <kbd className="rounded border border-stone-600 bg-stone-700 px-1 py-px font-mono text-stone-300">?</kbd> for shortcuts</span>
+                <span>Press <kbd className="rounded border border-stone-600 bg-stone-700 px-1 py-px font-mono text-stone-300">?</kbd> for all shortcuts</span>
                 <span className="w-px h-3 bg-stone-700" />
                 <span>Press <kbd className="rounded border border-stone-600 bg-stone-700 px-1 py-px font-mono text-stone-300">A</kbd> to annotate</span>
                 <span className="w-px h-3 bg-stone-700" />
-                <span><kbd className="rounded border border-stone-600 bg-stone-700 px-1 py-px font-mono text-stone-300">Ctrl+\</kbd> side by side</span>
+                <span><kbd className="rounded border border-stone-600 bg-stone-700 px-1 py-px font-mono text-stone-300">Ctrl+K</kbd> opens the command palette</span>
               </span>
               <button onClick={dismissFirstRunHint} className="ml-auto text-stone-500 hover:text-stone-300 transition" aria-label="Dismiss tips">
                 <X className="h-3 w-3" />
