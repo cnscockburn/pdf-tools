@@ -69,7 +69,7 @@ function SegmentedControl<T extends string | number>({
           className={cn(
             "flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors",
             value === opt.value
-              ? "bg-amber-500 border-amber-500 text-white"
+              ? "bg-brand-500 border-brand-500 text-white"
               : "bg-stone-800 border-stone-600 text-stone-400 hover:border-stone-500 hover:text-stone-200",
           )}
         >
@@ -107,7 +107,7 @@ function Toggle({
         className={cn(
           "shrink-0 inline-flex h-5 w-9 items-center rounded-full border-2 transition-colors",
           checked
-            ? "bg-amber-500 border-amber-500"
+            ? "bg-brand-500 border-brand-500"
             : "bg-stone-700 border-stone-600",
         )}
       >
@@ -380,7 +380,7 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
           <button
             type="button"
             onClick={save}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-xs font-semibold text-white transition shadow-sm"
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 text-xs font-semibold text-white transition shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
           >
             <Check className="h-3.5 w-3.5" /> Save
           </button>

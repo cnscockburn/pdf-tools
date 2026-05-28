@@ -1261,7 +1261,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
         <button
           onClick={() => openTab("home")}
           title="Back to home"
-          className="shrink-0 flex items-center gap-1.5 text-stone-400 hover:text-white transition"
+          className="shrink-0 flex items-center gap-1.5 text-stone-400 hover:text-white transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/50 rounded"
         >
           <svg width="16" height="16" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <rect x="2" y="9" width="18" height="18" stroke="#d97706" strokeWidth="1.5" strokeLinejoin="round"/>
@@ -1286,8 +1286,8 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
               onKeyDown={e => { if (e.key === "Enter") commitFilename(); if (e.key === "Escape") setEditingFilename(false); }}
               className="flex-1 min-w-0 bg-stone-800 border border-brand-500 rounded px-2 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
             />
-            <button onClick={commitFilename} className="shrink-0 text-green-400 hover:text-green-300 transition"><Check className="h-3.5 w-3.5" /></button>
-            <button onClick={() => setEditingFilename(false)} className="shrink-0 text-stone-400 hover:text-white transition"><X className="h-3.5 w-3.5" /></button>
+            <button onClick={commitFilename} aria-label="Confirm rename" className="shrink-0 text-green-400 hover:text-green-300 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-green-500/50 rounded"><Check className="h-3.5 w-3.5" /></button>
+            <button onClick={() => setEditingFilename(false)} aria-label="Cancel rename" className="shrink-0 text-stone-400 hover:text-white transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-500/50 rounded"><X className="h-3.5 w-3.5" /></button>
           </div>
         ) : (
           <button onClick={() => { setFilenameInput(filename); setEditingFilename(true); }} title="Click to rename"
@@ -1332,7 +1332,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
             <button
               onClick={() => openSettings()}
               title="Preferences"
-              className="flex items-center gap-1 rounded-lg p-1.5 text-stone-500 hover:text-stone-300 hover:bg-stone-700 transition"
+              className="flex items-center gap-1 rounded-lg p-1.5 text-stone-500 hover:text-stone-300 hover:bg-stone-700 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/50"
             >
               <SettingsIcon className="h-3.5 w-3.5" />
             </button>
@@ -1372,7 +1372,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
               <div
                 role="status"
                 aria-label={backendOk === null ? "Checking backend" : backendOk ? "Backend connected" : "Backend offline"}
-                title={backendOk === null ? "Checking backend…" : backendOk ? "Backend connected" : "Backend offline — run: cd backend && .venv\\Scripts\\uvicorn main:app --port 7342"}
+                title={backendOk === null ? "Checking background service…" : backendOk ? "Background service connected" : "Background service unavailable — annotation saving, redaction, compression, and cropping require it"}
                 className={cn("w-2 h-2 rounded-full shrink-0 transition-colors",
                   backendOk === null ? "bg-stone-600" : backendOk ? "bg-green-500" : "bg-red-500 animate-pulse")}
               />
@@ -1575,7 +1575,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                     return (
                       <button key={m} onClick={() => setAnnotateSubMode(m)}
                         title={`${label} (${key})`}
-                        className={cn("flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition",
+                        className={cn("flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/60",
                           active ? "bg-brand-600 text-white" : "text-stone-400 hover:bg-stone-700 hover:text-stone-200")}>
                         {icon}
                         <span className="hidden sm:inline">{label}</span>
@@ -1597,7 +1597,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                     return (
                       <button key={m} onClick={() => setAnnotateSubMode(m)}
                         title={`${label} (${key})`}
-                        className={cn("flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition",
+                        className={cn("flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/60",
                           active ? "bg-brand-600 text-white" : "text-stone-400 hover:bg-stone-700 hover:text-stone-200")}>
                         {icon}
                         <span className="hidden sm:inline">{label}</span>
@@ -1615,7 +1615,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                     return (
                       <button onClick={() => setAnnotateSubMode("stamp")}
                         title="Stamp (P)"
-                        className={cn("flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition",
+                        className={cn("flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/60",
                           active ? "bg-brand-600 text-white" : "text-stone-400 hover:bg-stone-700 hover:text-stone-200")}>
                         <Stamp className="h-3.5 w-3.5" />
                         <span className="hidden sm:inline">Stamp</span>
@@ -1702,13 +1702,13 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                         onClick={() => undoAnnotationRef.current()}
                         disabled={undoStack.length === 0}
                         title={undoStack.length > 0 ? `Undo (Ctrl+Z) — ${undoStack.length} step${undoStack.length !== 1 ? "s" : ""} available` : "Nothing to undo (Ctrl+Z)"}
-                        className="text-[10px] text-stone-500 hover:text-stone-300 disabled:opacity-30 transition"
+                        className="text-[10px] text-stone-500 hover:text-stone-300 disabled:opacity-30 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-500/50 rounded"
                       >Undo</button>
                       {redoStack.length > 0 && (
                         <button
                           onClick={() => redoAnnotationRef.current()}
                           title={`Redo (Ctrl+Shift+Z) — ${redoStack.length} step${redoStack.length !== 1 ? "s" : ""}`}
-                          className="text-[10px] text-stone-500 hover:text-stone-300 transition"
+                          className="text-[10px] text-stone-500 hover:text-stone-300 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-500/50 rounded"
                         >Redo</button>
                       )}
                       {confirmClearAnnot ? (
@@ -1721,7 +1721,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                         </span>
                       ) : (
                         <button onClick={() => setConfirmClearAnnot(true)}
-                          className="text-[10px] text-stone-500 hover:text-stone-300 transition">Clear</button>
+                          className="text-[10px] text-stone-500 hover:text-stone-300 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-500/50 rounded">Clear</button>
                       )}
                     </>
                   )}
@@ -1736,7 +1736,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                     onClick={() => switchMode("view")}
                     disabled={autoSaving}
                     title="Save annotations and return to view mode (Esc)"
-                    className="flex items-center gap-1 rounded-md bg-stone-600 hover:bg-stone-500 border border-stone-500 px-2.5 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50 transition"
+                    className="flex items-center gap-1 rounded-md bg-stone-600 hover:bg-stone-500 border border-stone-500 px-2.5 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
                   >
                     <Check className="h-3 w-3" /> Done
                   </button>
@@ -1755,7 +1755,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                   {redactError && <span className="text-xs text-red-300 max-w-40 truncate" title={redactError}>{redactError}</span>}
                   {redactBoxes.length > 0 && (
                     <>
-                      <button onClick={() => setRedactBoxes([])} className="text-xs text-red-400 hover:text-red-300 transition">Clear all</button>
+                      <button onClick={() => setRedactBoxes([])} className="text-xs text-red-400 hover:text-red-300 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500/50 rounded">Clear all</button>
                       {confirmRedact ? (
                         <span className="flex items-center gap-1.5">
                           <span className="text-[10px] text-red-300">This is permanent.</span>
@@ -1796,7 +1796,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                 <div className="flex items-center gap-2 ml-auto">
                   {cropSelection && (
                     <>
-                      <button onClick={() => setCropSelection(null)} className="text-xs text-brand-400 hover:text-brand-300 transition">Clear</button>
+                      <button onClick={() => setCropSelection(null)} className="text-xs text-brand-400 hover:text-brand-300 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/50 rounded">Clear</button>
                       {confirmCrop ? (
                         <span className="flex items-center gap-1.5">
                           <span className="text-[10px] text-brand-300">Content outside the selection will be removed.</span>

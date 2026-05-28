@@ -703,7 +703,7 @@ export default function AnnotationLayer({
         style={{ minWidth: 180 }}
         onMouseDown={e => e.stopPropagation()}
       >
-        <div className="bg-yellow-50 border-2 border-yellow-400 rounded-xl shadow-xl p-2 w-52 space-y-1.5">
+        <div className="bg-stone-900 border border-brand-500/50 rounded-xl shadow-xl p-2 w-52 space-y-1.5">
           <textarea
             autoFocus rows={2} value={editText}
             onChange={e => setEditText(e.target.value)}
@@ -718,13 +718,13 @@ export default function AnnotationLayer({
             }}
             onBlur={() => { updateAnnot({ ...ann, text: editText.trim() } as LocalAnnot); setEditingId(null); }}
             placeholder="Add comment…"
-            className="w-full rounded border border-yellow-300 bg-white px-2 py-1 text-xs text-stone-800 resize-none focus:outline-none focus:ring-1 focus:ring-yellow-500"
+            className="w-full rounded border border-stone-600 bg-stone-800 px-2 py-1 text-xs text-stone-100 resize-none focus:outline-none focus:ring-1 focus:ring-brand-500/60 placeholder:text-stone-500"
           />
           <div className="flex gap-1">
             <button onClick={() => { updateAnnot({ ...ann, text: editText.trim() } as LocalAnnot); setEditingId(null); }}
-              className="flex-1 rounded bg-yellow-400 hover:bg-yellow-300 py-0.5 text-xs font-semibold text-stone-800 transition">Save</button>
+              className="flex-1 rounded bg-brand-500 hover:bg-brand-600 py-0.5 text-xs font-semibold text-white transition">Save</button>
             <button onClick={() => setEditingId(null)}
-              className="px-2 rounded bg-stone-200 hover:bg-stone-300 text-xs text-stone-600 transition">Cancel</button>
+              className="px-2 rounded bg-stone-700 hover:bg-stone-600 text-xs text-stone-300 transition">Cancel</button>
           </div>
         </div>
       </div>
@@ -736,10 +736,10 @@ export default function AnnotationLayer({
     const replies = ann.replies ?? [];
     if (replies.length === 0 && replyingId !== ann.id) return null;
     return (
-      <div className="mt-1.5 border-t border-yellow-200 pt-1.5 space-y-1" onMouseDown={e => e.stopPropagation()}>
+      <div className="mt-1.5 border-t border-stone-700 pt-1.5 space-y-1" onMouseDown={e => e.stopPropagation()}>
         {replies.map(r => (
-          <div key={r.id} className="text-[10px] text-stone-700">
-            <span className="font-semibold text-stone-600">{r.author}</span>
+          <div key={r.id} className="text-[10px] text-stone-400">
+            <span className="font-semibold text-stone-300">{r.author}</span>
             {": "}
             {r.text}
           </div>
@@ -754,13 +754,13 @@ export default function AnnotationLayer({
                 if (e.key === "Escape") { setReplyingId(null); setReplyText(""); }
               }}
               placeholder="Reply… (Enter to send)"
-              className="w-full rounded border border-yellow-300 bg-white px-1.5 py-1 text-[10px] text-stone-800 resize-none focus:outline-none"
+              className="w-full rounded border border-stone-600 bg-stone-800 px-1.5 py-1 text-[10px] text-stone-100 resize-none focus:outline-none focus:ring-1 focus:ring-brand-500/50 placeholder:text-stone-500"
             />
             <div className="flex gap-1">
               <button onClick={() => addReply(ann)}
-                className="flex-1 rounded bg-yellow-300 hover:bg-yellow-200 py-0.5 text-[10px] font-semibold text-stone-800 transition">Send</button>
+                className="flex-1 rounded bg-brand-500 hover:bg-brand-600 py-0.5 text-[10px] font-semibold text-white transition">Send</button>
               <button onClick={() => { setReplyingId(null); setReplyText(""); }}
-                className="px-2 rounded bg-stone-100 text-[10px] text-stone-600 transition">Cancel</button>
+                className="px-2 rounded bg-stone-700 text-[10px] text-stone-300 transition">Cancel</button>
             </div>
           </div>
         ) : (
@@ -1019,7 +1019,7 @@ export default function AnnotationLayer({
                     className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-40 pointer-events-auto"
                     onMouseDown={e => e.stopPropagation()}
                   >
-                    <div className="bg-yellow-50 border-2 border-yellow-400 rounded-xl shadow-xl p-3 w-56 space-y-2">
+                    <div className="bg-stone-900 border border-brand-500/50 rounded-xl shadow-xl p-3 w-56 space-y-2">
                       <textarea autoFocus rows={3} value={editText}
                         onChange={e => setEditText(e.target.value)}
                         onKeyDown={e => {
@@ -1028,21 +1028,21 @@ export default function AnnotationLayer({
                           if (e.key === "Escape") { e.preventDefault(); cancelEdit(); }
                         }}
                         placeholder="Type note… (Ctrl+Enter to save)"
-                        className="w-full rounded-lg border border-yellow-300 bg-white px-2 py-1.5 text-xs text-stone-800 resize-none focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                        className="w-full rounded-lg border border-stone-600 bg-stone-800 px-2 py-1.5 text-xs text-stone-100 resize-none focus:outline-none focus:ring-2 focus:ring-brand-500/60 placeholder:text-stone-500"
                       />
                       <input
                         value={editTagsStr}
                         onChange={e => setEditTagsStr(e.target.value)}
                         onKeyDown={e => { e.stopPropagation(); if (e.key === "Escape") { e.preventDefault(); cancelEdit(); } }}
                         placeholder="Tags: citation, question…"
-                        className="w-full rounded border border-yellow-200 bg-white px-2 py-1 text-[10px] text-stone-600 focus:outline-none focus:ring-1 focus:ring-yellow-400"
+                        className="w-full rounded border border-stone-600 bg-stone-800 px-2 py-1 text-[10px] text-stone-400 focus:outline-none focus:ring-1 focus:ring-brand-500/50 placeholder:text-stone-600"
                       />
                       <div className="flex gap-1.5 items-center">
                         <SnippetDropdown onInsert={text => setEditText(prev => prev + text)} />
                         <button onClick={() => commitEdit(ann.id)} disabled={!editText.trim()}
-                          className="flex-1 rounded bg-yellow-400 hover:bg-yellow-300 py-1 text-xs font-semibold text-stone-800 disabled:opacity-40 transition">Save</button>
+                          className="flex-1 rounded bg-brand-500 hover:bg-brand-600 py-1 text-xs font-semibold text-white disabled:opacity-40 transition">Save</button>
                         <button onClick={cancelEdit}
-                          className="px-2 rounded bg-stone-200 hover:bg-stone-300 text-xs text-stone-600 transition">Cancel</button>
+                          className="px-2 rounded bg-stone-700 hover:bg-stone-600 text-xs text-stone-300 transition">Cancel</button>
                       </div>
                     </div>
                   </div>
@@ -1130,10 +1130,10 @@ export default function AnnotationLayer({
                 ) : (
                   /* ── Unselected — hover-only preview ── */
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-30 pointer-events-none
-                    bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg px-2 py-1.5 text-xs text-stone-800 max-w-52 whitespace-pre-wrap"
+                    bg-stone-900 border border-brand-500/40 rounded-lg shadow-lg px-2 py-1.5 text-xs text-stone-200 max-w-52 whitespace-pre-wrap"
                   >
                     {ann.author && <div className="text-[9px] text-stone-500 mb-0.5 font-medium">{ann.author}</div>}
-                    {ann.text ? <MathText text={ann.text} /> : <span className="italic text-stone-400">double-click to edit</span>}
+                    {ann.text ? <MathText text={ann.text} /> : <span className="italic text-stone-500">double-click to edit</span>}
                     {tagsDisplay(ann.tags)}
                     {(ann.replies?.length ?? 0) > 0 && (
                       <div className="text-[9px] text-brand-500 mt-0.5">{ann.replies!.length} repl{ann.replies!.length > 1 ? "ies" : "y"}</div>
@@ -1192,8 +1192,8 @@ export default function AnnotationLayer({
                         </button>
                       </div>
                       {showReplies === ann.id && (
-                        <div className="bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg px-2 py-1.5 w-52">
-                          {ann.text && <p className="text-[10px] text-stone-700 mb-1">{ann.text}</p>}
+                        <div className="bg-stone-900 border border-brand-500/40 rounded-lg shadow-lg px-2 py-1.5 w-52">
+                          {ann.text && <p className="text-[10px] text-stone-400 mb-1">{ann.text}</p>}
                           {renderReplies(ann)}
                         </div>
                       )}
@@ -1245,7 +1245,7 @@ export default function AnnotationLayer({
                     onChange={e => setEditTagsStr(e.target.value)}
                     onKeyDown={e => { e.stopPropagation(); }}
                     placeholder="tags: citation, question…"
-                    className="w-full rounded border border-yellow-200 bg-white/70 px-1.5 py-0.5 text-[9px] text-stone-600 focus:outline-none"
+                    className="w-full rounded border border-stone-400/40 bg-white/60 px-1.5 py-0.5 text-[9px] text-stone-700 focus:outline-none focus:ring-1 focus:ring-brand-500/40"
                   />
                 </div>
               </div>
@@ -1440,19 +1440,19 @@ export default function AnnotationLayer({
               }}
             >
               <span className="text-xl leading-none select-none cursor-default">📌</span>
-              {/* Hover tooltip — same style as unselected interactive notes */}
+              {/* Hover tooltip — dark system, amber-bordered */}
               <div className={cn(
                 "absolute bottom-full left-1/2 -translate-x-1/2 mb-1",
                 "hidden group-hover:block z-30 pointer-events-none",
-                "bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg",
-                "px-2 py-1.5 text-xs text-stone-800 max-w-52 whitespace-pre-wrap",
+                "bg-stone-900 border border-brand-500/40 rounded-lg shadow-lg",
+                "px-2 py-1.5 text-xs text-stone-200 max-w-52 whitespace-pre-wrap",
               )}>
                 {ann.author && (
                   <div className="text-[9px] text-stone-500 mb-0.5 font-medium">{ann.author}</div>
                 )}
                 {ann.text
                   ? <MathText text={ann.text} />
-                  : <span className="italic text-stone-400">empty note</span>
+                  : <span className="italic text-stone-500">empty note</span>
                 }
                 {ann.tags && ann.tags.length > 0 && (
                   <div className="flex flex-wrap gap-0.5 mt-0.5">
