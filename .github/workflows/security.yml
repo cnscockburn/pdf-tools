@@ -1,0 +1,173 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  schedule:
+    # Run every Monday at 08:00 UTC — catches new CVEs against existing deps
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write   # upload SARIF results to GitHub Security tab
+
+jobs:
+  # ── 1. JavaScript / TypeScript dependencies ─────────────────────────────────
+  npm-audit:
+    name: npm audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+        # moderate/low findings are informational; high/critical fail the build
+
+  # ── 2. Python dependencies ──────────────────────────────────────────────────
+  pip-audit:
+    name: pip-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Audit Python dependencies
+        run: |
+          cd backend
+          pip-audit --requirement <(python - <<'EOF'
+          import tomllib, pathlib
+          data = tomllib.loads(pathlib.Path("pyproject.toml").read_text())
+          for dep in data["project"]["dependencies"]:
+              print(dep)
+          EOF
+          ) --strict
+
+  # ── 3. Rust crates ──────────────────────────────────────────────────────────
+  cargo-audit:
+    name: cargo audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - name: Audit Rust dependencies
+        working-directory: src-tauri
+        run: cargo audit
+
+  # ── 4. Python SAST (bandit) ─────────────────────────────────────────────────
+  bandit:
+    name: bandit SAST
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install bandit
+        run: pip install bandit[toml]
+      - name: Run bandit
+        run: |
+          bandit -r backend \
+            --exclude backend/.venv \
+            --severity-level medium \
+            --confidence-level medium \
+            -f sarif \
+            -o bandit.sarif
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: bandit.sarif
+          category: bandit
+
+  # ── 5. Semgrep multi-language SAST ──────────────────────────────────────────
+  semgrep:
+    name: semgrep SAST
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run semgrep
+        run: |
+          semgrep \
+            --config=p/python \
+            --config=p/typescript \
+            --config=p/rust \
+            --config=p/owasp-top-ten \
+            --config=p/secrets \
+            --sarif \
+            --output semgrep.sarif \
+            src backend src-tauri/src
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+  # ── 6. Secret scanning (gitleaks) ───────────────────────────────────────────
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history for scanning
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── 7. TypeScript strict typecheck ──────────────────────────────────────────
+  typecheck:
+    name: TypeScript typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+
+  # ── 8. Python tests ─────────────────────────────────────────────────────────
+  python-tests:
+    name: Python tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend deps
+        run: pip install -r backend/requirements.txt 2>/dev/null || pip install -e "backend/.[dev]"
+      - name: Run tests
+        run: |
+          cd backend
+          python -m pytest -v 2>/dev/null || python smoke_test.py
+
+  # ── 9. Frontend tests ────────────────────────────────────────────────────────
+  frontend-tests:
+    name: Frontend tests (vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run test:run

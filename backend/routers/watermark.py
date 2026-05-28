@@ -20,6 +20,8 @@ async def watermark_pdf(
     data, filename = payload
     if not text.strip():
         raise HTTPException(status_code=400, detail="Watermark text cannot be empty.")
+    if len(text) > 200:
+        raise HTTPException(status_code=400, detail="Watermark text too long (max 200 characters).")
 
     try:
         r, g, b = (float(v) for v in color.split(","))

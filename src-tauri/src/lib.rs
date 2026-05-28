@@ -1,4 +1,5 @@
 use std::net::TcpStream;
+use std::path::Path;
 use std::process::{Child, Command};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -50,28 +51,63 @@ fn sidecar_path() -> std::path::PathBuf {
     base.join(name)
 }
 
-/// Read a file from disk and return it as a Tauri response.
-/// Used by the frontend to load files passed via CLI args or file associations.
+/// Validate that a path is a safe, accessible PDF file.
+///
+/// Checks:
+///   1. Canonicalize to resolve `..` and symlinks.
+///   2. Extension must be `.pdf` (case-insensitive) on the canonical path.
+///   3. File must actually exist (canonicalize already confirms this).
+///
+/// Returns the canonical path string on success, or an error message.
+fn validate_pdf_path(path: &str) -> Result<std::path::PathBuf, String> {
+    let p = Path::new(path);
+
+    // canonicalize resolves `..`, symlinks, and verifies the file exists.
+    let canonical = p.canonicalize().map_err(|_| {
+        // Deliberately vague — don't leak whether the path exists.
+        "File not found or not accessible.".to_string()
+    })?;
+
+    // Extension check on the canonical path (prevents tricks like "foo.pdf/../secret").
+    let ext = canonical
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase());
+    if ext.as_deref() != Some("pdf") {
+        return Err("Only PDF files can be opened.".to_string());
+    }
+
+    Ok(canonical)
+}
+
+/// Read a PDF file from disk.
+///
+/// The path is validated before reading: canonicalized to prevent directory
+/// traversal attacks, and checked to ensure the extension is `.pdf`.
+/// Only existing, accessible PDF files can be read.
 #[tauri::command]
 fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
-    std::fs::read(&path).map_err(|e| format!("Failed to read {}: {}", path, e))
+    let canonical = validate_pdf_path(&path)?;
+    std::fs::read(&canonical).map_err(|_| "Failed to read file.".to_string())
 }
 
 /// Get the file path passed as a CLI argument (e.g. "Open with" from Explorer).
-/// Returns None if no file argument was provided.
+/// Returns None if no file argument was provided or if the path is invalid.
 #[tauri::command]
 fn get_cli_file_path() -> Option<String> {
     let args: Vec<String> = std::env::args().collect();
     // The first arg is the exe itself; the second (if any) is the file path.
     // Skip args that look like flags (start with - or /).
-    args.iter()
+    let raw = args.iter()
         .skip(1)
         .find(|a| !a.starts_with('-') && !a.starts_with('/'))
-        .filter(|a| {
-            let lower = a.to_lowercase();
-            lower.ends_with(".pdf")
-        })
-        .cloned()
+        .filter(|a| a.to_lowercase().ends_with(".pdf"))
+        .cloned()?;
+
+    // Validate before returning to the frontend.
+    validate_pdf_path(&raw)
+        .ok()
+        .map(|p| p.to_string_lossy().into_owned())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -97,12 +133,14 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             // When a second instance is launched, find the PDF path in its args
             // and emit an event so the frontend can open it in a new tab.
-            if let Some(path) = args.iter()
+            // validate_pdf_path is called here too so the emitted value is always canonical.
+            let raw = args.iter()
                 .skip(1)
                 .find(|a| !a.starts_with('-') && !a.starts_with('/'))
                 .filter(|a| a.to_lowercase().ends_with(".pdf"))
-            {
-                let _ = app.emit("open-file", path.clone());
+                .cloned();
+            if let Some(path) = raw.and_then(|p| validate_pdf_path(&p).ok()) {
+                let _ = app.emit("open-file", path.to_string_lossy().into_owned());
             }
             // Focus the existing window
             if let Some(w) = app.get_webview_window("main") {

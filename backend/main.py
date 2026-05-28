@@ -1,7 +1,7 @@
 import sys
 import os
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 # When bundled as a PyInstaller exe with console=False, sys.stdout/stderr
@@ -15,14 +15,43 @@ if getattr(sys, "frozen", False):
 
 from routers import annotate, compress, convert, crop, export, merge, pages, redact, security, split, watermark
 
-app = FastAPI(title="PDF Tools API", version="0.1.0")
+app = FastAPI(
+    title="PDF Tools API",
+    version="0.1.0",
+    # Don't expose the interactive docs in production builds.
+    docs_url=None if getattr(sys, "frozen", False) else "/docs",
+    redoc_url=None if getattr(sys, "frozen", False) else "/redoc",
+    openapi_url=None if getattr(sys, "frozen", False) else "/openapi.json",
+)
 
+# ── CORS ──────────────────────────────────────────────────────────────────────
+# The sidecar only binds to 127.0.0.1, so this list is the last line of defence
+# against cross-origin calls from other browser tabs.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:7342", "tauri://localhost"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=[
+        "http://localhost:5173",   # Vite dev server
+        "http://localhost:7342",   # direct API access in dev
+        "tauri://localhost",       # production Tauri WebView
+    ],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Accept"],
+    expose_headers=["Content-Disposition"],
 )
+
+
+# ── Security headers ──────────────────────────────────────────────────────────
+# Applied to every response from the sidecar.
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next) -> Response:
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    # The sidecar is localhost-only; HSTS would break dev, so we omit it.
+    return response
+
 
 app.include_router(merge.router, prefix="/api")
 app.include_router(split.router, prefix="/api")

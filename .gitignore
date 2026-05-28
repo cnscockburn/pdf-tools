@@ -34,3 +34,19 @@ backend/*.spec.bak
 
 # Stray nested repo artefact
 pdf-tools/
+
+# Security / audit outputs — these may contain paths or dependency details
+.security/reports/
+security-audit-*.json
+security-audit-*.txt
+
+# Test fixture PDFs and scratch test files — never commit real documents
+backend/_test_*.pdf
+backend/_test_*.py
+
+# SAST tool caches
+.semgrep/
+.bandit/
+bandit-report.*
+pip-audit-report.*
+
