@@ -190,3 +190,33 @@ export async function pdfToImages(file: File, dpi: number, fmt: "png" | "jpg"): 
   form.append("fmt", fmt);
   return handleResponse(await fetch(`${BASE}/to-images`, { method: "POST", body: form }));
 }
+
+// ── Form fields (5.3) ────────────────────────────────────────────────────────
+
+export interface FormField {
+  name: string;
+  type: "text" | "checkbox" | "radio" | "combobox" | "listbox" | "button" | "signature" | "unknown";
+  value: string;
+  page: number;
+  options: string[];
+}
+
+export async function getFormFields(file: File): Promise<FormField[]> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${BASE}/form-fields`, { method: "POST", body: form });
+  if (!res.ok) {
+    let msg = `Server error ${res.status}`;
+    try { msg = (await res.json()).detail ?? msg; } catch { /* ignore */ }
+    throw new Error(msg);
+  }
+  const data = await res.json();
+  return (data.fields ?? []) as FormField[];
+}
+
+export async function fillForm(file: File, values: Record<string, string>): Promise<Blob> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("values", JSON.stringify(values));
+  return handleResponse(await fetch(`${BASE}/fill-form`, { method: "POST", body: form }));
+}

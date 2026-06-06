@@ -493,6 +493,64 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
 
 
 # ---------------------------------------------------------------------------
+# Form fields (AcroForm)
+# ---------------------------------------------------------------------------
+
+def list_form_fields(file_bytes: bytes) -> list[dict]:
+    """
+    Enumerate fillable form fields. Returns one entry per widget:
+      {name, type, value, page, options}
+    type is a friendly string: "text" | "checkbox" | "radio" | "combobox" |
+    "listbox" | "button" | "signature" | "unknown".
+    """
+    doc = _open(file_bytes)
+    fields: list[dict] = []
+    type_map = {
+        fitz.PDF_WIDGET_TYPE_TEXT: "text",
+        fitz.PDF_WIDGET_TYPE_CHECKBOX: "checkbox",
+        fitz.PDF_WIDGET_TYPE_RADIOBUTTON: "radio",
+        fitz.PDF_WIDGET_TYPE_COMBOBOX: "combobox",
+        fitz.PDF_WIDGET_TYPE_LISTBOX: "listbox",
+        fitz.PDF_WIDGET_TYPE_SIGNATURE: "signature",
+        fitz.PDF_WIDGET_TYPE_BUTTON: "button",
+    }
+    for page in doc:
+        widgets = page.widgets() or []
+        for w in widgets:
+            kind = type_map.get(w.field_type, "unknown")
+            fields.append({
+                "name": w.field_name or "",
+                "type": kind,
+                "value": "" if w.field_value is None else str(w.field_value),
+                "page": page.number + 1,
+                "options": list(w.choice_values) if getattr(w, "choice_values", None) else [],
+            })
+    return fields
+
+
+def fill_form(file_bytes: bytes, values: dict) -> bytes:
+    """
+    Set form-field values. `values` maps field name → value (string; for
+    checkboxes use "true"/"false"). Unknown fields are ignored. Returns the
+    filled PDF bytes.
+    """
+    doc = _open(file_bytes)
+    for page in doc:
+        widgets = page.widgets() or []
+        for w in widgets:
+            name = w.field_name
+            if name not in values:
+                continue
+            raw = values[name]
+            if w.field_type == fitz.PDF_WIDGET_TYPE_CHECKBOX:
+                w.field_value = str(raw).lower() in ("true", "1", "yes", "on", "checked")
+            else:
+                w.field_value = str(raw)
+            w.update()
+    return _save(doc)
+
+
+# ---------------------------------------------------------------------------
 # PDF → Images
 # ---------------------------------------------------------------------------
 

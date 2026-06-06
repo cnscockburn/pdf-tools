@@ -1,17 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Loader2 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { downloadBlob, parsePageRanges } from "../lib/utils";
 import {
   compressPDF, watermarkPDF, encryptPDF, decryptPDF,
   pdfToImages, splitPDF, extractPages, rotatePages, deletePages,
+  getFormFields, fillForm, type FormField,
 } from "../api/client";
 import type { Snippet } from "../lib/storage";
 
 export type PanelTool =
   | "compress" | "watermark" | "split" | "extract"
   | "rotate-delete" | "security" | "pdf-to-images"
-  | "snippets"
+  | "snippets" | "form"
   | null;
 
 interface Props {
@@ -666,6 +667,97 @@ export default function RightPanel({
       {tool === "rotate-delete" && <RotateDeletePanel  file={file} pageCount={pageCount} onClose={onClose} onApplied={onApplied} />}
       {tool === "security"      && <SecurityPanel      file={file} onClose={onClose} onApplied={onApplied} />}
       {tool === "pdf-to-images" && <PdfToImagesPanel   file={file} onClose={onClose} />}
+      {tool === "form"          && <FormPanel          file={file} onClose={onClose} onApplied={onApplied} />}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Form filling (5.3)
+// ---------------------------------------------------------------------------
+function FormPanel({ file, onClose, onApplied }: { file: File; onClose: () => void; onApplied?: (blob: Blob) => void }) {
+  const [fields, setFields] = useState<FormField[] | null>(null);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getFormFields(file)
+      .then(fs => {
+        if (cancelled) return;
+        setFields(fs);
+        const init: Record<string, string> = {};
+        for (const f of fs) init[f.name] = f.value;
+        setValues(init);
+      })
+      .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : "Couldn't read form fields."); });
+    return () => { cancelled = true; };
+  }, [file]);
+
+  // Editable fields only (skip buttons / signatures).
+  const editable = (fields ?? []).filter(f => f.type !== "button" && f.type !== "signature");
+
+  async function run() {
+    setLoading(true); setError(null);
+    try {
+      const blob = await fillForm(file, values);
+      if (onApplied) onApplied(blob);
+      else downloadBlob(blob, `filled_${file.name}`);
+    } catch (e) { setError(e instanceof Error ? e.message : "Unknown error"); }
+    finally { setLoading(false); }
+  }
+
+  return (
+    <>
+      <PanelHeader title="Fill Form" onClose={onClose} />
+      <div className="flex-1 overflow-y-auto scrollbar-dark p-4 space-y-4">
+        {fields === null && !error && (
+          <p className="text-xs text-stone-500 flex items-center gap-2"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Reading form fields…</p>
+        )}
+        {fields !== null && editable.length === 0 && !error && (
+          <p className="text-xs text-stone-500">This PDF has no fillable form fields.</p>
+        )}
+        {editable.map((f, i) => (
+          <div key={`${f.name}_${i}`} className="space-y-1">
+            <label className="block text-[11px] font-medium text-stone-400 truncate" title={f.name}>
+              {f.name || <span className="italic">unnamed</span>}
+              <span className="ml-1 text-[9px] text-stone-600">· {f.type} · p.{f.page}</span>
+            </label>
+            {f.type === "checkbox" ? (
+              <button
+                type="button"
+                onClick={() => setValues(v => ({ ...v, [f.name]: (v[f.name]?.toLowerCase() === "true" ? "false" : "true") }))}
+                className={cn("px-2.5 py-1 rounded text-xs font-medium border transition",
+                  values[f.name]?.toLowerCase() === "true"
+                    ? "bg-brand-600 border-brand-500 text-white"
+                    : "bg-stone-800 border-stone-600 text-stone-300 hover:border-stone-500")}
+              >
+                {values[f.name]?.toLowerCase() === "true" ? "Checked" : "Unchecked"}
+              </button>
+            ) : f.options.length > 0 ? (
+              <select
+                value={values[f.name] ?? ""}
+                onChange={e => setValues(v => ({ ...v, [f.name]: e.target.value }))}
+                className="w-full bg-stone-800 border border-stone-600 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-brand-500"
+              >
+                <option value=""></option>
+                {f.options.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            ) : (
+              <input
+                value={values[f.name] ?? ""}
+                onChange={e => setValues(v => ({ ...v, [f.name]: e.target.value }))}
+                className="w-full bg-stone-800 border border-stone-600 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-stone-600 focus:outline-none focus:border-brand-500"
+              />
+            )}
+          </div>
+        ))}
+        <Err msg={error} />
+        {editable.length > 0 && (
+          <ProcessBtn onClick={run} loading={loading} disabled={false} label={onApplied ? "Apply to PDF" : "Fill & Download"} />
+        )}
+      </div>
+    </>
   );
 }

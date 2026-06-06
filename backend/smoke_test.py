@@ -218,6 +218,31 @@ except ValueError:
     check("decrypt with wrong password raises", True)
 
 
+# ── FORM FIELDS (fill, 5.3) ──────────────────────────────────────────────────
+print("\n== form fields ==")
+# Build a tiny PDF with one text widget.
+_fdoc = fitz.open()
+_fpage = _fdoc.new_page()
+_w = fitz.Widget()
+_w.field_name = "full_name"
+_w.field_type = fitz.PDF_WIDGET_TYPE_TEXT
+_w.rect = fitz.Rect(72, 72, 272, 96)
+_fpage.add_widget(_w)
+form_bytes = _fdoc.tobytes()
+_fdoc.close()
+
+found = pdf_engine.list_form_fields(form_bytes)
+check("list_form_fields finds the text field",
+      any(f["name"] == "full_name" and f["type"] == "text" for f in found),
+      f"got {found}")
+
+filled = pdf_engine.fill_form(form_bytes, {"full_name": "Ada Lovelace"})
+filled_fields = pdf_engine.list_form_fields(filled)
+check("fill_form sets the value",
+      any(f["name"] == "full_name" and f["value"] == "Ada Lovelace" for f in filled_fields),
+      f"got {filled_fields}")
+
+
 # ── PDF → IMAGES ─────────────────────────────────────────────────────────────
 print("\n== pdf_to_images ==")
 zip_bytes = pdf_engine.pdf_to_images(pdf_bytes, dpi=72, fmt="png")

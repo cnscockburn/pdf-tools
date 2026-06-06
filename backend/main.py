@@ -13,7 +13,7 @@ if getattr(sys, "frozen", False):
     if sys.stderr is None:
         sys.stderr = open(os.devnull, "w")
 
-from routers import annotate, compress, convert, crop, export, merge, pages, redact, security, split, watermark
+from routers import annotate, compress, convert, crop, export, forms, merge, pages, redact, security, split, watermark
 
 app = FastAPI(
     title="PDF Tools API",
@@ -64,6 +64,7 @@ app.include_router(redact.router, prefix="/api")
 app.include_router(annotate.router, prefix="/api")
 app.include_router(security.router, prefix="/api")
 app.include_router(export.router, prefix="/api")
+app.include_router(forms.router, prefix="/api")
 
 
 @app.get("/api/health")
