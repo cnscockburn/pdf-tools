@@ -87,12 +87,17 @@ interface Props {
   onStatusChange: (id: AnnotId, status: AnnotStatus) => void;
   onExportReport: () => void;
   onFocusAnnot?:  (id: AnnotId) => void;
+  /** Active annotation id — highlighted in the list (P1-11 / UX-11) */
+  focusAnnotId?:  AnnotId | null;
+  /** User-customised highlight colour labels, indexed by colorIdx (P1-15) */
+  colorLabels?:   string[];
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function AnnotationsListPanel({
   annotations, currentPage, onGoTo, onFocusAnnot, onDelete, onStatusChange, onExportReport,
+  focusAnnotId, colorLabels,
 }: Props) {
   const [filterStatus,  setFilterStatus]  = useState<FilterStatus>("all");
   const [filterTag,     setFilterTag]     = useState<string | null>(null);
@@ -190,10 +195,20 @@ export default function AnnotationsListPanel({
       onFocusAnnot?.(ann.id);
     }
 
+    const isFocused = focusAnnotId != null && ann.id === focusAnnotId;
+    // Highlights show their (possibly user-renamed) colour label instead of the
+    // generic "Highlight" (P1-15).
+    const label = ann.type === "highlight" && colorLabels?.[(ann as { colorIdx: number }).colorIdx]
+      ? colorLabels[(ann as { colorIdx: number }).colorIdx]
+      : typeLabel(ann.type);
+
     return (
       <div
         key={ann.id}
-        className="group flex items-start gap-2 px-3 py-2 hover:bg-stone-800 transition cursor-pointer"
+        className={cn(
+          "group flex items-start gap-2 px-3 py-2 transition cursor-pointer",
+          isFocused ? "bg-brand-500/15 ring-1 ring-inset ring-brand-500/40" : "hover:bg-stone-800",
+        )}
         onClick={handleRowClick}
       >
         {/* Type icon */}
@@ -202,7 +217,7 @@ export default function AnnotationsListPanel({
         {/* Content */}
         <div className="flex-1 min-w-0 space-y-0.5">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] font-medium text-stone-300">{typeLabel(ann.type)}</span>
+            <span className="text-[10px] font-medium text-stone-300">{label}</span>
             {(ann as { author?: string }).author && (
               <span className="text-[9px] text-stone-600">
                 · {(ann as { author?: string }).author}

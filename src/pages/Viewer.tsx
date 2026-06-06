@@ -317,6 +317,9 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   const workingBlobRef = useRef<Blob | null>(null);
   workingBlobRef.current = workingBlob;
 
+  // ── Stable ref to applyMarkup (used by the text-selection auto-apply path) ──
+  const applyMarkupRef = useRef<(type: "highlight" | "underline" | "strikethrough", rects: FracRect[], text: string) => void>(() => {});
+
   // ── Keyboard shortcut state ref ────────────────────────────────────────────
   const kbRef = useRef({
     currentPage: 1,
@@ -595,6 +598,17 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
         if (rects.length === 0) { setQuickBar(null); return; }
 
         const text = sel.toString();
+
+        // P1-09: if a markup tool is already chosen, apply it directly to the
+        // selection instead of popping the redundant H/U/S chooser bar.
+        const subMode = freeRectStateRef.current.annotateSubMode;
+        if (subMode === "highlight" || subMode === "underline" || subMode === "strikethrough") {
+          applyMarkupRef.current(subMode, rects, text);
+          window.getSelection()?.removeAllRanges();
+          setQuickBar(null);
+          return;
+        }
+
         // Position bar above the topmost rect, centred on its midpoint. Also pass
         // the bottommost edge so the bar can flip below the selection when there
         // isn't room above (near the top of the viewport / under the menu bar).
@@ -1044,29 +1058,26 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
 
   // ── QuickActionBar handlers ───────────────────────────────────────────────
 
-  function createAnnotFromSelection(type: "highlight" | "underline" | "strikethrough") {
-    if (!quickBar) return;
-    const { rects } = quickBar;
+  /** Create a markup annotation from selection rects. Shared by the
+   *  QuickActionBar buttons and the auto-apply path (P1-09). Goes through
+   *  changeAnnotations so it lands on the undo stack. */
+  function applyMarkup(type: "highlight" | "underline" | "strikethrough", rects: FracRect[], _text: string) {
     const bb = boundingBox(rects);
     const id = newId();
     const base = { id, page: currentPage, author: settings.author || undefined };
-    if (type === "highlight") {
-      setAnnotations(prev => [...prev, {
-        ...base, type: "highlight",
-        x0: bb.x0, y0: bb.y0, x1: bb.x1, y1: bb.y1,
-        rects, colorIdx: hlColor, color: effectiveHlColors[hlColor].rgb,
-      }]);
-    } else {
-      setAnnotations(prev => [...prev, {
-        ...base, type,
-        x0: bb.x0, y0: bb.y0, x1: bb.x1, y1: bb.y1,
-        rects,
-      }]);
-    }
+    const ann: LocalAnnot = type === "highlight"
+      ? { ...base, type: "highlight", x0: bb.x0, y0: bb.y0, x1: bb.x1, y1: bb.y1, rects, colorIdx: hlColor, color: effectiveHlColors[hlColor].rgb }
+      : { ...base, type, x0: bb.x0, y0: bb.y0, x1: bb.x1, y1: bb.y1, rects };
+    changeAnnotations([...annotationsRef.current, ann]);
     window.getSelection()?.removeAllRanges();
     setQuickBar(null);
-    // Make sure we're in annotate mode
     if (canvasMode !== "annotate") doSwitchMode("annotate");
+  }
+  applyMarkupRef.current = applyMarkup;
+
+  function createAnnotFromSelection(type: "highlight" | "underline" | "strikethrough") {
+    if (!quickBar) return;
+    applyMarkup(type, quickBar.rects, quickBar.text);
   }
 
   function addNoteAtSelection() {
@@ -2075,6 +2086,8 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
             onDeleteAnnot={deleteAnnot}
             onStatusChange={changeAnnotStatus}
             onExportReport={() => downloadAnnotationReport([...bakedAnnotations, ...annotations], filename)}
+            focusAnnotId={focusAnnotId}
+            colorLabels={settings.colorLabels}
             pdf={pdf}
             bookmarks={bookmarks}
             onAddBookmark={() => addBookmark(currentPage)}

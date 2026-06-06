@@ -322,6 +322,11 @@ export default function AnnotationLayer({
   const [editingId,   setEditingId]   = useState<AnnotId | null>(null);
   const [editText,    setEditText]    = useState("");
   const [editTagsStr, setEditTagsStr] = useState(""); // comma-separated tags during edit
+  // Pending note: a note that has been placed but not yet committed. It is NOT
+  // in the annotations array, so an accidental click that's dismissed without
+  // text leaves nothing behind (P1-06), and committing it with text is a single
+  // undo step (P1-07). page is always the current `page`.
+  const [pendingNote, setPendingNote] = useState<{ x: number; y: number } | null>(null);
   const [replyingId,  setReplyingId]  = useState<AnnotId | null>(null);
   const [replyText,   setReplyText]   = useState("");
   const [showReplies, setShowReplies] = useState<AnnotId | null>(null);
@@ -351,18 +356,32 @@ export default function AnnotationLayer({
   // Sync selection to parent
   useEffect(() => { onSelectedChange?.(selectedId); }, [selectedId]); // eslint-disable-line
 
+  // Switching tool (or entering a text-selection mode) clears any current
+  // selection so selection-bound popups — e.g. the highlight colour picker —
+  // don't linger after you move on (P1-08). Also discard a pending note.
+  useEffect(() => {
+    setSelectedId(null);
+    setSelectedIds(new Set());
+    setShowReplies(null);
+    setEditingId(null);
+    setPendingNote(null);
+  }, [createMode, textSelectActive]); // eslint-disable-line
+
   // Keyboard: delete / escape
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
       if ((e.key === "Delete" || e.key === "Backspace") && !editingId) {
-        if (selectedIds.size > 1) {
+        // Full selection = the multi-select set plus any single-selected item.
+        const ids = new Set(selectedIds);
+        if (selectedId) ids.add(selectedId);
+        if (ids.size > 1) {
           e.preventDefault();
-          const ids = new Set(selectedIds);
           onAnnotationsChange(annotations.filter(a => !ids.has(a.id)));
           setSelectedIds(new Set());
           setSelectedId(null);
+          onSelectedChange?.(null);
           return;
         }
         if (selectedId) {
@@ -421,6 +440,32 @@ export default function AnnotationLayer({
     if (editText.trim()) updateAnnot({ ...ann, text: editText.trim(), tags: tags.length ? tags : undefined } as LocalAnnot);
     else deleteAnnot(id);
     setEditingId(null);
+  }
+
+  // ── Pending-note lifecycle (P1-06 / P1-07) ────────────────────────────────
+  // Commit if the user typed something; otherwise silently discard. Either way
+  // clears the pending state. Committing adds the note in a single undo step.
+  function commitOrCancelPendingNote() {
+    if (!pendingNote) return;
+    const text = editText.trim();
+    if (text) {
+      const tags = editTagsStr.split(",").map(t => t.trim()).filter(Boolean);
+      const id = newId();
+      addAnnot({
+        id, type: "note", page,
+        x: pendingNote.x, y: pendingNote.y,
+        text, ...(tags.length ? { tags } : {}),
+        author: author || undefined,
+      });
+      setSelectedId(id); onSelectedChange?.(id);
+    }
+    setPendingNote(null);
+    setEditText(""); setEditTagsStr("");
+  }
+
+  function cancelPendingNote() {
+    setPendingNote(null);
+    setEditText(""); setEditTagsStr("");
   }
 
   function cancelEdit() { setEditingId(null); }
@@ -583,9 +628,12 @@ export default function AnnotationLayer({
     if (dragRef.current) return;
     if (createMode === "note") {
       const pt = getContainerFrac(e);
-      const id = newId();
-      addAnnot({ id, type: "note", page, x: pt.x, y: pt.y, text: "", author: author || undefined });
-      setEditingId(id); setEditText(""); setSelectedId(id); onSelectedChange?.(id);
+      // Commit/cancel any in-flight pending note before starting a new one.
+      commitOrCancelPendingNote();
+      setPendingNote({ x: pt.x, y: pt.y });
+      setEditText(""); setEditTagsStr("");
+      setSelectedId(null); onSelectedChange?.(null);
+      setEditingId(null);
     }
     if (createMode === "stamp") {
       const pt = getContainerFrac(e);
@@ -612,10 +660,14 @@ export default function AnnotationLayer({
     if (editingId === ann.id) return;
     e.preventDefault(); e.stopPropagation();
 
-    // Shift+click: multi-select toggle
+    // Shift+click: multi-select toggle. Seed the set with the currently
+    // single-selected annotation so the FIRST item (held in selectedId, not yet
+    // in selectedIds) joins the multi-selection — otherwise it survives a bulk
+    // delete and the bulk bar under-counts (P1-13 / P1-14).
     if (e.shiftKey) {
       setSelectedIds(prev => {
         const next = new Set(prev);
+        if (selectedId && !next.has(selectedId)) next.add(selectedId);
         next.has(ann.id) ? next.delete(ann.id) : next.add(ann.id);
         return next;
       });
@@ -1231,11 +1283,14 @@ export default function AnnotationLayer({
             onDoubleClick={e => onAnnotDblClick(e, ann)}
           >
             {editing ? (
-              <div className="w-full h-full flex flex-col" onMouseDown={e => e.stopPropagation()}>
+              <div className="w-full h-full flex flex-col" onMouseDown={e => e.stopPropagation()}
+                // Commit only when focus leaves the whole editor — moving to the
+                // tag input must not dismiss it (P1-16).
+                onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) commitEdit(ann.id); }}
+              >
                 <textarea autoFocus value={editText}
                   onChange={e => setEditText(e.target.value)}
                   onKeyDown={e => { e.stopPropagation(); if (e.key === "Escape") commitEdit(ann.id); }}
-                  onBlur={() => commitEdit(ann.id)}
                   className="flex-1 bg-transparent border-none px-1.5 py-1 text-xs text-stone-800 resize-none focus:outline-none"
                   style={{ lineHeight: 1.4 }}
                 />
@@ -1351,6 +1406,56 @@ export default function AnnotationLayer({
 
         return null;
       })}
+
+      {/* ── Pending note (placed, not yet committed) ──────────────────────────
+           Lives outside the annotations array so dismissing without text leaves
+           nothing behind (P1-06) and committing is one undo step (P1-07). ── */}
+      {pendingNote && (
+        <div
+          data-annot="true"
+          className="absolute pointer-events-auto"
+          style={{ left: `${pendingNote.x * 100}%`, top: `${pendingNote.y * 100}%`, transform: "translate(-50%,-100%)", zIndex: 40 }}
+          onMouseDown={e => e.stopPropagation()}
+        >
+          <div className="relative">
+            <span className="text-xl leading-none">📌</span>
+            <div
+              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-40 pointer-events-auto"
+              onMouseDown={e => e.stopPropagation()}
+              // Commit/cancel only when focus leaves the whole popup — moving
+              // between the textarea, tag input and buttons must not dismiss it.
+              onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) commitOrCancelPendingNote(); }}
+            >
+              <div className="bg-stone-900 border border-brand-500/50 rounded-xl shadow-xl p-3 w-56 space-y-2">
+                <textarea autoFocus rows={3} value={editText}
+                  onChange={e => setEditText(e.target.value)}
+                  onKeyDown={e => {
+                    e.stopPropagation();
+                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commitOrCancelPendingNote(); }
+                    if (e.key === "Escape") { e.preventDefault(); cancelPendingNote(); }
+                  }}
+                  placeholder="Type note… (Ctrl+Enter to save)"
+                  className="w-full rounded-lg border border-stone-600 bg-stone-800 px-2 py-1.5 text-xs text-stone-100 resize-none focus:outline-none focus:ring-2 focus:ring-brand-500/60 placeholder:text-stone-500"
+                />
+                <input
+                  value={editTagsStr}
+                  onChange={e => setEditTagsStr(e.target.value)}
+                  onKeyDown={e => { e.stopPropagation(); if (e.key === "Escape") { e.preventDefault(); cancelPendingNote(); } }}
+                  placeholder="Tags: citation, question…"
+                  className="w-full rounded border border-stone-600 bg-stone-800 px-2 py-1 text-[10px] text-stone-400 focus:outline-none focus:ring-1 focus:ring-brand-500/50 placeholder:text-stone-600"
+                />
+                <div className="flex gap-1.5 items-center">
+                  <SnippetDropdown onInsert={text => setEditText(prev => prev + text)} />
+                  <button onClick={commitOrCancelPendingNote} disabled={!editText.trim()}
+                    className="flex-1 rounded bg-brand-500 hover:bg-brand-600 py-1 text-xs font-semibold text-white disabled:opacity-40 transition">Save</button>
+                  <button onClick={cancelPendingNote}
+                    className="px-2 rounded bg-stone-700 hover:bg-stone-600 text-xs text-stone-300 transition">Cancel</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Read-only baked annotations ────────────────────────────────────────
            These are annotations already committed to the PDF blob. They show
@@ -1593,6 +1698,21 @@ export default function AnnotationLayer({
                 const pts = arrowheadPoints(live.x0, live.y0, live.x1, live.y1, inkStrokeWidth);
                 return pts ? <polygon points={pts} fill={dragColor} vectorEffect="non-scaling-stroke" opacity={0.6} /> : null;
               })()}
+            </svg>
+          );
+        }
+        // Ellipse: preview as an actual ellipse, not a bounding rectangle (P1-17).
+        if (createMode === "shape" && shapeSubType === "ellipse") {
+          if (live.x1 - live.x0 <= 0.002 && live.y1 - live.y0 <= 0.002) return null;
+          const cx = (live.x0 + live.x1) / 2, cy = (live.y0 + live.y1) / 2;
+          const rx = Math.abs(live.x1 - live.x0) / 2, ry = Math.abs(live.y1 - live.y0) / 2;
+          return (
+            <svg className="absolute inset-0 pointer-events-none"
+              viewBox="0 0 1 1" preserveAspectRatio="none"
+              style={{ zIndex: 20, width: "100%", height: "100%" }}>
+              <ellipse cx={cx} cy={cy} rx={rx} ry={ry}
+                fill={dragBg} stroke={dragColor} strokeWidth={2} strokeDasharray="6,4"
+                vectorEffect="non-scaling-stroke" />
             </svg>
           );
         }

@@ -35,6 +35,8 @@ interface Props {
   onDeleteAnnot: (id: AnnotId) => void;
   onStatusChange: (id: AnnotId, status: AnnotStatus) => void;
   onExportReport: () => void;
+  focusAnnotId?: AnnotId | null;
+  colorLabels?: string[];
   // Outline
   pdf: PDFDocumentProxy | null;
   // Bookmarks
@@ -55,6 +57,7 @@ const TABS: { id: RailTab; label: string; Icon: React.ComponentType<{ className?
 
 export default function RightRail({
   annotations, currentPage, onGoToPage, onFocusAnnot, onDeleteAnnot, onStatusChange, onExportReport,
+  focusAnnotId, colorLabels,
   pdf, bookmarks, onAddBookmark, onDeleteBookmark, onRenameBookmark,
   activeTab: controlledTab, onTabChange,
 }: Props) {
@@ -118,6 +121,8 @@ export default function RightRail({
             onDelete={onDeleteAnnot}
             onStatusChange={onStatusChange}
             onExportReport={onExportReport}
+            focusAnnotId={focusAnnotId}
+            colorLabels={colorLabels}
           />
         )}
 
