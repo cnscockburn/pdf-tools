@@ -32,6 +32,7 @@ import { useSettingsContext } from "../lib/settingsContext";
 import { downloadAnnotationReport } from "../lib/annotationReport";
 import { subscribe, publish } from "../lib/mirrorSync";
 import { pickPdfFiles } from "../lib/fileIntake";
+import { useHelpMode, helpForMode } from "../lib/helpMode";
 
 type CanvasMode = "view" | "annotate" | "redact" | "crop";
 
@@ -148,6 +149,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   );
   const [panelTool, setPanelTool] = useState<PanelTool>(null);
   const [railTab, setRailTab] = useState<RailTab>("annotations");
+  const [helpMode, setHelpModeState] = useHelpMode();
 
   // ── Canvas modes ───────────────────────────────────────────────────────────
   const [canvasMode, setCanvasMode]           = useState<CanvasMode>("view");
@@ -1700,6 +1702,20 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
             </div>
           )}
 
+          {/* Help mode — contextual explanation of the current tool (6.4) */}
+          {helpMode && (() => {
+            const h = helpForMode(canvasMode, annotateSubMode);
+            return (
+              <div className="shrink-0 flex items-start gap-2 px-4 py-1.5 bg-brand-950/40 border-b border-brand-500/30 text-[11px] text-stone-300">
+                <HelpCircle className="h-3.5 w-3.5 shrink-0 text-brand-500 mt-px" />
+                <span><span className="font-semibold text-brand-300">{h.title}:</span> {h.body}</span>
+                <button onClick={() => setHelpModeState(false)} className="ml-auto shrink-0 text-stone-500 hover:text-stone-300 transition" aria-label="Turn off help">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            );
+          })()}
+
           {/* Canvas scroll area */}
           <div ref={canvasAreaRef} className="flex-1 overflow-auto scrollbar-dark flex flex-col items-center py-8 px-4">
 
@@ -2273,6 +2289,16 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                 className="flex items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-stone-700 transition text-stone-500 hover:text-stone-300">
                 <Command className="h-3.5 w-3.5" />
                 <kbd className="rounded border border-stone-600 bg-stone-800 px-1 py-0 text-[9px] font-mono leading-4 text-stone-500">Ctrl+K</kbd>
+              </button>
+
+              {/* Help mode toggle (6.4) */}
+              <button onClick={() => setHelpModeState(!helpMode)}
+                title={helpMode ? "Turn off help hints" : "Show help hints"}
+                aria-pressed={helpMode}
+                className={cn("flex items-center gap-1 rounded-lg px-2 py-1.5 transition",
+                  helpMode ? "bg-brand-600 text-white" : "text-stone-500 hover:text-stone-300 hover:bg-stone-700")}>
+                <HelpCircle className="h-3.5 w-3.5" />
+                <span className="text-[10px] font-medium">Help</span>
               </button>
 
               {/* Keyboard cheat sheet */}
