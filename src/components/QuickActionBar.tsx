@@ -9,14 +9,20 @@ import type { ReactNode } from "react";
 interface Props {
   /** Horizontal centre of the bar in viewport px */
   x: number;
-  /** Top of the bar anchor — bar appears above this y */
+  /** Top of the selection in viewport px — bar prefers to sit above this */
   y: number;
+  /** Bottom of the selection in viewport px — bar flips here when no room above */
+  yBottom: number;
   onHighlight:     () => void;
   onUnderline:     () => void;
   onStrikethrough: () => void;
   onComment:       () => void;
   onCopy:          () => void;
 }
+
+/** Keep the bar inside the viewport, below the top chrome. */
+const TOP_CHROME_PX = 56; // top bar (~36) + menu bar; keep the bar clear of it
+const EDGE_PAD = 8;
 
 function Btn({ icon, label, k, onClick }: {
   icon: ReactNode; label: string; k?: string; onClick: () => void;
@@ -38,18 +44,31 @@ function Btn({ icon, label, k, onClick }: {
   );
 }
 
-export default function QuickActionBar({ x, y, onHighlight, onUnderline, onStrikethrough, onComment, onCopy }: Props) {
+export default function QuickActionBar({ x, y, yBottom, onHighlight, onUnderline, onStrikethrough, onComment, onCopy }: Props) {
   const barRef = useRef<HTMLDivElement>(null);
-  const [barH, setBarH] = useState(68);
+  const [size, setSize] = useState({ h: 68, w: 240 });
   useEffect(() => {
-    if (barRef.current) setBarH(barRef.current.offsetHeight + 8);
+    if (barRef.current) {
+      setSize({ h: barRef.current.offsetHeight, w: barRef.current.offsetWidth });
+    }
   }, []);
+
+  // Prefer above the selection. If that would collide with the top chrome, flip
+  // to below. Never overlap the selection itself (gap of EDGE_PAD on both paths).
+  const aboveTop = y - size.h - EDGE_PAD;
+  const placeBelow = aboveTop < TOP_CHROME_PX;
+  const top = placeBelow ? yBottom + EDGE_PAD : aboveTop;
+
+  // Clamp horizontally so the (centre-anchored) bar stays fully on screen.
+  const half = size.w / 2;
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1280;
+  const left = Math.min(vw - half - EDGE_PAD, Math.max(half + EDGE_PAD, x));
 
   return (
     <div
       ref={barRef}
       className="fixed z-50 flex items-center gap-0.5 bg-stone-900 border border-stone-700 rounded-xl shadow-2xl px-1.5 py-1"
-      style={{ left: x, top: y - barH, transform: "translateX(-50%)" }}
+      style={{ left, top, transform: "translateX(-50%)" }}
       onMouseDown={e => e.stopPropagation()}
       onPointerDown={e => e.stopPropagation()}
     >

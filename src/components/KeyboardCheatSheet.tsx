@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import { useFocusTrap } from "../lib/useFocusTrap";
 
 type Entry = { key: string; desc: string } | { section: string };
 
@@ -62,6 +63,7 @@ const SHORTCUTS: Entry[] = [
 interface Props { onClose: () => void }
 
 export default function KeyboardCheatSheet({ onClose }: Props) {
+  const trapRef = useFocusTrap<HTMLDivElement>(true);
   return (
     <div
       role="dialog"
@@ -70,7 +72,7 @@ export default function KeyboardCheatSheet({ onClose }: Props) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-stone-900 border border-stone-700 rounded-2xl shadow-2xl w-[460px] max-w-[90vw] max-h-[80vh] overflow-hidden flex flex-col">
+      <div ref={trapRef} className="bg-stone-900 border border-stone-700 rounded-2xl shadow-2xl w-[460px] max-w-[90vw] max-h-[80vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-stone-700 shrink-0">
           <span className="text-sm font-semibold text-white tracking-tight">Keyboard shortcuts</span>

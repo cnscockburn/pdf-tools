@@ -8,7 +8,7 @@ import {
   MessageSquare, EyeOff, Crop,
   Stamp, Loader2, Highlighter, Type, Pencil, Check, X, Download,
   Underline, Strikethrough, Search, HelpCircle, User,
-  PenLine, Square, Command, Settings as SettingsIcon, Columns,
+  PenLine, Square, Command, Columns,
 } from "lucide-react";
 import { cn, downloadBlob } from "../lib/utils";
 import ThumbnailSidebar from "../components/ThumbnailSidebar";
@@ -212,7 +212,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   // ── Text selection / QuickActionBar ───────────────────────────────────────
   const [textSelectActive, setTextSelectActive] = useState(false);
   const [quickBar, setQuickBar] = useState<{
-    rects: FracRect[]; text: string; barX: number; barY: number;
+    rects: FracRect[]; text: string; barX: number; barY: number; barYBottom: number;
   } | null>(null);
 
   // ── Search ─────────────────────────────────────────────────────────────────
@@ -292,6 +292,10 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
 
   // ── Stable ref for mode switch ─────────────────────────────────────────────
   const switchModeRef = useRef<(m: CanvasMode) => void>(() => {});
+
+  // ── Stable ref for opening settings (used by the Ctrl+, keyboard shortcut) ──
+  const openSettingsRef = useRef<() => void>(() => {});
+  openSettingsRef.current = openSettings;
 
   // ── Keyboard shortcut state ref ────────────────────────────────────────────
   const kbRef = useRef({
@@ -571,13 +575,17 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
         if (rects.length === 0) { setQuickBar(null); return; }
 
         const text = sel.toString();
-        // Position bar above the topmost rect, centred on its midpoint
+        // Position bar above the topmost rect, centred on its midpoint. Also pass
+        // the bottommost edge so the bar can flip below the selection when there
+        // isn't room above (near the top of the viewport / under the menu bar).
         const topRect = clientRects.reduce((t, r) => r.top < t.top ? r : t, clientRects[0]);
+        const bottomRect = clientRects.reduce((b, r) => r.bottom > b.bottom ? r : b, clientRects[0]);
         setQuickBar({
           rects,
           text,
           barX: topRect.left + topRect.width / 2,
           barY: topRect.top,
+          barYBottom: bottomRect.bottom,
         });
       }, 10);
     }
@@ -696,6 +704,11 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
         if (((e.key === "p" || e.key === "P") && e.shiftKey) || e.key === "k" || e.key === "K") {
           e.preventDefault();
           setPaletteOpen(v => !v);
+          return;
+        }
+        if (e.key === ",") {
+          e.preventDefault();
+          openSettingsRef.current();
           return;
         }
         if (e.key === "s" || e.key === "S") {
@@ -1131,15 +1144,16 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   }
 
   // ── Current-page search rects ──────────────────────────────────────────────
+  // Each rect is tagged `active` when it belongs to the currently-focused match
+  // (searchResults[searchIdx]), so the active match is visually distinct from the
+  // other matches on the same page — regardless of its position on the page.
   const pageSearchRects = useMemo(() => {
-    if (!searchQuery) return [];
+    if (!searchQuery) return [] as Array<{ x0: number; y0: number; x1: number; y1: number; active: boolean }>;
     return searchResults
-      .filter(r => r.page === currentPage)
-      .flatMap(r => r.rects);
-  }, [searchResults, currentPage, searchQuery]);
-
-  const currentSearchResult = searchResults[searchIdx];
-  const currentSearchIsOnPage = currentSearchResult?.page === currentPage;
+      .map((r, idx) => ({ r, active: idx === searchIdx }))
+      .filter(({ r }) => r.page === currentPage)
+      .flatMap(({ r, active }) => r.rects.map(rect => ({ ...rect, active })));
+  }, [searchResults, currentPage, searchQuery, searchIdx]);
 
   // ── Derived display values ─────────────────────────────────────────────────
   const pageRedactBoxes = redactBoxes.filter(b => b.page === currentPage);
@@ -1216,6 +1230,8 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           { label: "Save / Download",      shortcut: "Ctrl+S",       action: () => { if (workingBlob) downloadBlob(workingBlob, filename); }, disabled: !hasBlob },
           { type: "separator" },
           { label: "Export Review Report", action: () => downloadAnnotationReport([...bakedAnnotations, ...annotations], filename), disabled: bakedAnnotations.length === 0 && annotations.length === 0 },
+          { type: "separator" },
+          { label: "Settings…",            shortcut: "Ctrl+,", action: () => openSettings() },
         ],
       },
       {
@@ -1259,9 +1275,9 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           { label: "Table of Contents",  action: () => setRailTab("outline"),       disabled: !hasDoc },
           { label: "Bookmarks",          action: () => setRailTab("bookmarks"),     disabled: !hasDoc },
           { type: "separator" },
-          { label: "Side by Side — Same Document", shortcut: "Ctrl+\\",  action: () => openSideBySide("horizontal", "mirror", workingFile ?? file), disabled: !hasDoc },
-          { label: "Side by Side — New Document",                        action: () => openSideBySide("horizontal", "new") },
-          ...(isSideBySide ? [{ label: "Close Side by Side",             action: () => closeSideBySide() }] : []),
+          { label: "Side by Side — Same Document",                       action: () => openSideBySide("horizontal", "mirror", workingFile ?? file), disabled: !hasDoc },
+          { label: "Side by Side — New Document",   shortcut: "Ctrl+\\",  action: () => openSideBySide("horizontal", "new") },
+          ...(isSideBySide ? [{ label: "Close Side by Side",  shortcut: "Ctrl+\\", action: () => closeSideBySide() }] : []),
         ],
       },
     ];
@@ -1345,16 +1361,8 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
             )
           )}
 
-          {/* Settings — primary pane only */}
-          {!isSecondaryPane && (
-            <button
-              onClick={() => openSettings()}
-              title="Preferences"
-              className="flex items-center gap-1 rounded-lg p-1.5 text-stone-500 hover:text-stone-300 hover:bg-stone-700 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/50"
-            >
-              <SettingsIcon className="h-3.5 w-3.5" />
-            </button>
-          )}
+          {/* Settings is reached via the File menu (Settings…), the tab-bar gear,
+              or Ctrl+, — no separate gear here to avoid a duplicate entry point. */}
 
           {/* Author badge — primary pane only */}
           {!isSecondaryPane && (
@@ -1512,9 +1520,10 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                     <div key={i} className="absolute" style={{
                       left: `${r.x0 * 100}%`, top: `${r.y0 * 100}%`,
                       width: `${(r.x1 - r.x0) * 100}%`, height: `${(r.y1 - r.y0) * 100}%`,
-                      backgroundColor: currentSearchIsOnPage && i === 0
-                        ? "rgba(255,120,0,0.45)"
-                        : "rgba(255,200,0,0.35)",
+                      backgroundColor: r.active
+                        ? "rgba(255,120,0,0.45)"   // active match — warm amber
+                        : "rgba(255,200,0,0.35)",  // other matches — warm yellow
+                      outline: r.active ? "1.5px solid rgba(217,119,6,0.9)" : "none",
                       borderRadius: 2,
                     }} />
                   ))}
@@ -1948,7 +1957,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                     if (e.key === "Enter") commitPageInput();
                     if (e.key === "Escape") { setEditingPage(false); setPageInput(String(currentPage)); }
                   }}
-                  className="w-12 rounded bg-stone-700 border border-stone-600 text-center text-xs text-white py-0.5 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  className="no-spinner w-12 rounded bg-stone-700 border border-stone-600 text-center text-xs text-white py-0.5 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 />
               ) : (
                 <button onClick={() => { setEditingPage(true); setPageInput(String(currentPage)); }}
@@ -1978,10 +1987,10 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
               <div className="w-px h-5 bg-stone-700 mx-0.5" />
 
               {/* Command palette */}
-              <button onClick={() => setPaletteOpen(true)} title="Command palette (Ctrl+Shift+P)"
+              <button onClick={() => setPaletteOpen(true)} title="Command palette (Ctrl+K)"
                 className="flex items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-stone-700 transition text-stone-500 hover:text-stone-300">
                 <Command className="h-3.5 w-3.5" />
-                <kbd className="rounded border border-stone-600 bg-stone-800 px-1 py-0 text-[9px] font-mono leading-4 text-stone-500">⌘P</kbd>
+                <kbd className="rounded border border-stone-600 bg-stone-800 px-1 py-0 text-[9px] font-mono leading-4 text-stone-500">Ctrl+K</kbd>
               </button>
 
               {/* Keyboard cheat sheet */}
@@ -2038,6 +2047,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           <QuickActionBar
             x={quickBar.barX}
             y={quickBar.barY}
+            yBottom={quickBar.barYBottom}
             onHighlight={() => createAnnotFromSelection("highlight")}
             onUnderline={() => createAnnotFromSelection("underline")}
             onStrikethrough={() => createAnnotFromSelection("strikethrough")}

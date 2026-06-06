@@ -47,33 +47,50 @@ function OutlineNode({ node, pdf, depth, onGoTo, currentPage }: NodeProps) {
   const [open, setOpen] = useState(depth < 1);
   const hasChildren = node.items && node.items.length > 0;
 
-  async function handleClick() {
+  // Navigation only — clicking the row jumps to the section. It does NOT toggle
+  // the children (that would collapse a heading the first time you navigate to
+  // it). Expand/collapse is driven solely by the chevron below.
+  async function handleNavigate() {
     const idx = await resolvePageIndex(pdf, node.dest);
     if (idx !== null) onGoTo(idx + 1);
-    if (hasChildren) setOpen(v => !v);
+  }
+
+  function handleToggle(e: React.MouseEvent) {
+    e.stopPropagation();
+    setOpen(v => !v);
   }
 
   return (
     <div>
-      <button
-        onClick={handleClick}
-        className="w-full flex items-center gap-1.5 py-2 pr-3 text-left hover:bg-stone-800 transition group"
+      <div
+        className="w-full flex items-center gap-1.5 pr-3 hover:bg-stone-800 transition group"
         style={{ paddingLeft: `${12 + depth * 12}px` }}
       >
-        <span className="shrink-0 text-stone-600">
-          {hasChildren
-            ? (open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />)
-            : <span className="w-3 inline-block" />}
-        </span>
-        <span className={cn(
-          "text-xs truncate flex-1",
-          node.bold ? "font-semibold" : "font-normal",
-          node.italic ? "italic" : "",
-          "text-stone-300 group-hover:text-white"
-        )}>
+        {hasChildren ? (
+          <button
+            type="button"
+            aria-label={open ? "Collapse section" : "Expand section"}
+            onClick={handleToggle}
+            className="shrink-0 text-stone-600 hover:text-stone-300 rounded transition py-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/50"
+          >
+            {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          </button>
+        ) : (
+          <span className="shrink-0 text-stone-600"><span className="w-3 inline-block" /></span>
+        )}
+        <button
+          type="button"
+          onClick={handleNavigate}
+          className={cn(
+            "text-xs truncate flex-1 text-left py-2",
+            node.bold ? "font-semibold" : "font-normal",
+            node.italic ? "italic" : "",
+            "text-stone-300 group-hover:text-white"
+          )}
+        >
           {node.title || "Untitled"}
-        </span>
-      </button>
+        </button>
+      </div>
       {hasChildren && open && (
         <div>
           {node.items.map((child, i) => (

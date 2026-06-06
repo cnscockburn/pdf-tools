@@ -15,6 +15,7 @@ import { X, Check } from "lucide-react";
 import { cn } from "../lib/utils";
 import { DEFAULT_COLOR_LABELS } from "../lib/storage";
 import type { Settings, UiScale, FitMode } from "../lib/storage";
+import { useFocusTrap } from "../lib/useFocusTrap";
 
 // ── Static config ────────────────────────────────────────────────────────────
 
@@ -173,6 +174,8 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
     "focus:border-brand-500 focus:ring-1 focus:ring-brand-500/30 transition",
   );
 
+  const trapRef = useFocusTrap<HTMLDivElement>(true);
+
   return (
     <div
       role="dialog"
@@ -181,7 +184,7 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/65"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-stone-900 border border-stone-700 rounded-2xl shadow-2xl w-[440px] max-w-[90vw] max-h-[90vh] flex flex-col overflow-hidden">
+      <div ref={trapRef} className="bg-stone-900 border border-stone-700 rounded-2xl shadow-2xl w-[440px] max-w-[90vw] max-h-[90vh] flex flex-col overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-stone-700 shrink-0">

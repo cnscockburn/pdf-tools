@@ -29,21 +29,24 @@ export default function ThumbnailSidebar({ file, currentPage, onSelect, collapse
   return (
     <div
       className={cn(
-        "relative flex-shrink-0 flex flex-col bg-stone-900 border-r border-stone-700 transition-[width] duration-200 overflow-hidden",
+        // z-20 keeps the floating collapse toggle (which sits -right-3, outside
+        // the box) above the canvas sibling. No overflow-hidden here, or the
+        // toggle gets clipped — the inner scroll area handles its own overflow.
+        "relative z-20 flex-shrink-0 flex flex-col bg-stone-900 border-r border-stone-700 transition-[width] duration-200",
         collapsed ? "w-8" : "w-40"
       )}
     >
-      {/* Collapse toggle */}
+      {/* Collapse toggle — sits just outside the right edge; must not be clipped */}
       <button
         onClick={onToggle}
         title={collapsed ? "Show thumbnails" : "Hide thumbnails"}
-        className="absolute -right-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-stone-700 border border-stone-600 text-stone-300 hover:bg-stone-600 transition"
+        className="absolute -right-3 top-3 z-30 flex h-6 w-6 items-center justify-center rounded-full bg-stone-700 border border-stone-600 text-stone-300 hover:bg-stone-600 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/50"
       >
         {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
       </button>
 
       {!collapsed && (
-        <div className="flex-1 overflow-y-auto p-2 space-y-1.5 pt-3">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 space-y-1.5 pt-3">
           {Array.from({ length: pageCount }, (_, i) => i + 1).map((p) => {
             const count = countsByPage.get(p) ?? 0;
             return (

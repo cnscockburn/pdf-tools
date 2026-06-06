@@ -36,6 +36,18 @@
   .scrollbar-thin {
     scrollbar-width: thin;
   }
+
+  /* Suppress the native number-input spinner arrows — they don't match the dark
+     UI. Page-number and similar inputs use .no-spinner; value is still typeable. */
+  .no-spinner::-webkit-outer-spin-button,
+  .no-spinner::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .no-spinner {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
 }
 
 /* ── PDF.js text layer ──────────────────────────────────────────────────────── */
