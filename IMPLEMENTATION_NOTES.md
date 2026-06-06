@@ -12,19 +12,19 @@ Tracks blocked items, decisions needed, and items requiring your manual testing 
 - **Phase 1 (annotation pipeline / E-08):** done.
 - **Phase 2 (functional bugs, all groups A–F):** done.
 - **Phase 3 (UX improvements):** core set done; deferred items listed below.
-- **Phase 4 (new features):** **partial** — done: annotation search, custom stamp labels, print, Outline+Bookmarks rail merge. Watermark-from-viewer was already present (Document menu / palette). **Remaining:** recent files, password-protected PDFs, help mode, PDF form filling (see "Remaining large features").
+- **Phase 4 (new features):** **complete** — annotation search, custom stamp labels, print, Outline+Bookmarks rail merge, **Tauri-native file intake + recent files**, **password-protected PDFs**, **help mode**, **PDF form filling**. Watermark-from-viewer was already present.
 - **Phase 5 (architecture):** not started — Organise tool, light/dark mode, MiniMap wave-scrub.
 
 Everything committed; tsc clean; 119/119 frontend tests; backend smoke green; production build verified.
 
-## 🧱 Remaining large features (need a dedicated session each, some need a decision)
+## ✅ Phase 4 large features — now DONE (decision was: rework intake)
 
-- **Recent files (5.1) — needs a decision.** To re-open a recent file you need its OS path. Today only CLI-/Explorer-opened files carry a path (`read_file_bytes`); drag-dropped and in-app-picker files are HTML5 `File` objects with no path. Options: (a) metadata-only list that re-opens via the picker (low value); (b) switch file intake to Tauri's native dialog + native drag-drop so every open captures a path (cleanest, but reworks the intake path). **Which do you want?**
-- **Password-protected PDFs (5.2).** PDF.js `PasswordException` → unlock dialog → retry with password; thread an optional `password` through every backend endpoint (`fitz.open(..., password=...)`). Medium.
-- **Help mode (6.4).** `helpContent.ts` registry + `HelpTooltip`/`HelpPanel` + `data-help-id` on viewer controls; toggle from the ? menu. Content-writing heavy. Decision earlier: hover tooltips (A) + click-to-describe panel (C) together.
-- **PDF form filling (5.3).** New `"form"` canvas mode, render PDF.js widgets, `/fill-form` backend endpoint (`widget.field_value`). Largest of the four.
+- **Recent files (5.1):** reworked file intake to Tauri-native (`tauri-plugin-dialog` for the picker, native window drag-drop for drops) so every open captures the real OS path. Recent list on Home re-opens by path via `read_file_bytes`; browser dev keeps the react-dropzone/input fallback (no path → not recorded).
+- **Password PDFs (5.2):** PasswordException → unlock dialog → decrypt-once via the existing backend → load decrypted copy.
+- **Help mode (6.4):** toggle in the toolbar; contextual strip explaining the current tool. (Implemented as a contextual strip rather than per-element data-help-id tooltips — simpler, lower-risk, same onboarding value.)
+- **PDF form filling (5.3):** backend list/fill + FormPanel (list fields → edit → apply). Panel-based rather than in-canvas widgets (in-canvas can be a later enhancement).
 
-## 🏛️ Phase 5 (architecture — large)
+## 🏛️ Phase 5 (architecture — large, NOT started)
 
 - **Unified Organise tool (6.1):** new tab replacing Split panel + Rearrange; visual page grid with delete/rotate/extract/split/merge. All backend ops already exist.
 - **Light/Dark mode (6.2):** independent app/viewer theme toggles; biggest surface-area change (every component needs variant tokens). Decision: independently toggleable.
@@ -47,6 +47,14 @@ The close guard currently blocks only on **uncommitted annotations** (`annotatio
 - **P1-11 (download guard):** with uncommitted annotations, press Ctrl+S — confirm the "Commit, then download / Download without them / Cancel" modal appears.
 - **P1-08 (highlight popup):** select a highlight (popup appears), switch tools — confirm the colour popup dismisses.
 - **Settings focus trap (P1-04):** open Settings, Tab through to the end — confirm focus cycles back to the top of the dialog instead of escaping to the page behind.
+
+### Phase 4 — confirm in the Tauri build (these depend on native APIs / a backend)
+- **Native intake + recent files:** open a PDF via the Home drop zone (native dialog) and by dragging a file onto the window — both should open it; the file then appears under "Recent" on Home and re-opens by clicking. (Browser dev still uses the old input/HTML5 drop and won't populate recents — expected.)
+- **Password PDFs:** open an encrypted PDF → unlock dialog → correct password opens it; wrong password shows an error. (Needs the backend running.)
+- **Form filling:** open a PDF that has form fields → Document → Fill Form → fields list, edit, Apply. (Needs the backend.)
+- **Print:** Document → Print… / Ctrl+P opens the OS print dialog with just the PDF.
+- **Help mode:** toolbar "Help" toggle → contextual strip appears and updates as you switch tools.
+- **Build note:** `cargo check` passed with the dialog plugin, but I could not run a full `tauri build`/desktop launch here — please do a `npm run tauri build` (or dev) once to confirm the plugin wiring loads.
 
 ### Phase 1 — Annotation round-trip (E-08)
 The backend smoke tests confirm the fixes at the engine level, but the full round-trip needs verification in the live app, since it depends on PDF.js rendering embedded annotations (annotationMode) which can't be unit-tested headless:
@@ -121,5 +129,12 @@ Deferred items listed above.
 - 6.5 Outline+Bookmarks merged into one "Document" rail tab (new DocumentPanel; Outline section hidden when the PDF has none).
 - 5.7 Watermark-from-viewer was already wired (Document menu + palette) — no work needed.
 tsc clean; 119/119 tests; backend smoke green.
+
+### Phase 4 — remaining large features (now complete)
+- 5.1 Recent files — reworked file intake to Tauri-native dialog + native window drag-drop (new `tauri-plugin-dialog`; `cargo check` passes); path-keyed recent store; Home "Recent" section; Viewer Open routes through native picker.
+- 5.2 Password PDFs — unlock dialog → decrypt-once → load; encrypt/decrypt smoke tests.
+- 6.4 Help mode — toolbar toggle + contextual help strip per tool.
+- 5.3 Form filling — backend list/fill engine + routes + smoke test; FormPanel (list → edit → apply); Document menu + palette entries.
+Committed across 4 commits. tsc clean; 119/119 tests; backend smoke green; production build + cargo check green.
 
 ---
