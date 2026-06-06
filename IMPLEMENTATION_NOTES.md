@@ -13,7 +13,7 @@ Tracks blocked items, decisions needed, and items requiring your manual testing 
 - **Phase 2 (functional bugs, all groups A–F):** done.
 - **Phase 3 (UX improvements):** core set done; deferred items listed below.
 - **Phase 4 (new features):** **complete** — annotation search, custom stamp labels, print, Outline+Bookmarks rail merge, **Tauri-native file intake + recent files**, **password-protected PDFs**, **help mode**, **PDF form filling**. Watermark-from-viewer was already present.
-- **Phase 5 (architecture):** not started — Organise tool, light/dark mode, MiniMap wave-scrub.
+- **Phase 5 (architecture):** **Organise tool DONE**; remaining — light/dark mode, MiniMap wave-scrub.
 
 Everything committed; tsc clean; 119/119 frontend tests; backend smoke green; production build verified.
 
@@ -24,11 +24,14 @@ Everything committed; tsc clean; 119/119 frontend tests; backend smoke green; pr
 - **Help mode (6.4):** toggle in the toolbar; contextual strip explaining the current tool. (Implemented as a contextual strip rather than per-element data-help-id tooltips — simpler, lower-risk, same onboarding value.)
 - **PDF form filling (5.3):** backend list/fill + FormPanel (list fields → edit → apply). Panel-based rather than in-canvas widgets (in-canvas can be a later enhancement).
 
-## 🏛️ Phase 5 (architecture — large, NOT started)
+## 🏛️ Phase 5 (architecture)
 
-- **Unified Organise tool (6.1):** new tab replacing Split panel + Rearrange; visual page grid with delete/rotate/extract/split/merge. All backend ops already exist.
-- **Light/Dark mode (6.2):** independent app/viewer theme toggles; biggest surface-area change (every component needs variant tokens). Decision: independently toggleable.
-- **MiniMap wave-scrub (6.3):** thin strip + dock-magnification hover + thumbnail-on-settle + drag-defers-nav. Complex interaction; plan the feel carefully.
+- **Unified Organise tool (6.1): DONE (v1).** Rebuilt the Rearrange tab into an Organise grid — click-to-select (+Shift range), grip-drag reorder, rotate L/R, delete, extract; one backend `/organise` call on Save (or Save & open in viewer). Backend `organise(plan)` does reorder+rotate+delete in one pass (smoke-tested). **Follow-ups (optional, task #31):** visual split-divider builder (click between pages / split-every-N), fold the standalone Split tab in, merge-drop additional PDFs. The in-viewer Rotate/Delete/Extract/Split panels were left in place for quick single-doc edits.
+- **Light/Dark mode (6.2): remaining.** Independent app/viewer theme toggles; biggest surface-area change (every component needs variant tokens). Decision: independently toggleable. Needs running-app design review per surface.
+- **MiniMap wave-scrub (6.3): remaining.** Thin strip + dock-magnification hover + thumbnail-on-settle + drag-defers-nav. Complex interaction; needs the running app to tune feel.
+
+### Organise tool — confirm in the running app
+Open a multi-page PDF in Organise (Home → Organize, or Document → Organise Pages): click to select pages, Shift-click a range, drag the grip to reorder, rotate/delete/extract the selection, then Save (or Save & open in viewer). Confirm click-vs-drag feels right (5px activation distance) and rotated thumbnails preview correctly.
 
 ## 🔴 Needs Your Decision
 
