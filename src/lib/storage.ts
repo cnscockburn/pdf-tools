@@ -51,6 +51,8 @@ export interface Settings {
   defaultHighlightColor: 0 | 1 | 2 | 3;
   /** Default ink annotation stroke width in CSS px (stored; displayed ÷ 2 as PDF pts). */
   defaultInkWidth: number;
+  /** User-defined stamp labels, appended to the built-in set. */
+  customStampLabels: string[];
 
   // ── Accessibility ───────────────────────────────────────────────────────────
   /**
@@ -82,6 +84,7 @@ function defaults(): Settings {
     rightRailOpenDefault: true,
     defaultHighlightColor: 0,
     defaultInkWidth: 2,
+    customStampLabels: [],
     reduceMotion: prefersReduced,
   };
 }
@@ -116,6 +119,9 @@ export function loadSettings(): Settings {
         defaultInkWidth: typeof parsed.defaultInkWidth === "number" && parsed.defaultInkWidth > 0
           ? parsed.defaultInkWidth
           : d.defaultInkWidth,
+        customStampLabels: Array.isArray(parsed.customStampLabels)
+          ? parsed.customStampLabels.filter((s): s is string => typeof s === "string").slice(0, 24)
+          : d.customStampLabels,
         // Reduced motion: the OS preference wins on every launch UNLESS the user
         // has explicitly turned it on in Settings (stored `true`). A stored
         // `false` must not override a later OS opt-in (P1-27 — previously the

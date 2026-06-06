@@ -366,6 +366,12 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     [settings.colorLabels],
   );
 
+  // Built-in stamps + any user-defined custom labels (5.5).
+  const effectiveStampLabels = useMemo(
+    () => [...STAMP_LABELS, ...(settings.customStampLabels ?? [])],
+    [settings.customStampLabels],
+  );
+
   // ── Current annotate state ref (for free-rect fallback closure) ─────────
   // Avoids stale closures inside the mouseup listener without re-registering it.
   const freeRectStateRef = useRef({ annotateSubMode, hlColor, effectiveHlColors, currentPage, settings });
@@ -1912,7 +1918,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                   <>
                     <div className="w-px h-5 bg-stone-700 shrink-0 mx-0.5" />
                     <div className="flex items-center gap-0.5 flex-wrap">
-                      {STAMP_LABELS.map(l => (
+                      {effectiveStampLabels.map(l => (
                         <button key={l} onClick={() => setStampLabel(l)}
                           className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide transition",
                             stampLabel === l ? "bg-red-800 text-red-200" : "text-stone-500 hover:bg-stone-700 hover:text-stone-300")}>

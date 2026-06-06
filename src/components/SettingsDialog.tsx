@@ -144,6 +144,14 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
   const [labels, setLabels]               = useState<[string,string,string,string]>(
     [...settings.colorLabels] as [string,string,string,string],
   );
+  const [customStamps, setCustomStamps]   = useState<string[]>([...(settings.customStampLabels ?? [])]);
+  const [newStamp, setNewStamp]           = useState("");
+
+  function addStamp() {
+    const v = newStamp.trim().toUpperCase().slice(0, 24);
+    if (v && !customStamps.includes(v)) setCustomStamps([...customStamps, v]);
+    setNewStamp("");
+  }
 
   function setLabel(i: number, v: string) {
     const next = [...labels] as [string,string,string,string];
@@ -166,6 +174,7 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
       defaultHighlightColor: hlDefault,
       defaultInkWidth:       inkWidth,
       colorLabels:           labels,
+      customStampLabels:     customStamps,
     });
     onClose();
   }
@@ -375,6 +384,42 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
                     />
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Custom stamp labels */}
+            <div>
+              <p className="text-xs font-medium text-stone-300 mb-1.5">Custom stamp labels</p>
+              <p className="text-[11px] text-stone-600 leading-snug mb-2">
+                Added to the built-in stamps (Approved, Rejected, Draft…). Shown in the stamp tool.
+              </p>
+              {customStamps.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {customStamps.map(s => (
+                    <span key={s} className="inline-flex items-center gap-1 rounded bg-stone-800 border border-stone-600 px-2 py-0.5 text-[10px] font-bold tracking-wide text-stone-300">
+                      {s}
+                      <button type="button" onClick={() => setCustomStamps(customStamps.filter(x => x !== s))}
+                        aria-label={`Remove ${s}`} className="text-stone-500 hover:text-red-400 transition">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  value={newStamp}
+                  onChange={e => setNewStamp(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addStamp(); } }}
+                  placeholder="e.g. CONFIDENTIAL"
+                  className={cn(
+                    "flex-1 bg-stone-800 border border-stone-600 rounded-lg px-2.5 py-1.5",
+                    "text-xs text-white placeholder-stone-600 focus:outline-none uppercase",
+                    "focus:border-brand-500 focus:ring-1 focus:ring-brand-500/30 transition",
+                  )}
+                />
+                <button type="button" onClick={addStamp}
+                  className="px-3 rounded-lg bg-stone-700 hover:bg-stone-600 text-xs text-stone-200 transition">Add</button>
               </div>
             </div>
           </section>

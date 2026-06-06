@@ -13,7 +13,7 @@ import { useState, useMemo } from "react";
 import {
   MessageSquare, Highlighter, Type, Underline, Strikethrough,
   Trash2, FileText, ChevronDown, ChevronRight,
-  ChevronUp, PenLine, Square, Stamp,
+  ChevronUp, PenLine, Square, Stamp, Search as SearchIcon, X,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import type { LocalAnnot, AnnotId, AnnotStatus } from "./AnnotationLayer";
@@ -109,8 +109,22 @@ export default function AnnotationsListPanel({
 }: Props) {
   const [filterStatus,  setFilterStatus]  = useState<FilterStatus>("all");
   const [filterTag,     setFilterTag]     = useState<string | null>(null);
+  const [search,        setSearch]        = useState("");
   const [markupOpen,    setMarkupOpen]    = useState(true);
   const [collapsedPages, setCollapsedPages] = useState<Set<string>>(new Set());
+
+  // Free-text match across content, author, type label and tags (5.4).
+  const q = search.trim().toLowerCase();
+  function matchesSearch(a: LocalAnnot): boolean {
+    if (!q) return true;
+    const hay = [
+      annotText(a),
+      (a as { author?: string }).author ?? "",
+      typeLabel(a.type),
+      ...annotTags(a),
+    ].join(" ").toLowerCase();
+    return hay.includes(q);
+  }
 
   // All unique tags in use across all annotations
   const allTags = useMemo(() => {
@@ -145,13 +159,15 @@ export default function AnnotationsListPanel({
       if (s !== filterStatus) return false;
     }
     if (filterTag !== null && !annotTags(a).includes(filterTag)) return false;
+    if (!matchesSearch(a)) return false;
     return true;
-  }), [allComments, filterStatus, filterTag]);
+  }), [allComments, filterStatus, filterTag, q]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const visibleMarkup = useMemo(() => allMarkup.filter(a => {
     if (filterTag !== null && !annotTags(a).includes(filterTag)) return false;
+    if (!matchesSearch(a)) return false;
     return true;
-  }), [allMarkup, filterTag]);
+  }), [allMarkup, filterTag, q]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Group helpers ─────────────────────────────────────────────────────────
 
@@ -349,6 +365,24 @@ export default function AnnotationsListPanel({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
+
+      {/* ── Search within annotations (5.4) ──────────────────────────────── */}
+      <div className="px-3 pt-2 pb-2 border-b border-stone-700 shrink-0">
+        <div className="flex items-center gap-1.5 rounded-lg bg-stone-900 border border-stone-600 px-2 py-1">
+          <SearchIcon className="h-3 w-3 text-stone-500 shrink-0" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search annotations…"
+            className="flex-1 min-w-0 bg-transparent text-xs text-stone-200 placeholder-stone-600 focus:outline-none"
+          />
+          {search && (
+            <button onClick={() => setSearch("")} aria-label="Clear search" className="text-stone-500 hover:text-stone-300 transition">
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* ── Global tag filter ────────────────────────────────────────────── */}
       {allTags.length > 0 && (
