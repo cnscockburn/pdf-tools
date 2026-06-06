@@ -321,6 +321,10 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   // ── Stable ref to applyMarkup (used by the text-selection auto-apply path) ──
   const applyMarkupRef = useRef<(type: "highlight" | "underline" | "strikethrough", rects: FracRect[], text: string) => void>(() => {});
 
+  // ── Stable refs for zoom (used by the keyboard + wheel handlers) ───────────
+  const zoomByRef = useRef<(dir: 1 | -1, step?: number) => void>(() => {});
+  const resetZoomRef = useRef<() => void>(() => {});
+
   // ── Keyboard shortcut state ref ────────────────────────────────────────────
   const kbRef = useRef({
     currentPage: 1,
@@ -672,6 +676,14 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
       const { pdf, currentPage } = kbRef.current;
       if (!pdf) return;
 
+      // Ctrl/Cmd + wheel → zoom (UX-02), like every other document viewer.
+      // 5% fine steps for precise framing.
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        zoomByRef.current(e.deltaY < 0 ? 1 : -1, 0.05);
+        return;
+      }
+
       // hasOverflow: the rendered page is taller than the scroll container
       const hasOverflow = el.scrollHeight > el.clientHeight + 2;
       // at-boundary checks — 6px tolerance for sub-pixel rounding
@@ -764,8 +776,9 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           redoAnnotationRef.current();
           return;
         }
-        if (e.key === "+" || e.key === "=") { e.preventDefault(); setScale(s => parseFloat(Math.min(s + 0.2, 4).toFixed(2))); return; }
-        if (e.key === "-")                  { e.preventDefault(); setScale(s => parseFloat(Math.max(s - 0.2, 0.5).toFixed(2))); return; }
+        if (e.key === "+" || e.key === "=") { e.preventDefault(); zoomByRef.current(1); return; }
+        if (e.key === "-")                  { e.preventDefault(); zoomByRef.current(-1); return; }
+        if (e.key === "0")                  { e.preventDefault(); resetZoomRef.current(); return; }
         if (e.key === "\\") {
           e.preventDefault();
           if (kbRef.current.isSideBySide) closeSideBySide();
@@ -804,8 +817,8 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
         if (e.key === "p" || e.key === "P") { e.preventDefault(); switchModeRef.current("annotate"); setAnnotateSubMode("stamp"); return; }
         if (e.key === "r" || e.key === "R") { e.preventDefault(); switchModeRef.current("redact"); return; }
         if (e.key === "c" || e.key === "C") { e.preventDefault(); switchModeRef.current("crop"); return; }
-        if (e.key === "+" || e.key === "=") { setScale(s => parseFloat(Math.min(s + 0.2, 4).toFixed(2))); return; }
-        if (e.key === "-")                  { setScale(s => parseFloat(Math.max(s - 0.2, 0.5).toFixed(2))); return; }
+        if (e.key === "+" || e.key === "=") { zoomByRef.current(1); return; }
+        if (e.key === "-")                  { zoomByRef.current(-1); return; }
         // Highlight colour shortcuts (1-4) while in annotate/highlight mode
         if (e.key >= "1" && e.key <= "4")  { setHlColor(Number(e.key) - 1); return; }
       }
@@ -846,6 +859,20 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     });
     return () => unregisterCloseGuard(tabId);
   }, [tabId, registerCloseGuard, unregisterCloseGuard]);
+
+  // ── UI-scale ↔ PDF-zoom compensation (UX-04) ───────────────────────────────
+  // The whole content area is CSS-zoomed by uiScale, so raising the UI scale
+  // enlarges the PDF too. Counter-scale the page so its apparent size on screen
+  // stays constant when the user changes UI scale in Settings.
+  const prevUiScaleRef = useRef(settings.uiScale ?? 1);
+  useEffect(() => {
+    const prev = prevUiScaleRef.current;
+    const next = settings.uiScale ?? 1;
+    if (prev !== next) {
+      prevUiScaleRef.current = next;
+      setScale(s => parseFloat(Math.max(0.5, Math.min(s * (prev / next), 4)).toFixed(2)));
+    }
+  }, [settings.uiScale]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   async function loadFile(f: File) {
@@ -1018,6 +1045,22 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   function togglePanel(t: PanelTool) {
     setPanelTool(prev => (prev === t ? null : t));
   }
+
+  // ── Zoom (UX-02) ───────────────────────────────────────────────────────────
+  // Step zooms snap to the nearest 10% in the direction of travel, then move in
+  // 10% increments. Ctrl+scroll uses finer 5% steps for precise framing.
+  function zoomBy(dir: 1 | -1, step = 0.1) {
+    setScale(s => {
+      const snapped = dir > 0
+        ? Math.ceil(s * 10 - 1e-4) / 10   // next 10% up
+        : Math.floor(s * 10 + 1e-4) / 10; // next 10% down
+      const next = Math.abs(snapped - s) > 1e-3 ? snapped : s + dir * step;
+      return parseFloat(Math.max(0.5, Math.min(next, 4)).toFixed(2));
+    });
+  }
+  function resetZoom() { setScale(1); }
+  zoomByRef.current = zoomBy;
+  resetZoomRef.current = resetZoom;
 
   // ── Operations ────────────────────────────────────────────────────────────
 
@@ -1350,8 +1393,9 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
       {
         label: "View",
         items: [
-          { label: "Zoom In",          shortcut: "+",        action: () => setScale(s => parseFloat(Math.min(s + 0.2, 4).toFixed(2))) },
-          { label: "Zoom Out",         shortcut: "−",        action: () => setScale(s => parseFloat(Math.max(s - 0.2, 0.5).toFixed(2))) },
+          { label: "Zoom In",          shortcut: "+",        action: () => zoomBy(1) },
+          { label: "Zoom Out",         shortcut: "−",        action: () => zoomBy(-1) },
+          { label: "Reset Zoom (100%)", shortcut: "Ctrl+0",  action: () => resetZoom() },
           { label: "Fit Width",                             action: () => {
               if (!canvasAreaRef.current || !canvasRef.current) return;
               const w = canvasAreaRef.current.clientWidth - 64;
@@ -1551,7 +1595,13 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
             <div
               ref={canvasWrapRef}
               className="relative inline-block shadow-2xl rounded"
-              style={{ lineHeight: 0 }}
+              style={{
+                lineHeight: 0,
+                // Gentle fade-in when a new page renders so page changes don't
+                // snap (UX-01). Respects reduce-motion.
+                opacity: rendering ? 0.65 : 1,
+                transition: settings.reduceMotion ? "none" : "opacity 160ms ease-out",
+              }}
               onMouseDown={e => {
                 // Record drag-start for free-rect fallback when textSelectActive=true
                 if (!textSelectActive || canvasMode !== "annotate") return;
@@ -2030,12 +2080,14 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
               <div className="w-px h-5 bg-stone-700 mx-0.5" />
 
               {/* Zoom */}
-              <button onClick={() => setScale(s => parseFloat(Math.max(s - 0.2, 0.5).toFixed(2)))}
+              <button onClick={() => zoomBy(-1)}
                 title="Zoom out (−)" aria-label="Zoom out" className="p-1.5 rounded-lg hover:bg-stone-700 transition text-stone-300">
                 <ZoomOut className="h-4 w-4" />
               </button>
-              <span className="text-xs text-stone-300 tabular-nums w-10 text-center" aria-live="polite">{Math.round(scale * 100)}%</span>
-              <button onClick={() => setScale(s => parseFloat(Math.min(s + 0.2, 4).toFixed(2)))}
+              <button onClick={() => resetZoom()}
+                title="Reset zoom to 100% (Ctrl+0)" aria-label="Reset zoom"
+                className="text-xs text-stone-300 tabular-nums w-10 text-center hover:text-white rounded transition" aria-live="polite">{Math.round(scale * 100)}%</button>
+              <button onClick={() => zoomBy(1)}
                 title="Zoom in (+)" aria-label="Zoom in" className="p-1.5 rounded-lg hover:bg-stone-700 transition text-stone-300">
                 <ZoomIn className="h-4 w-4" />
               </button>

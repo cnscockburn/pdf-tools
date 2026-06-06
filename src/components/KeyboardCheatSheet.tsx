@@ -40,8 +40,10 @@ const SHORTCUTS: Entry[] = [
   { key: "End",            desc: "Last page" },
 
   { section: "Zoom" },
-  { key: "+ / =",          desc: "Zoom in" },
-  { key: "−",              desc: "Zoom out" },
+  { key: "+ / =",          desc: "Zoom in (snaps to 10%)" },
+  { key: "−",              desc: "Zoom out (snaps to 10%)" },
+  { key: "Ctrl+0",         desc: "Reset zoom to 100%" },
+  { key: "Ctrl+scroll",    desc: "Zoom in / out (fine)" },
 
   { section: "Tabs" },
   { key: "Ctrl+T",         desc: "New tab" },
