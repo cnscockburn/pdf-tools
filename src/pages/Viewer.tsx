@@ -31,6 +31,7 @@ import { useBookmarks } from "../lib/storage";
 import { useSettingsContext } from "../lib/settingsContext";
 import { downloadAnnotationReport } from "../lib/annotationReport";
 import { subscribe, publish } from "../lib/mirrorSync";
+import { pickPdfFiles } from "../lib/fileIntake";
 
 type CanvasMode = "view" | "annotate" | "redact" | "crop";
 
@@ -1272,11 +1273,18 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   }
 
   // ── Drop zone ──────────────────────────────────────────────────────────────
-  const { getRootProps, getInputProps, isDragActive, open: openFilePicker } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: ([f]) => f && loadFile(f),
     accept: { "application/pdf": [".pdf"] },
     multiple: false,
   });
+
+  // Open a PDF into THIS viewer tab. Native picker in Tauri captures the path
+  // and records a recent; browser falls back to a hidden input.
+  async function openFilePicker() {
+    const opened = await pickPdfFiles(false);
+    if (opened[0]) loadFile(opened[0].file);
+  }
 
   // ── Overlay coordinate helper ─────────────────────────────────────────────
   function overlayFrac(el: HTMLElement, clientX: number, clientY: number) {

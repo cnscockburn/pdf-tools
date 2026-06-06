@@ -16,6 +16,7 @@ import { TabContext, newTabId, defaultTabTitle, type Tab, type TabType, type Tab
 import { SettingsContext, type SettingsContextValue } from "../lib/settingsContext";
 import { useSettings } from "../lib/storage";
 import { getCliFile, listenForFileOpen } from "../lib/tauriFileOpen";
+import { onWindowFileDrop } from "../lib/fileIntake";
 import TabBar from "./TabBar";
 import SettingsDialog from "./SettingsDialog";
 import Home from "../pages/Home";
@@ -212,7 +213,13 @@ export default function TabShell() {
     const unlisten = listenForFileOpen(file => {
       openTab("viewer", { file, title: file.name });
     });
-    return unlisten;
+    // Native OS drag-drop onto the window → open each PDF in a Viewer tab.
+    // (Tauri-only; the browser uses react-dropzone per page. Paths captured
+    //  here are recorded as recent files by fileIntake.)
+    const unlistenDrop = onWindowFileDrop(opened => {
+      for (const { file } of opened) openTab("viewer", { file, title: file.name });
+    });
+    return () => { unlisten(); unlistenDrop(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

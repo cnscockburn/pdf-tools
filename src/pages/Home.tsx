@@ -1,12 +1,16 @@
-import { useCallback, useRef, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import {
   Layers, Scissors, Minimize2, EyeOff, LayoutGrid, FileImage,
-  Keyboard, Columns, MessageSquare, ShieldCheck, X,
+  Keyboard, Columns, MessageSquare, ShieldCheck, X, FileText, Clock,
 } from "lucide-react";
-import { cn } from "../lib/utils";
+import { cn, formatBytes } from "../lib/utils";
 import { useTabContext, type TabType } from "../lib/tabs";
 import { useFocusTrap } from "../lib/useFocusTrap";
+import {
+  isTauri, pickPdfFiles, openPathAsFile,
+  loadRecentFiles, clearRecentFiles, type RecentFile,
+} from "../lib/fileIntake";
 import striaLogo from "../assets/stria-logo.png";
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
@@ -83,14 +87,20 @@ const CAPABILITIES: { icon: React.ReactNode; text: string; kbd: string; toolHint
 
 export default function Home() {
   const { openTab } = useTabContext();
-  const fileRef        = useRef<HTMLInputElement>(null);
-  const pendingToolRef = useRef<string | null>(null);
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const privacyTrapRef = useFocusTrap<HTMLDivElement>(privacyOpen);
+  const [recents, setRecents] = useState<RecentFile[]>(() => loadRecentFiles());
+  const [recentError, setRecentError] = useState<string | null>(null);
 
-  // Set window title
-  useEffect(() => { document.title = "Stria"; }, []);
+  // Set window title; keep the recents list fresh when other surfaces change it.
+  useEffect(() => {
+    document.title = "Stria";
+    const refresh = () => setRecents(loadRecentFiles());
+    window.addEventListener("recent-files-changed", refresh);
+    return () => window.removeEventListener("recent-files-changed", refresh);
+  }, []);
 
+  // Browser HTML5 drag-drop (Tauri native drops are handled globally in TabShell).
   const onDrop = useCallback((files: File[]) => {
     const f = files[0];
     if (f) openTab("viewer", { file: f });
@@ -100,21 +110,32 @@ export default function Home() {
     onDrop,
     accept: { "application/pdf": [".pdf"] },
     multiple: false,
+    noClick: isTauri, // in Tauri we open the native dialog ourselves (captures path)
   });
 
-  function openToolFilePicker(toolHint?: string) {
-    pendingToolRef.current = toolHint ?? null;
-    fileRef.current?.click();
+  // Open the file picker (native in Tauri → captures path & records a recent).
+  async function openViaPicker(toolHint?: string) {
+    const opened = await pickPdfFiles(false);
+    const first = opened[0];
+    if (first) openTab("viewer", { file: first.file, ...(toolHint ? { toolHint } : {}) });
   }
 
-  function handleToolFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (f) {
-      const tool = pendingToolRef.current;
-      openTab("viewer", { file: f, ...(tool ? { toolHint: tool } : {}) });
+  function openToolFilePicker(toolHint?: string) {
+    void openViaPicker(toolHint);
+  }
+
+  // Re-open a recent file by its stored OS path.
+  async function openRecent(r: RecentFile) {
+    try {
+      const file = await openPathAsFile(r.path);
+      openTab("viewer", { file, title: file.name });
+    } catch {
+      setRecentError(`Couldn't open ${r.name} — it may have been moved or deleted.`);
+      // Drop the stale entry.
+      const next = loadRecentFiles().filter(x => x.path !== r.path);
+      try { localStorage.setItem("pdf-tools-recent-files", JSON.stringify(next)); } catch { /* ignore */ }
+      setRecents(next);
     }
-    pendingToolRef.current = null;
-    e.target.value = "";
   }
 
   return (
@@ -136,7 +157,7 @@ export default function Home() {
           {/* ── Primary: file intake ──────────────────────────────────────── */}
           <div className="w-full">
             <div
-              {...getRootProps()}
+              {...getRootProps(isTauri ? { onClick: () => openViaPicker() } : {})}
               className={cn(
                 "w-full flex flex-col items-center justify-center gap-5 rounded-2xl",
                 "border-2 border-dashed transition-colors duration-200 cursor-pointer",
@@ -181,6 +202,42 @@ export default function Home() {
               ))}
             </div>
           </div>
+
+          {/* ── Recent files (Tauri — reopened by stored path) ─────────────── */}
+          {recents.length > 0 && (
+            <div className="w-full">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="flex items-center gap-1.5 text-[10px] font-medium text-stone-400 uppercase tracking-[0.1em]">
+                  <Clock className="h-3 w-3" /> Recent
+                </span>
+                <button
+                  onClick={() => { clearRecentFiles(); setRecents([]); }}
+                  className="text-[10px] text-stone-400 hover:text-stone-600 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded px-1"
+                >
+                  Clear
+                </button>
+              </div>
+              {recentError && (
+                <p className="mb-1.5 text-[10px] text-red-500">{recentError}</p>
+              )}
+              <div className="grid grid-cols-2 gap-1.5">
+                {recents.slice(0, 6).map(r => (
+                  <button
+                    key={r.path}
+                    onClick={() => openRecent(r)}
+                    title={r.path}
+                    className="group flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-left hover:border-stone-300 hover:shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
+                  >
+                    <FileText className="h-4 w-4 shrink-0 text-stone-300 group-hover:text-amber-600 transition-colors" />
+                    <span className="flex-1 min-w-0">
+                      <span className="block truncate text-[12px] text-stone-700 group-hover:text-stone-900">{r.name}</span>
+                      <span className="block text-[10px] text-stone-400">{formatBytes(r.size)}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* ── Divider ──────────────────────────────────────────────────── */}
           <div className="w-full flex items-center gap-3">
@@ -269,9 +326,6 @@ export default function Home() {
           </div>
         </div>
       )}
-
-      {/* Hidden file input for tool cards that need a file */}
-      <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={handleToolFile} />
     </div>
   );
 }
