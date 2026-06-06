@@ -112,7 +112,11 @@ export function loadSettings(): Settings {
         defaultInkWidth: typeof parsed.defaultInkWidth === "number" && parsed.defaultInkWidth > 0
           ? parsed.defaultInkWidth
           : d.defaultInkWidth,
-        reduceMotion: parsed.reduceMotion ?? d.reduceMotion,
+        // Reduced motion: the OS preference wins on every launch UNLESS the user
+        // has explicitly turned it on in Settings (stored `true`). A stored
+        // `false` must not override a later OS opt-in (P1-27 — previously the
+        // `??` kept stale `false` and the OS setting never auto-applied).
+        reduceMotion: parsed.reduceMotion === true ? true : d.reduceMotion,
       };
     }
   } catch { /* ignore */ }

@@ -34,6 +34,14 @@ export interface Tab {
 
 export type SplitDirection = "horizontal" | "vertical";
 
+/** Result a tab's close-guard returns when asked whether it's safe to close. */
+export interface CloseGuardResult {
+  /** false = block the close and show a confirmation dialog. */
+  safe: boolean;
+  message?: string;
+  details?: string;
+}
+
 export interface TabContextValue {
   tabs: Tab[];
   activeTabId: string;
@@ -45,6 +53,15 @@ export interface TabContextValue {
   switchTab: (id: string) => void;
   /** Update the display title of a tab (e.g. when a file is loaded). */
   updateTabTitle: (id: string, title: string) => void;
+
+  // ── Close guards ──────────────────────────────────────────────────────────
+  /**
+   * Register a guard that's consulted before a tab is closed. A Viewer tab uses
+   * this to block closing while it has uncommitted annotations. The guard reads
+   * live state, so register once on mount and let it close over a ref.
+   */
+  registerCloseGuard: (tabId: string, guard: () => CloseGuardResult) => void;
+  unregisterCloseGuard: (tabId: string) => void;
 
   // ── Side by side ────────────────────────────────────────────────────────
   /** The id of the tab in the secondary (right/bottom) pane, or null. */

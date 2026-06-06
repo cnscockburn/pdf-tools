@@ -15,6 +15,8 @@ beforeEach(() => {
     closeTab: vi.fn(),
     switchTab: vi.fn(),
     updateTabTitle: vi.fn(),
+    registerCloseGuard: vi.fn(),
+    unregisterCloseGuard: vi.fn(),
     sideBySideTabId: null,
     sideBySideDirection: "horizontal",
     openSideBySide: vi.fn(),

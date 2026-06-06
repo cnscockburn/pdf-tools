@@ -153,7 +153,8 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   const pendingToolRef = useRef<string | null>(null);
 
   // ── Tab navigation ─────────────────────────────────────────────────────────
-  const { openTab, updateTabTitle, openSideBySide, closeSideBySide, isSideBySide } = useTabContext();
+  const { openTab, updateTabTitle, openSideBySide, closeSideBySide, isSideBySide,
+          registerCloseGuard, unregisterCloseGuard } = useTabContext();
 
   // ── Annotations ────────────────────────────────────────────────────────────
   const [annotations, setAnnotations]         = useState<LocalAnnot[]>([]);
@@ -828,6 +829,20 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Tab close guard: warn before closing with uncommitted annotations ──────
+  // (P1-03 / P1-24). The guard reads the live annotation count via the ref, so
+  // it stays correct without re-registering on every annotation change.
+  useEffect(() => {
+    if (!tabId) return;
+    registerCloseGuard(tabId, () => {
+      const n = annotationsRef.current.length;
+      return n === 0
+        ? { safe: true }
+        : { safe: false, message: `You have ${n} uncommitted annotation${n !== 1 ? "s" : ""} that haven't been saved into the PDF.`, details: "Commit them with “Done” first if you want to keep them." };
+    });
+    return () => unregisterCloseGuard(tabId);
+  }, [tabId, registerCloseGuard, unregisterCloseGuard]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   async function loadFile(f: File) {
@@ -1552,7 +1567,17 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                    so this overlay is always the source of truth.           ── */}
               <AnnotationLayer
                 annotations={canvasMode === "annotate" ? annotations : []}
-                readOnlyAnnotations={bakedAnnotations}
+                // In a mirror pane the partner's draft annotations arrive via the
+                // mirror channel while this pane sits in view mode; show them as
+                // read-only so they appear live instead of only after switching
+                // to annotate mode (P1-26).
+                readOnlyAnnotations={
+                  canvasMode === "annotate"
+                    ? bakedAnnotations
+                    : mirrorGroupId
+                      ? [...bakedAnnotations, ...annotations]
+                      : bakedAnnotations
+                }
                 page={currentPage}
                 createMode={annotateSubMode}
                 hlColorIdx={hlColor}

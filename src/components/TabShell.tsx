@@ -12,7 +12,7 @@
  * the user opens something from them. The initial Home tab persists.
  */
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
-import { TabContext, newTabId, defaultTabTitle, type Tab, type TabType, type TabContextValue, type SplitDirection } from "../lib/tabs";
+import { TabContext, newTabId, defaultTabTitle, type Tab, type TabType, type TabContextValue, type SplitDirection, type CloseGuardResult } from "../lib/tabs";
 import { SettingsContext, type SettingsContextValue } from "../lib/settingsContext";
 import { useSettings } from "../lib/storage";
 import { getCliFile, listenForFileOpen } from "../lib/tauriFileOpen";
@@ -75,6 +75,19 @@ export default function TabShell() {
   const stateRef = useRef({ activeTabId, tabs });
   stateRef.current = { activeTabId, tabs };
 
+  // ── Close guards ───────────────────────────────────────────────────────────
+  // Tabs (Viewer) register a guard consulted before close. A blocked close
+  // surfaces a confirmation dialog instead of discarding work silently.
+  const closeGuardsRef = useRef<Map<string, () => CloseGuardResult>>(new Map());
+  const [pendingClose, setPendingClose] = useState<{ id: string; message: string; details?: string } | null>(null);
+
+  const registerCloseGuard = useCallback((tabId: string, guard: () => CloseGuardResult) => {
+    closeGuardsRef.current.set(tabId, guard);
+  }, []);
+  const unregisterCloseGuard = useCallback((tabId: string) => {
+    closeGuardsRef.current.delete(tabId);
+  }, []);
+
   const openTab = useCallback((type: TabType, opts?: { file?: File; toolHint?: string; title?: string }) => {
     const id = newTabId();
     const tab: Tab = {
@@ -100,14 +113,23 @@ export default function TabShell() {
     return id;
   }, []);
 
-  const closeTab = useCallback((id: string) => {
+  // Actually remove a tab — no guard check (call only after confirming).
+  const doCloseTab = useCallback((id: string) => {
+    closeGuardsRef.current.delete(id);
+    // If closing a mirrored secondary pane, also clear the mirrorGroupId from
+    // its partner so the surviving pane stops syncing to a dead group (P1-35).
+    const closing = stateRef.current.tabs.find(t => t.id === id);
+    const groupId = closing?.mirrorGroupId;
+
     // If closing the side-by-side tab, exit side-by-side mode
     setSideBySideTabId(prev => prev === id ? null : prev);
 
     setTabs(prev => {
       const idx = prev.findIndex(t => t.id === id);
       if (idx < 0) return prev;
-      const next = prev.filter(t => t.id !== id);
+      let next = prev.filter(t => t.id !== id);
+      // Clear the partner's mirrorGroupId.
+      if (groupId) next = next.map(t => t.mirrorGroupId === groupId ? { ...t, mirrorGroupId: undefined } : t);
       if (next.length === 0) {
         const home = makeHomeTab(false);
         setActiveTabId(home.id);
@@ -121,6 +143,18 @@ export default function TabShell() {
       return next;
     });
   }, []);
+
+  const closeTab = useCallback((id: string) => {
+    const guard = closeGuardsRef.current.get(id);
+    if (guard) {
+      const result = guard();
+      if (!result.safe) {
+        setPendingClose({ id, message: result.message ?? "You have unsaved changes.", details: result.details });
+        return;
+      }
+    }
+    doCloseTab(id);
+  }, [doCloseTab]);
 
   const switchTab = useCallback((id: string) => {
     setActiveTabId(id);
@@ -156,13 +190,11 @@ export default function TabShell() {
 
   const closeSideBySide = useCallback(() => {
     const secondaryId = sideBySideTabId;
-    // Remove the secondary tab and clear mirrorGroupId from the primary
-    setTabs(prev => prev
-      .filter(t => t.id !== secondaryId)
-      .map(t => t.mirrorGroupId ? { ...t, mirrorGroupId: undefined } : t)
-    );
-    setSideBySideTabId(null);
-  }, [sideBySideTabId]);
+    if (!secondaryId) return;
+    // Route through closeTab so the secondary pane's unsaved-changes guard runs
+    // (P1-24) and the partner's mirrorGroupId is cleared (P1-35).
+    closeTab(secondaryId);
+  }, [sideBySideTabId, closeTab]);
 
   // ── "New tab" handler — creates ephemeral Home tabs ────────────────────────
   const handleNewTab = useCallback(() => {
@@ -186,8 +218,10 @@ export default function TabShell() {
 
   const tabCtx = useMemo<TabContextValue>(() => ({
     tabs, activeTabId, openTab, closeTab, switchTab, updateTabTitle,
+    registerCloseGuard, unregisterCloseGuard,
     sideBySideTabId, sideBySideDirection, openSideBySide, closeSideBySide, isSideBySide,
   }), [tabs, activeTabId, openTab, closeTab, switchTab, updateTabTitle,
+       registerCloseGuard, unregisterCloseGuard,
        sideBySideTabId, sideBySideDirection, openSideBySide, closeSideBySide, isSideBySide]);
 
   const settingsCtx = useMemo<SettingsContextValue>(() => ({
@@ -282,6 +316,41 @@ export default function TabShell() {
           onUpdate={updateSettings}
           onClose={closeSettings}
         />
+      )}
+
+      {/* ── Close-guard confirmation (uncommitted annotations, P1-03/P1-24) ──── */}
+      {pendingClose && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Unsaved changes"
+          className="fixed inset-0 z-[350] flex items-center justify-center bg-black/70"
+          onClick={e => { if (e.target === e.currentTarget) setPendingClose(null); }}
+        >
+          <div className="bg-stone-900 border border-stone-700 rounded-2xl shadow-2xl w-[380px] max-w-[90vw] p-6 flex flex-col gap-5">
+            <div>
+              <h2 className="text-sm font-semibold text-white">Close this tab?</h2>
+              <p className="mt-1.5 text-xs text-stone-400 leading-relaxed">
+                {pendingClose.message}
+                {pendingClose.details && <><br />{pendingClose.details}</>}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => { const id = pendingClose.id; setPendingClose(null); doCloseTab(id); }}
+                className="rounded-xl bg-red-600 hover:bg-red-500 px-4 py-2.5 text-xs font-semibold text-white transition shadow-lg"
+              >
+                Close without saving
+              </button>
+              <button
+                onClick={() => setPendingClose(null)}
+                className="rounded-xl bg-stone-700 hover:bg-stone-600 border border-stone-600 px-4 py-2.5 text-xs font-medium text-stone-300 transition"
+              >
+                Keep editing
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </TabContext.Provider>
