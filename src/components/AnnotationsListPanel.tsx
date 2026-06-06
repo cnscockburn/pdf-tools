@@ -12,7 +12,7 @@
 import { useState, useMemo } from "react";
 import {
   MessageSquare, Highlighter, Type, Underline, Strikethrough,
-  Trash2, CheckCircle, XCircle, Clock, FileText, ChevronDown, ChevronRight,
+  Trash2, FileText, ChevronDown, ChevronRight,
   ChevronUp, PenLine, Square, Stamp,
 } from "lucide-react";
 import { cn } from "../lib/utils";
@@ -54,11 +54,19 @@ function typeLabel(type: string): string {
   return MAP[type] ?? type;
 }
 
-function statusIcon(status?: AnnotStatus) {
-  const cls = "h-3 w-3 shrink-0";
-  if (!status || status === "open")  return <Clock       className={cn(cls, "text-sky-400")} />;
-  if (status === "resolved")        return <CheckCircle  className={cn(cls, "text-green-400")} />;
-  return                                   <XCircle      className={cn(cls, "text-stone-500")} />;
+/** Text lozenge for annotation status — clearer than an icon (UX-12). */
+function statusLozenge(status?: AnnotStatus) {
+  const s = status ?? "open";
+  const label = s === "wontfix" ? "Won't fix" : s.charAt(0).toUpperCase() + s.slice(1);
+  const tone =
+    s === "resolved" ? "bg-green-900/50 text-green-300"
+    : s === "wontfix" ? "bg-stone-700 text-stone-400"
+    : "bg-sky-900/50 text-sky-300";
+  return (
+    <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-medium leading-none whitespace-nowrap", tone)}>
+      {label}
+    </span>
+  );
 }
 
 function annotText(ann: LocalAnnot): string {
@@ -265,14 +273,14 @@ export default function AnnotationsListPanel({
             <ChevronDown className="h-3 w-3" />
           </button>
 
-          {/* Status toggle (comments only) */}
+          {/* Status toggle (comments only) — text lozenge, click to cycle */}
           {showStatus && (
             <button
               onClick={e => { e.stopPropagation(); cycleStatus(ann); }}
               title={`Status: ${status} — click to cycle`}
-              className="hover:opacity-100 transition"
+              className="hover:opacity-90 transition"
             >
-              {statusIcon((ann as { status?: AnnotStatus }).status)}
+              {statusLozenge((ann as { status?: AnnotStatus }).status)}
             </button>
           )}
 

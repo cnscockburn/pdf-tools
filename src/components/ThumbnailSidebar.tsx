@@ -46,7 +46,7 @@ export default function ThumbnailSidebar({ file, currentPage, onSelect, collapse
       </button>
 
       {!collapsed && (
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 space-y-1.5 pt-3">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-dark p-2 space-y-1.5 pt-3">
           {Array.from({ length: pageCount }, (_, i) => i + 1).map((p) => {
             const count = countsByPage.get(p) ?? 0;
             return (

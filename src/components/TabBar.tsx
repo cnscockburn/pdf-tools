@@ -79,9 +79,10 @@ export default function TabBar({ tabs, activeTabId, sideBySideTabId, onSwitch, o
   }, [tabs, activeTabId, onSwitch, onClose, onNewTab]);
 
   return (
-    <div className="bg-stone-900 border-b border-stone-700 flex items-end gap-0 shrink-0 overflow-x-auto scrollbar-none select-none"
-      role="tablist"
-    >
+    <div className="bg-stone-900 border-b border-stone-700 flex items-end gap-0 shrink-0 select-none">
+      {/* Scrolling tab strip — the +/gear stay pinned outside so they're always
+          reachable however many tabs are open (plan §8.5). */}
+      <div className="flex items-end gap-0 overflow-x-auto scrollbar-none min-w-0 flex-1" role="tablist">
       {tabs.map(tab => {
         const active = tab.id === activeTabId;
         const inSplit = tab.id === sideBySideTabId;
@@ -96,7 +97,7 @@ export default function TabBar({ tabs, activeTabId, sideBySideTabId, onSwitch, o
             onAuxClick={e => { if (e.button === 1) { e.preventDefault(); onClose(tab.id); } }}
             className={cn(
               "group relative flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors cursor-pointer",
-              "min-w-0 max-w-[180px] shrink-0",
+              "min-w-0 max-w-[270px] shrink-0",
               active
                 ? "text-white bg-stone-800"
                 : inSplit
@@ -138,8 +139,9 @@ export default function TabBar({ tabs, activeTabId, sideBySideTabId, onSwitch, o
           </div>
         );
       })}
+      </div>
 
-      {/* New tab button */}
+      {/* New tab button — pinned (outside the scroll strip) */}
       <button
         onClick={onNewTab}
         title="New tab (Ctrl+T)"
@@ -148,9 +150,6 @@ export default function TabBar({ tabs, activeTabId, sideBySideTabId, onSwitch, o
       >
         <Plus className="h-3.5 w-3.5" />
       </button>
-
-      {/* Spacer — pushes settings gear to the right */}
-      <div className="flex-1" />
 
       {/* Settings gear — always visible, accessible from any tab */}
       <button

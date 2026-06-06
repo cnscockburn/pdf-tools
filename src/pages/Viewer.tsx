@@ -532,8 +532,11 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   }, [isSecondaryPane]);
 
   // ── Text selection → QuickActionBar ──────────────────────────────────────
+  // Active in annotate mode AND view mode (UX-05): selecting text anywhere
+  // surfaces the quick markup bar. In view mode there's no free-rect fallback
+  // (that drag ref is only set in annotate mode) and no auto-apply.
   useEffect(() => {
-    if (canvasMode !== "annotate") return;
+    if (canvasMode !== "annotate" && canvasMode !== "view") return;
 
     function onMouseUp(e: MouseEvent) {
       // Small delay so the selection settles
@@ -1099,14 +1102,19 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     if (!quickBar) return;
     const bb = boundingBox(quickBar.rects);
     const id = newId();
-    setAnnotations(prev => [...prev, {
+    // Pre-populate the note with the selected text and switch to annotate/note
+    // mode so it's immediately editable (double-click to refine). Goes through
+    // changeAnnotations for undo. (UX-09 / G-02)
+    const ann: LocalAnnot = {
       id, page: currentPage, type: "note",
       x: bb.x0, y: bb.y0, text: quickBar.text.slice(0, 200),
       author: settings.author || undefined,
-    }]);
+    };
+    changeAnnotations([...annotationsRef.current, ann]);
     window.getSelection()?.removeAllRanges();
     setQuickBar(null);
-    if (canvasMode !== "annotate") doSwitchMode("annotate");
+    doSwitchMode("annotate");
+    setAnnotateSubMode("note");
   }
 
   // ── Annotation management ─────────────────────────────────────────────────
@@ -1124,7 +1132,20 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     // Only switch to annotate mode for draft annotations — baked ones are
     // always visible via the read-only layer regardless of canvasMode.
     if (isDraft && canvasMode !== "annotate") doSwitchMode("annotate");
-    setTimeout(() => setFocusAnnotId(null), 150);
+
+    // Scroll the canvas so the annotation sits roughly in the middle of the
+    // viewport, not just somewhere on the (possibly tall) page (UX-10). Delay
+    // lets a cross-page navigation finish rendering the new page first.
+    const yFrac = "y" in ann ? ann.y : ann.y0;
+    setTimeout(() => {
+      const area = canvasAreaRef.current, wrap = canvasWrapRef.current;
+      if (!area || !wrap) return;
+      const target = wrap.offsetTop + yFrac * wrap.offsetHeight - area.clientHeight / 2;
+      area.scrollTo({ top: Math.max(0, target), behavior: settings.reduceMotion ? "auto" : "smooth" });
+    }, 120);
+
+    // Keep the row/overlay highlighted long enough to read as "selected".
+    setTimeout(() => setFocusAnnotId(null), 1600);
   }
 
   function deleteAnnot(id: AnnotId) {
@@ -1525,7 +1546,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           )}
 
           {/* Canvas scroll area */}
-          <div ref={canvasAreaRef} className="flex-1 overflow-auto flex flex-col items-center py-8 px-4">
+          <div ref={canvasAreaRef} className="flex-1 overflow-auto scrollbar-dark flex flex-col items-center py-8 px-4">
 
             <div
               ref={canvasWrapRef}
@@ -1550,13 +1571,16 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                 className="rounded block"
               />
 
-              {/* ── Text layer (always in annotate mode) ────────────────────── */}
-              {canvasMode === "annotate" && pdf && (
+              {/* ── Text layer — mounted in annotate AND view mode ──────────────
+                   View mode: always selectable so the quick markup bar can be
+                   summoned over a selection (UX-05). Annotate mode: selectable
+                   only in the text-markup sub-modes (textSelectActive). ── */}
+              {(canvasMode === "annotate" || canvasMode === "view") && pdf && (
                 <TextLayer
                   pdf={pdf}
                   pageNum={currentPage}
                   scale={scale}
-                  active={textSelectActive}
+                  active={canvasMode === "view" ? true : textSelectActive}
                 />
               )}
 
@@ -2126,7 +2150,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
       </div>
 
       {/* ── QuickActionBar ────────────────────────────────────────────────────── */}
-      {quickBar && canvasMode === "annotate" && (
+      {quickBar && (canvasMode === "annotate" || canvasMode === "view") && (
         <div data-quickbar="true">
           <QuickActionBar
             x={quickBar.barX}

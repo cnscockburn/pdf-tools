@@ -37,6 +37,31 @@
     scrollbar-width: thin;
   }
 
+  /* Hidden scrollbar (used by the tab strip). */
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+
+  /* Themed scrollbar for dark viewer surfaces (thumbnail sidebar, right rail,
+     canvas area) — warm-stone, slim, unobtrusive (UX-14). */
+  .scrollbar-dark {
+    scrollbar-width: thin;
+    scrollbar-color: #57534e transparent; /* stone-600 thumb */
+  }
+  .scrollbar-dark::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scrollbar-dark::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-dark::-webkit-scrollbar-thumb {
+    background: #57534e;            /* stone-600 */
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  .scrollbar-dark::-webkit-scrollbar-thumb:hover {
+    background: #78716c;            /* stone-500 */
+    background-clip: padding-box;
+  }
+
   /* Suppress the native number-input spinner arrows — they don't match the dark
      UI. Page-number and similar inputs use .no-spinner; value is still typeable. */
   .no-spinner::-webkit-outer-spin-button,
