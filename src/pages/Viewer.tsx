@@ -128,6 +128,11 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => !(settings.thumbnailsOpenDefault ?? false),
   );
+  // Right rail collapse. Secondary panes start collapsed to save space; the
+  // primary follows the user's default (UX-22 / N-06).
+  const [railCollapsed, setRailCollapsed] = useState(
+    () => isSecondaryPane ? true : !(settings.rightRailOpenDefault ?? true),
+  );
   const [panelTool, setPanelTool] = useState<PanelTool>(null);
   const [railTab, setRailTab] = useState<RailTab>("annotations");
 
@@ -1406,11 +1411,12 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           { type: "separator" },
           { label: annotationsVisible ? "Hide annotations" : "Show annotations", shortcut: "Shift+H", action: () => setAnnotationsVisible(v => !v), checked: annotationsVisible },
           { label: "Show Thumbnails",    action: () => setSidebarCollapsed(v => !v), checked: !sidebarCollapsed },
+          { label: "Show Side Panel",    action: () => setRailCollapsed(v => !v),    checked: !railCollapsed },
           { label: "Mini-map",          action: () => setMiniMapVisible(v => !v),   checked: miniMapVisible },
           { type: "separator" },
-          { label: "Annotations panel",  action: () => setRailTab("annotations"),  disabled: !hasDoc },
-          { label: "Table of Contents",  action: () => setRailTab("outline"),       disabled: !hasDoc },
-          { label: "Bookmarks",          action: () => setRailTab("bookmarks"),     disabled: !hasDoc },
+          { label: "Annotations panel",  action: () => { setRailCollapsed(false); setRailTab("annotations"); },  disabled: !hasDoc },
+          { label: "Table of Contents",  action: () => { setRailCollapsed(false); setRailTab("outline"); },      disabled: !hasDoc },
+          { label: "Bookmarks",          action: () => { setRailCollapsed(false); setRailTab("bookmarks"); },     disabled: !hasDoc },
           { type: "separator" },
           { label: "Side by Side — Same Document",                       action: () => openSideBySide("horizontal", "mirror", workingFile ?? file), disabled: !hasDoc },
           { label: "Side by Side — New Document",   shortcut: "Ctrl+\\",  action: () => openSideBySide("horizontal", "new") },
@@ -2178,25 +2184,47 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
             onAddSnippet={addSnippet}
             onRemoveSnippet={removeSnippet}
           />
+        ) : railCollapsed ? (
+          // Collapsed rail — a thin bar with an expand handle (UX-22 / N-06).
+          <div className="w-8 shrink-0 flex flex-col items-center bg-stone-800 border-l border-stone-600">
+            <button
+              onClick={() => setRailCollapsed(false)}
+              title="Show panel"
+              aria-label="Show annotations panel"
+              className="mt-3 flex h-6 w-6 items-center justify-center rounded-full bg-stone-700 border border-stone-600 text-stone-300 hover:bg-stone-600 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/50 -ml-6 z-20"
+            >
+              <ChevronLeft className="h-3 w-3" />
+            </button>
+          </div>
         ) : (
-          <RightRail
-            annotations={[...bakedAnnotations, ...annotations]}
-            currentPage={currentPage}
-            onGoToPage={goTo}
-            onFocusAnnot={focusAnnotation}
-            onDeleteAnnot={deleteAnnot}
-            onStatusChange={changeAnnotStatus}
-            onExportReport={() => downloadAnnotationReport([...bakedAnnotations, ...annotations], filename)}
-            focusAnnotId={focusAnnotId}
-            colorLabels={settings.colorLabels}
-            pdf={pdf}
-            bookmarks={bookmarks}
-            onAddBookmark={() => addBookmark(currentPage)}
-            onDeleteBookmark={removeBookmark}
-            onRenameBookmark={renameBookmark}
-            activeTab={railTab}
-            onTabChange={setRailTab}
-          />
+          <div className="relative flex">
+            <button
+              onClick={() => setRailCollapsed(true)}
+              title="Hide panel"
+              aria-label="Hide annotations panel"
+              className="absolute -left-3 top-3 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-stone-700 border border-stone-600 text-stone-300 hover:bg-stone-600 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/50"
+            >
+              <ChevronRight className="h-3 w-3" />
+            </button>
+            <RightRail
+              annotations={[...bakedAnnotations, ...annotations]}
+              currentPage={currentPage}
+              onGoToPage={goTo}
+              onFocusAnnot={focusAnnotation}
+              onDeleteAnnot={deleteAnnot}
+              onStatusChange={changeAnnotStatus}
+              onExportReport={() => downloadAnnotationReport([...bakedAnnotations, ...annotations], filename)}
+              focusAnnotId={focusAnnotId}
+              colorLabels={settings.colorLabels}
+              pdf={pdf}
+              bookmarks={bookmarks}
+              onAddBookmark={() => addBookmark(currentPage)}
+              onDeleteBookmark={removeBookmark}
+              onRenameBookmark={renameBookmark}
+              activeTab={railTab}
+              onTabChange={setRailTab}
+            />
+          </div>
         ))}
 
       </div>

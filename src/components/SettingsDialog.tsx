@@ -138,6 +138,7 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
   const [reduceMotion, setReduceMotion]   = useState(settings.reduceMotion ?? false);
   const [fitMode, setFitMode]             = useState<FitMode>(settings.defaultFitMode ?? "width");
   const [thumbsDefault, setThumbsDefault] = useState(settings.thumbnailsOpenDefault ?? false);
+  const [railDefault, setRailDefault]     = useState(settings.rightRailOpenDefault ?? true);
   const [hlDefault, setHlDefault]         = useState<0|1|2|3>(settings.defaultHighlightColor ?? 0);
   const [inkWidth, setInkWidth]           = useState(settings.defaultInkWidth ?? 2);
   const [labels, setLabels]               = useState<[string,string,string,string]>(
@@ -161,6 +162,7 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
       reduceMotion,
       defaultFitMode:        fitMode,
       thumbnailsOpenDefault: thumbsDefault,
+      rightRailOpenDefault:  railDefault,
       defaultHighlightColor: hlDefault,
       defaultInkWidth:       inkWidth,
       colorLabels:           labels,
@@ -265,6 +267,13 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
               onChange={setThumbsDefault}
               label="Open thumbnail sidebar by default"
               description="Show page thumbnails automatically when a PDF loads."
+            />
+
+            <Toggle
+              checked={railDefault}
+              onChange={setRailDefault}
+              label="Open side panel by default"
+              description="Show the annotations / outline / bookmarks panel when a PDF loads."
             />
           </section>
 

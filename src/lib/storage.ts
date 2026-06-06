@@ -40,6 +40,8 @@ export interface Settings {
   defaultFitMode: FitMode;
   /** Whether the thumbnail sidebar opens automatically when a PDF is loaded. */
   thumbnailsOpenDefault: boolean;
+  /** Whether the right rail (annotations / outline / bookmarks) starts open. */
+  rightRailOpenDefault: boolean;
 
   // ── Annotation defaults ─────────────────────────────────────────────────────
   /**
@@ -77,6 +79,7 @@ function defaults(): Settings {
     uiScale: 1.25,
     defaultFitMode: "width",
     thumbnailsOpenDefault: false,
+    rightRailOpenDefault: true,
     defaultHighlightColor: 0,
     defaultInkWidth: 2,
     reduceMotion: prefersReduced,
@@ -106,6 +109,7 @@ export function loadSettings(): Settings {
           ? (parsed.defaultFitMode as FitMode)
           : d.defaultFitMode,
         thumbnailsOpenDefault: parsed.thumbnailsOpenDefault ?? d.thumbnailsOpenDefault,
+        rightRailOpenDefault: parsed.rightRailOpenDefault ?? d.rightRailOpenDefault,
         defaultHighlightColor: ([0, 1, 2, 3] as const).includes(parsed.defaultHighlightColor as 0)
           ? (parsed.defaultHighlightColor as 0 | 1 | 2 | 3)
           : d.defaultHighlightColor,
