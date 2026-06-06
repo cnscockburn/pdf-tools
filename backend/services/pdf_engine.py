@@ -146,8 +146,16 @@ def images_to_pdf(image_data: list[tuple[bytes, str]]) -> bytes:
 def compress(file_bytes: bytes, quality: str = "ebook") -> bytes:
     """
     Compress a PDF. Removes unused objects and recompresses images with Pillow.
-    quality: 'screen' (smallest/lowest), 'ebook' (balanced), 'printer' (high quality)
+    quality: 'screen' (smallest/lowest), 'ebook' (balanced), 'printer' (high quality),
+             'lossless' (structure-only: deflate + garbage-collect, images untouched,
+                         text stays selectable — smaller win but no quality loss).
     """
+    # Lossless mode: skip image recompression entirely. Just drop unused objects
+    # and deflate streams. Preserves text and image fidelity (UX-20).
+    if quality == "lossless":
+        doc = _open(file_bytes)
+        return doc.tobytes(garbage=4, deflate=True, clean=True)
+
     from PIL import Image
 
     jpeg_quality = {"screen": 25, "ebook": 55, "printer": 82}.get(quality, 55)

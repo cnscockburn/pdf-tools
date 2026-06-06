@@ -194,6 +194,9 @@ print("\n== compress / watermark / crop ==")
 compressed = pdf_engine.compress(pdf_bytes, "ebook")
 check("compress returns valid PDF", compressed.startswith(b"%PDF"))
 
+lossless = pdf_engine.compress(pdf_bytes, "lossless")
+check("lossless compress returns valid PDF", lossless.startswith(b"%PDF"))
+
 watermarked = pdf_engine.watermark_text(pdf_bytes, "DRAFT")
 check("watermark returns valid PDF", watermarked.startswith(b"%PDF"))
 

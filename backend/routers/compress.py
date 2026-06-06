@@ -11,10 +11,10 @@ router = APIRouter()
 @router.post("/compress")
 async def compress_pdf(
     payload: tuple[bytes, str] = Depends(read_pdf_upload),
-    quality: str = Form("ebook"),  # screen | ebook | printer
+    quality: str = Form("ebook"),  # screen | ebook | printer | lossless
 ):
-    if quality not in ("screen", "ebook", "printer"):
-        raise HTTPException(status_code=400, detail="quality must be screen, ebook, or printer.")
+    if quality not in ("screen", "ebook", "printer", "lossless"):
+        raise HTTPException(status_code=400, detail="quality must be screen, ebook, printer, or lossless.")
     data, filename = payload
     result = run_engine(pdf_engine.compress, data, quality)
     return Response(

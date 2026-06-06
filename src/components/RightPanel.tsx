@@ -67,6 +67,7 @@ function CompressPanel({ file, onClose, onApplied }: { file: File; onClose: () =
   const [error, setError] = useState<string | null>(null);
 
   const QUALITIES = [
+    { value: "lossless", label: "Lossless", desc: "Keeps text & image quality — modest size win" },
     { value: "screen",  label: "Screen",  desc: "Smallest file — 72 DPI images" },
     { value: "ebook",   label: "Balanced", desc: "Good quality — recommended" },
     { value: "printer", label: "Printer",  desc: "High quality — large file" },
