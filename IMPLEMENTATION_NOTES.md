@@ -6,6 +6,30 @@ Tracks blocked items, decisions needed, and items requiring your manual testing 
 
 ---
 
+## 📊 Overall status (2026-06-06)
+
+- **Pre-Phase 1 hotfix:** done.
+- **Phase 1 (annotation pipeline / E-08):** done.
+- **Phase 2 (functional bugs, all groups A–F):** done.
+- **Phase 3 (UX improvements):** core set done; deferred items listed below.
+- **Phase 4 (new features):** **partial** — done: annotation search, custom stamp labels, print, Outline+Bookmarks rail merge. Watermark-from-viewer was already present (Document menu / palette). **Remaining:** recent files, password-protected PDFs, help mode, PDF form filling (see "Remaining large features").
+- **Phase 5 (architecture):** not started — Organise tool, light/dark mode, MiniMap wave-scrub.
+
+Everything committed; tsc clean; 119/119 frontend tests; backend smoke green; production build verified.
+
+## 🧱 Remaining large features (need a dedicated session each, some need a decision)
+
+- **Recent files (5.1) — needs a decision.** To re-open a recent file you need its OS path. Today only CLI-/Explorer-opened files carry a path (`read_file_bytes`); drag-dropped and in-app-picker files are HTML5 `File` objects with no path. Options: (a) metadata-only list that re-opens via the picker (low value); (b) switch file intake to Tauri's native dialog + native drag-drop so every open captures a path (cleanest, but reworks the intake path). **Which do you want?**
+- **Password-protected PDFs (5.2).** PDF.js `PasswordException` → unlock dialog → retry with password; thread an optional `password` through every backend endpoint (`fitz.open(..., password=...)`). Medium.
+- **Help mode (6.4).** `helpContent.ts` registry + `HelpTooltip`/`HelpPanel` + `data-help-id` on viewer controls; toggle from the ? menu. Content-writing heavy. Decision earlier: hover tooltips (A) + click-to-describe panel (C) together.
+- **PDF form filling (5.3).** New `"form"` canvas mode, render PDF.js widgets, `/fill-form` backend endpoint (`widget.field_value`). Largest of the four.
+
+## 🏛️ Phase 5 (architecture — large)
+
+- **Unified Organise tool (6.1):** new tab replacing Split panel + Rearrange; visual page grid with delete/rotate/extract/split/merge. All backend ops already exist.
+- **Light/Dark mode (6.2):** independent app/viewer theme toggles; biggest surface-area change (every component needs variant tokens). Decision: independently toggleable.
+- **MiniMap wave-scrub (6.3):** thin strip + dock-magnification hover + thumbnail-on-settle + drag-defers-nav. Complex interaction; plan the feel carefully.
+
 ## 🔴 Needs Your Decision
 
 ### Tab-close guard scope (P1-03)
@@ -89,5 +113,13 @@ All committed across 6 commits. tsc clean; 119/119 tests; backend smoke green.
 - UX-05 ink colour picker + 1-9 weighted width keys.
 Committed across ~7 commits. tsc clean; 119/119 tests; backend smoke green; production build verified.
 Deferred items listed above.
+
+### Phase 4 — new features (partial)
+- 5.4 Annotation search — search box in the right-rail Notes panel (content/author/type/tags).
+- 5.5 Custom stamp labels — Settings → Annotations add/remove; appended to built-in stamps.
+- 5.6 Print — File menu / palette / Ctrl+P via hidden iframe (prints only the PDF). **Verify the print dialog opens in the Tauri build.**
+- 6.5 Outline+Bookmarks merged into one "Document" rail tab (new DocumentPanel; Outline section hidden when the PDF has none).
+- 5.7 Watermark-from-viewer was already wired (Document menu + palette) — no work needed.
+tsc clean; 119/119 tests; backend smoke green.
 
 ---
