@@ -25,6 +25,9 @@ The backend smoke tests confirm the fixes at the engine level, but the full roun
 
 **Note on stamp border:** I kept the stamp as a real PDF annotation (white fill + coloured bold text + coloured border) rather than the plan's "draw_rect + insert_text as page content" approach. Reason: page-content drawing is NOT cleared by the replace-semantics loop, so it would **duplicate** on every re-save (incompatible with the multi-layer fix). The annotation approach renders reliably and clears correctly. If you want a more visually distinct stamp (e.g. filled colour background with white text), flag it and I'll explore the `rich_text=True` border path.
 
+### Phase 2 — `?` key opens cheat sheet (P1-20)
+Code path verified correct by inspection (window keydown listener, `?` handled at top of handler before mode keys, renders `<KeyboardCheatSheet>` when `cheatSheetOpen`). Could not find a bug. **Please confirm in the live app:** with a PDF open and focus NOT in a text field, press `?` (Shift+/) — the shortcuts panel should toggle. If it still does nothing, tell me what element had focus when you pressed it and I'll dig further. (Clicking the `?` button in the bottom toolbar is a known-good fallback.)
+
 ---
 
 ## ⛔ Blocked

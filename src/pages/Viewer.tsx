@@ -274,6 +274,18 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     | { type: "tab"; tabType: "merge" | "rearrange" | "images-to-pdf"; file?: File };
   const [pendingNav, setPendingNav] = useState<PendingNav | null>(null);
 
+  // ── Transient toast (e.g. "no changes to download") ────────────────────────
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function showToast(msg: string) {
+    setToast(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
+  }
+
+  // ── Download guard (uncommitted annotations) ───────────────────────────────
+  const [downloadGuard, setDownloadGuard] = useState(false);
+
   // ── Multi-level undo / redo ────────────────────────────────────────────────
   const [undoStack, setUndoStack] = useState<LocalAnnot[][]>([]);
   const [redoStack, setRedoStack] = useState<LocalAnnot[][]>([]);
@@ -296,6 +308,14 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   // ── Stable ref for opening settings (used by the Ctrl+, keyboard shortcut) ──
   const openSettingsRef = useRef<() => void>(() => {});
   openSettingsRef.current = openSettings;
+
+  // ── Stable ref for the download entry point (used by the Ctrl+S shortcut) ───
+  const requestDownloadRef = useRef<() => void>(() => {});
+
+  // ── Always-fresh ref to the working blob (read after awaits where the state
+  //    closure would be stale, e.g. commit-then-download). ──────────────────
+  const workingBlobRef = useRef<Blob | null>(null);
+  workingBlobRef.current = workingBlob;
 
   // ── Keyboard shortcut state ref ────────────────────────────────────────────
   const kbRef = useRef({
@@ -685,7 +705,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
       // Allow search input to capture everything
       if (tag === "INPUT" || tag === "TEXTAREA") return;
 
-      const { currentPage, pdf, workingBlob, filename, selectedRedact } = kbRef.current;
+      const { currentPage, pdf, selectedRedact } = kbRef.current;
 
       // ── Cheat sheet ────────────────────────────────────────────────────
       if (e.key === "?" && !e.ctrlKey && !e.metaKey) {
@@ -713,7 +733,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
         }
         if (e.key === "s" || e.key === "S") {
           e.preventDefault();
-          if (workingBlob) downloadBlob(workingBlob, filename);
+          requestDownloadRef.current();
           return;
         }
         if ((e.key === "z" || e.key === "Z") && !e.shiftKey) {
@@ -853,6 +873,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     doSwitchMode(m);
   }
   switchModeRef.current = switchMode;
+  requestDownloadRef.current = requestDownload;
 
   // ── Annotation history (multi-level undo / redo) ───────────────────────────
 
@@ -932,8 +953,34 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
 
   function commitFilename() {
     const t = filenameInput.trim();
-    if (t) setFilename(t.endsWith(".pdf") ? t : `${t}.pdf`);
+    if (t) {
+      const next = t.endsWith(".pdf") ? t : `${t}.pdf`;
+      setFilename(next);
+      // A rename is a modification: if nothing has been baked yet there is no
+      // workingBlob, so Ctrl+S / the download button would stay disabled and the
+      // user couldn't save the renamed file. Seed a workingBlob from the original
+      // file so the rename alone is downloadable. (Fixes D-07.)
+      if (!workingBlob && file) {
+        setWorkingBlob(new Blob([file], { type: "application/pdf" }));
+      }
+    }
     setEditingFilename(false);
+  }
+
+  /**
+   * Central download entry point used by Ctrl+S, the File menu, the toolbar
+   * button, and the command palette. Handles the three states:
+   *   - uncommitted annotations present → guard modal (commit first or discard)
+   *   - nothing to download (no blob, no annotations) → toast
+   *   - otherwise → download the working blob
+   */
+  function requestDownload() {
+    if (annotations.length > 0) { setDownloadGuard(true); return; }
+    if (!workingBlob) {
+      showToast("No changes to download yet — annotate, redact, or crop first.");
+      return;
+    }
+    downloadBlob(workingBlob, filename);
   }
 
   function togglePanel(t: PanelTool) {
@@ -1220,14 +1267,13 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   // ── Menu bar definitions ──────────────────────────────────────────────────
   function buildViewerMenus(): MenuDef[] {
     const hasDoc = !!pdf;
-    const hasBlob = !!workingBlob;
 
     return [
       {
         label: "File",
         items: [
           { label: "Open…",               shortcut: "Ctrl+O",       action: () => openFilePicker() },
-          { label: "Save / Download",      shortcut: "Ctrl+S",       action: () => { if (workingBlob) downloadBlob(workingBlob, filename); }, disabled: !hasBlob },
+          { label: "Save / Download",      shortcut: "Ctrl+S",       action: () => requestDownload() },
           { type: "separator" },
           { label: "Export Review Report", action: () => downloadAnnotationReport([...bakedAnnotations, ...annotations], filename), disabled: bakedAnnotations.length === 0 && annotations.length === 0 },
           { type: "separator" },
@@ -1409,7 +1455,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           {/* Download button — primary pane only */}
           {!isSecondaryPane && workingBlob && (
             <button
-              onClick={() => downloadBlob(workingBlob, filename)}
+              onClick={() => requestDownload()}
               title="Download modified PDF (Ctrl+S)"
               className="flex items-center gap-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 px-2.5 py-1.5 text-xs font-semibold text-white transition shadow-lg"
             >
@@ -2120,6 +2166,69 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           </div>
         </div>
       )}
+
+      {/* ── Download guard: uncommitted annotations (P1-11) ─────────────────── */}
+      {downloadGuard && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Uncommitted annotations"
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70"
+          onClick={e => { if (e.target === e.currentTarget) setDownloadGuard(false); }}
+        >
+          <div className="bg-stone-900 border border-stone-700 rounded-2xl shadow-2xl w-[400px] max-w-[90vw] p-6 flex flex-col gap-5">
+            <div>
+              <h2 className="text-sm font-semibold text-white">Commit annotations before downloading?</h2>
+              <p className="mt-1.5 text-xs text-stone-400 leading-relaxed">
+                You have <span className="text-stone-300 font-medium">{annotations.length} annotation{annotations.length !== 1 ? "s" : ""}</span> that
+                {" "}haven't been embedded into the PDF yet. Commit them first so they appear in the downloaded file, or download the current version without them.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={async () => {
+                  setDownloadGuard(false);
+                  await autoSaveAnnotations("view");
+                  // autoSaveAnnotations updates workingBlob; download the result.
+                  // Read the freshest blob via a microtask so state has settled.
+                  setTimeout(() => {
+                    if (workingBlobRef.current) downloadBlob(workingBlobRef.current, filename);
+                  }, 60);
+                }}
+                disabled={autoSaving}
+                className="flex items-center justify-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 px-4 py-2.5 text-xs font-semibold text-white transition shadow-lg disabled:opacity-50"
+              >
+                <Check className="h-3.5 w-3.5" /> Commit, then download
+              </button>
+              <button
+                onClick={() => {
+                  setDownloadGuard(false);
+                  if (workingBlob) downloadBlob(workingBlob, filename);
+                  else showToast("Nothing committed yet — annotate and commit to create a downloadable PDF.");
+                }}
+                className="rounded-xl bg-stone-700 hover:bg-stone-600 border border-stone-600 px-4 py-2.5 text-xs font-medium text-stone-300 transition"
+              >
+                Download without them
+              </button>
+              <button
+                onClick={() => setDownloadGuard(false)}
+                className="rounded-xl px-4 py-2 text-xs text-stone-500 hover:text-stone-300 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Transient toast ────────────────────────────────────────────────── */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[400] pointer-events-none">
+          <div className="bg-stone-900 border border-stone-600 rounded-lg shadow-2xl px-4 py-2 text-xs text-stone-200">
+            {toast}
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -2162,7 +2271,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
       { id: "export",       label: "Export report",     description: "Download annotations as .md",   category: "Export",     action: () => { downloadAnnotationReport([...bakedAnnotations, ...annotations], filename); setPaletteOpen(false); } },
       ...(workingBlob ? [{
         id: "download", label: "Download PDF", description: "Save modified PDF (Ctrl+S)", category: "Export",
-        action: () => { downloadBlob(workingBlob, filename); setPaletteOpen(false); },
+        action: () => { setPaletteOpen(false); requestDownload(); },
       }] : []),
       { id: "sbs-same",     label: "Side by Side — Same Document", description: "View this document in two panes (Ctrl+\\)", category: "View", action: () => { openSideBySide("horizontal", "mirror", workingFile ?? file); setPaletteOpen(false); } },
       { id: "sbs-new",      label: "Side by Side — New Document",  description: "Open another document alongside",          category: "View", action: () => { openSideBySide("horizontal", "new"); setPaletteOpen(false); } },
