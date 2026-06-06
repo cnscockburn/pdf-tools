@@ -1786,7 +1786,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                 <div className="flex gap-0.5">
                   {([
                     { m: "freetext" as CreateMode, icon: <Type    className="h-3.5 w-3.5" />, label: "Text",  key: "T" },
-                    { m: "ink"      as CreateMode, icon: <PenLine className="h-3.5 w-3.5" />, label: "Draw",  key: "I" },
+                    { m: "ink"      as CreateMode, icon: <PenLine className="h-3.5 w-3.5" />, label: "Ink",   key: "I" },
                     { m: "shape"    as CreateMode, icon: <Square  className="h-3.5 w-3.5" />, label: "Shape", key: "G" },
                   ]).map(({ m, icon, label, key }) => {
                     const active = annotateSubMode === m;
@@ -2391,9 +2391,14 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
       { id: "underline",    label: "Underline",        description: "Underline text (U)",             category: "Annotate",   action: go("annotate", "underline") },
       { id: "strikethrough",label: "Strikethrough",    description: "Strike through text (S)",        category: "Annotate",   action: go("annotate", "strikethrough") },
       { id: "freetext",     label: "Text box",         description: "Drag to place a text box (T)",   category: "Annotate",   action: go("annotate", "freetext") },
-      { id: "ink",          label: "Draw / Ink",       description: "Freehand drawing (I)",           category: "Annotate",   action: go("annotate", "ink") },
+      { id: "ink",          label: "Ink",              description: "Freehand drawing (I)",           category: "Annotate",   action: go("annotate", "ink") },
       { id: "shape",        label: "Shape",            description: "Draw rect / ellipse / arrow",    category: "Annotate",   action: go("annotate", "shape") },
       { id: "stamp",        label: "Stamp",            description: "Place a stamp label",            category: "Annotate",   action: go("annotate", "stamp") },
+      { id: "open",         label: "Open PDF…",         description: "Open another file (Ctrl+O)",     category: "File",       action: () => { setPaletteOpen(false); openFilePicker(); } },
+      { id: "zoom-in",      label: "Zoom in",           description: "Enlarge the page (+)",           category: "View",       action: () => { zoomBy(1); setPaletteOpen(false); } },
+      { id: "zoom-out",     label: "Zoom out",          description: "Shrink the page (−)",            category: "View",       action: () => { zoomBy(-1); setPaletteOpen(false); } },
+      { id: "zoom-reset",   label: "Reset zoom",        description: "Back to 100% (Ctrl+0)",          category: "View",       action: () => { resetZoom(); setPaletteOpen(false); } },
+      { id: "toggle-annots",label: annotationsVisible ? "Hide annotations" : "Show annotations", description: "Toggle annotation overlay (Shift+H)", category: "View", action: () => { setAnnotationsVisible(v => !v); setPaletteOpen(false); } },
       { id: "search",       label: "Search text",       description: "Find text in document (Ctrl+F)", category: "Navigation", action: () => { setSearchOpen(true); setPaletteOpen(false); } },
       { id: "cheatsheet",   label: "Keyboard shortcuts",description: "Show all key bindings (?)",     category: "Help",       action: () => { setCheatSheetOpen(true); setPaletteOpen(false); } },
       { id: "annotations",  label: "Annotations panel", description: "View all annotations",          category: "Navigation", action: () => { setRailTab("annotations"); setPaletteOpen(false); } },

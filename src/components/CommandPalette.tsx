@@ -1,7 +1,7 @@
 /**
  * CommandPalette — Ctrl+Shift+P fuzzy command launcher.
  *
- * Type any command name to filter. Type a number or ">N" to jump to page N.
+ * Type any command name to filter. Type a number to jump to that page.
  * Snippets from settings appear as insertable items (copies to clipboard).
  */
 import { useState, useRef, useEffect, useMemo } from "react";

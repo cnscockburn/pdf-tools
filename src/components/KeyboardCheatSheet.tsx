@@ -23,7 +23,7 @@ const SHORTCUTS: Entry[] = [
   { key: "Del / Backspace", desc: "Delete selected annotation" },
   { key: "Shift+click",    desc: "Multi-select (then bulk status/colour/delete)" },
   { key: "Dbl-click",      desc: "Edit note or add comment to markup" },
-  { key: "Ctrl+Z",         desc: "Undo" },
+  { key: "Ctrl+Z",         desc: "Undo (cleared once you commit with Done)" },
   { key: "Ctrl+Shift+Z",   desc: "Redo" },
 
   { section: "Text selection (Highlight / Underline / Strike mode)" },
