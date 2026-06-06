@@ -8,11 +8,21 @@ Tracks blocked items, decisions needed, and items requiring your manual testing 
 
 ## 🔴 Needs Your Decision
 
-_(none yet)_
+### Tab-close guard scope (P1-03)
+The close guard currently blocks only on **uncommitted annotations** (`annotations.length > 0`). It does **not** warn when you have a modified-but-not-downloaded working blob (after redact/crop/bake) on tab close. Reason: the working blob persists after download (no "downloaded" flag), so guarding on it would warn on every close even after you've saved. The navigation guard (`pendingNav`) already covers download-before-leaving for Home/Merge/etc. navigation.
+**Decision needed:** is annotation-only close guarding enough, or do you want me to add a "modified since last download" flag so tab-close also warns about undownloaded redact/crop/compress results? (Small extra state; straightforward.)
 
 ---
 
 ## 🟡 Needs Your Manual Testing (in a running Tauri build)
+
+### Phase 2 — items to confirm live
+- **D-04 (scroll-past-edge navigation):** the wheel handler is present and well-formed (80px threshold + cooldown). Not covered in your test notes. Please scroll past the bottom/top of a page and confirm it advances/retreats.
+- **P1-26 (mirror sync live):** open the same doc side-by-side (View → Side by Side — Same Document), annotate in one pane, confirm it now appears in the other pane immediately (no longer requires switching to annotate mode).
+- **P1-03/P1-24 (close guards):** with uncommitted annotations, press Ctrl+W / click the tab ×, and close a split pane — confirm the "Close without saving / Keep editing" dialog appears.
+- **P1-11 (download guard):** with uncommitted annotations, press Ctrl+S — confirm the "Commit, then download / Download without them / Cancel" modal appears.
+- **P1-08 (highlight popup):** select a highlight (popup appears), switch tools — confirm the colour popup dismisses.
+- **Settings focus trap (P1-04):** open Settings, Tab through to the end — confirm focus cycles back to the top of the dialog instead of escaping to the page behind.
 
 ### Phase 1 — Annotation round-trip (E-08)
 The backend smoke tests confirm the fixes at the engine level, but the full round-trip needs verification in the live app, since it depends on PDF.js rendering embedded annotations (annotationMode) which can't be unit-tested headless:
@@ -48,5 +58,14 @@ _(none yet)_
 - **P1-34 (author):** Added `author?` to API `Annotation` type and `InkAnnot` local type; `toApiAnnotations()` passes it through; backend writes it to each annotation's `/T` field via `set_info(title=...)`. Added length cap in router validation.
 - **P1-31 (dev error copy):** Replaced "cd backend && uvicorn..." with "Annotation service unavailable — the background service isn't running."
 - **Tests:** 3 new smoke tests (multi-layer bake, author round-trip, stamp-not-red-box) — all pass. Full smoke suite green, tsc clean, 119/119 frontend tests pass.
+
+### Phase 2 — functional bug batch (all groups complete)
+**Group A (annotation behaviour):** P1-06/07 pending-note pattern (no empty notes, atomic undo); P1-08 selection clears on tool switch (popup dismisses); P1-09 markup auto-applies when tool already selected; P1-13/14 shift-click seeds multi-select (first item included, bulk bar works); P1-15 colour labels in right rail; P1-16 freetext tag input no longer dismisses editor; P1-17 ellipse preview; UX-11 focused-row highlight. Also fixed QuickActionBar markup bypassing undo.
+**Group B (download/save):** P1-10 toast on no-change Ctrl+S; P1-11 commit-or-download guard modal; P1-12 rename seeds workingBlob so it's downloadable.
+**Group C (keyboard):** P1-21 ⌘P→Ctrl+K label; P1-22 Ctrl+, opens Settings; P1-23 removed duplicate gear, added File→Settings…; P1-25 fixed View-menu side-by-side shortcut labels.
+**Group D (navigation/display):** P1-18 search active-match indicator; P1-19 outline navigate-vs-collapse; P1-28 QuickActionBar viewport clamping/flip; P1-29/32 thumbnail toggle no longer clipped; P1-30 number-input spinner suppressed; P1-04 focus trap (Settings + cheat sheet).
+**Group E (split):** P1-03/24 close guards; P1-35 mirrorGroupId cleanup; P1-26 live mirror draft display.
+**Group F:** P1-27 reduced-motion OS-preference-wins.
+All committed across 6 commits. tsc clean; 119/119 tests; backend smoke green.
 
 ---
