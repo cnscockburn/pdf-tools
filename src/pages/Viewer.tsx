@@ -2207,6 +2207,8 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                 annotations={[...bakedAnnotations, ...annotations]}
                 onGoTo={goTo}
                 accent={isSecondaryPane ? "cyan" : "amber"}
+                pdf={pdf}
+                reduceMotion={settings.reduceMotion ?? false}
               />
             </div>
           )}
