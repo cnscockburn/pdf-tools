@@ -42,7 +42,16 @@ Code path verified correct by inspection (window keydown listener, `?` handled a
 
 ## ⛔ Blocked
 
-_(none yet)_
+_(none)_
+
+## ⏭️ Deferred to later phases (with reasons)
+
+- **UX-06 (arrowhead styles):** multi-layer cosmetic change (ShapeAnnot type + sub-toolbar UI + overlay render + toApiAnnotations + backend line-ends). Current single closed-arrow renders fine. Deferred — flag if you want the style picker prioritised.
+- **UX-08 (note re-edit from right rail):** canvas double-click re-edit works now. Right-rail double-click-to-edit is deferred because baked annotations are read-only in Phase 1 (re-editable baked annots is the Phase 2 sidecar item).
+- **UX-23 (split auto-collapse + zoom sync):** rail-collapse infrastructure done; secondary panes start collapsed. Full auto-collapse-of-both-panes-on-split and initial zoom/position sync deferred to the Phase 5 split-view polish.
+- **UX-30 (MiniMap):** no overlap today (toolbar/minimap/bottom-bar are stacked in flow). The wave-scrub redesign is Phase 5C.
+- **UX-32 (sync scroll between panes):** genuinely missing feature. Deferred to Phase 5 split-view work — needs a cross-pane page channel + View-menu toggle + loop guard.
+- **FC-05 PDF form filling, FC-06 password PDFs, Help mode, Organise tool, Light/Dark mode:** large Phase 4/5 features, each its own focused build.
 
 ---
 
@@ -67,5 +76,18 @@ _(none yet)_
 **Group E (split):** P1-03/24 close guards; P1-35 mirrorGroupId cleanup; P1-26 live mirror draft display.
 **Group F:** P1-27 reduced-motion OS-preference-wins.
 All committed across 6 commits. tsc clean; 119/119 tests; backend smoke green.
+
+### Phase 3 — UX improvements (core set complete)
+- UX-05 text selection + QuickActionBar in View mode; UX-09 note-from-selection pre-populates + editable.
+- UX-02 zoom overhaul (snap-to-10%, Ctrl+0 reset, Ctrl+scroll); UX-04 UI-scale↔PDF-zoom compensation; UX-01 page fade-in.
+- UX-10 scroll-to-centre on rail click; UX-11 focus highlight; UX-12 status lozenges.
+- UX-13 wider tabs + pinned +/gear with scrolling strip; UX-14 themed scrollbars; number-input spinner suppressed.
+- UX-15/16 merge duplicate flag + page counts; UX-17/29 rearrange open-in-viewer + keyboard hint; UX-18 images reorder + GIF/BMP/WebP.
+- UX-20 lossless compress mode; UX-22/N-06 collapsible right rail + setting.
+- UX-24 home capability CTAs; UX-25 privacy popup.
+- UX-26 palette completeness (Open/Zoom/Toggle annotations); UX-27 plain-number page jump; L-02 "Draw"→"Ink"; UX-33 undo-after-bake note.
+- UX-05 ink colour picker + 1-9 weighted width keys.
+Committed across ~7 commits. tsc clean; 119/119 tests; backend smoke green; production build verified.
+Deferred items listed above.
 
 ---
