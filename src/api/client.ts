@@ -80,6 +80,16 @@ export async function extractPages(file: File, pages: number[]): Promise<Blob> {
   return handleResponse(await fetch(`${BASE}/extract`, { method: "POST", body: form }));
 }
 
+/** A single page in an Organise plan: source page (1-indexed) + added rotation. */
+export interface OrganisePlanItem { src: number; rotate: number }
+
+export async function organisePdf(file: File, plan: OrganisePlanItem[]): Promise<Blob> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("plan", JSON.stringify(plan));
+  return handleResponse(await fetch(`${BASE}/organise`, { method: "POST", body: form }));
+}
+
 export async function imagesToPDF(images: File[]): Promise<Blob> {
   const form = new FormData();
   images.forEach((f) => form.append("files", f));

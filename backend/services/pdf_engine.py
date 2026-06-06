@@ -106,6 +106,32 @@ def extract(file_bytes: bytes, pages: list[int]) -> bytes:
     return result
 
 
+def organise(file_bytes: bytes, plan: list[dict]) -> bytes:
+    """
+    Rebuild a PDF from a plan produced by the Organise tool. Each plan item:
+      {"src": <1-indexed original page>, "rotate": <degrees added to existing>}
+    Pages appear in plan order; pages omitted from the plan are dropped; rotate is
+    added to each page's existing rotation. This expresses reorder + delete +
+    rotate as a single operation.
+    """
+    doc = _open(file_bytes)
+    n = doc.page_count
+    new_doc = fitz.open()
+    for item in plan:
+        src = item.get("src")
+        if not isinstance(src, int) or src < 1 or src > n:
+            continue
+        new_doc.insert_pdf(doc, from_page=src - 1, to_page=src - 1)
+        rotate = int(item.get("rotate", 0)) % 360
+        if rotate:
+            page = new_doc[-1]
+            page.set_rotation((page.rotation + rotate) % 360)
+    result = _save(new_doc)
+    new_doc.close()
+    doc.close()
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Convert: images → PDF
 # ---------------------------------------------------------------------------

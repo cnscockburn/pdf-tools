@@ -188,6 +188,16 @@ extract_doc = fitz.open(stream=extracted, filetype="pdf")
 check("extract returns the right pages", extract_doc.page_count == 2)
 extract_doc.close()
 
+# Organise: reorder + delete + rotate in one plan (drop page 2, swap 1/3, rotate).
+organised = pdf_engine.organise(pdf_bytes, [
+    {"src": 3, "rotate": 90},
+    {"src": 1, "rotate": 0},
+])
+org_doc = fitz.open(stream=organised, filetype="pdf")
+check("organise keeps the planned pages in order", org_doc.page_count == 2)
+check("organise applies rotation", org_doc[0].rotation == 90, f"got {org_doc[0].rotation}")
+org_doc.close()
+
 
 # ── COMPRESS / WATERMARK / CROP ──────────────────────────────────────────────
 print("\n== compress / watermark / crop ==")

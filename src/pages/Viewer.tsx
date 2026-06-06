@@ -1497,7 +1497,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           { label: "Split PDF",              action: () => togglePanel("split"),          disabled: !hasDoc },
           { label: "Extract Pages",          action: () => togglePanel("extract"),        disabled: !hasDoc },
           { label: "Rotate / Delete Pages",  action: () => togglePanel("rotate-delete"), disabled: !hasDoc },
-          { label: "Rearrange Pages",        action: () => maybeNavigate({ type: "tab", tabType: "rearrange", file: workingFile ?? file ?? undefined }), disabled: !hasDoc },
+          { label: "Organise Pages",         action: () => maybeNavigate({ type: "tab", tabType: "rearrange", file: workingFile ?? file ?? undefined }), disabled: !hasDoc },
           { label: "Merge PDFs",             action: () => maybeNavigate({ type: "tab", tabType: "merge", file: workingFile ?? file ?? undefined }) },
           { type: "separator" },
           { label: "Fill Form",             action: () => togglePanel("form"),           disabled: !hasDoc },
