@@ -107,9 +107,12 @@ interface Props {
   pdf: PDFDocumentProxy;
   currentPage: number;
   onGoTo: (page: number) => void;
+  /** When embedded in the combined Document panel: render at natural height and
+   *  stay silent (render nothing) when the PDF has no outline. */
+  embedded?: boolean;
 }
 
-export default function OutlinePanel({ pdf, currentPage, onGoTo }: Props) {
+export default function OutlinePanel({ pdf, currentPage, onGoTo, embedded }: Props) {
   const [outline, setOutline] = useState<OutlineNode[] | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -130,6 +133,7 @@ export default function OutlinePanel({ pdf, currentPage, onGoTo }: Props) {
   }, [pdf]);
 
   if (loading) {
+    if (embedded) return <p className="px-3 py-2 text-[11px] text-stone-600">Loading outline…</p>;
     return (
       <div className="flex-1 flex items-center justify-center p-4">
         <span className="text-xs text-stone-500 animate-pulse">Loading outline…</span>
@@ -138,6 +142,8 @@ export default function OutlinePanel({ pdf, currentPage, onGoTo }: Props) {
   }
 
   if (!outline || outline.length === 0) {
+    // Embedded: stay silent so the combined Document panel can hide the section.
+    if (embedded) return null;
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-2 p-6 text-center">
         <BookOpen className="h-7 w-7 text-stone-600" />
@@ -147,7 +153,7 @@ export default function OutlinePanel({ pdf, currentPage, onGoTo }: Props) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className={embedded ? "" : "flex-1 overflow-y-auto"}>
       {outline.map((node, i) => (
         <OutlineNode key={i} node={node} pdf={pdf} depth={0}
           onGoTo={onGoTo} currentPage={currentPage} />

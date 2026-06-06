@@ -331,6 +331,9 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   // ── Stable ref for the download entry point (used by the Ctrl+S shortcut) ───
   const requestDownloadRef = useRef<() => void>(() => {});
 
+  // ── Stable ref for print (used by the Ctrl+P shortcut) ──────────────────────
+  const printDocumentRef = useRef<() => void>(() => {});
+
   // ── Always-fresh ref to the working blob (read after awaits where the state
   //    closure would be stale, e.g. commit-then-download). ──────────────────
   const workingBlobRef = useRef<Blob | null>(null);
@@ -792,6 +795,11 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           requestDownloadRef.current();
           return;
         }
+        if ((e.key === "p" || e.key === "P") && !e.shiftKey) {
+          e.preventDefault();
+          printDocumentRef.current();
+          return;
+        }
         if ((e.key === "z" || e.key === "Z") && !e.shiftKey) {
           e.preventDefault();
           undoAnnotationRef.current();
@@ -968,6 +976,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   }
   switchModeRef.current = switchMode;
   requestDownloadRef.current = requestDownload;
+  printDocumentRef.current = printDocument;
 
   // ── Annotation history (multi-level undo / redo) ───────────────────────────
 
@@ -1079,6 +1088,27 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
 
   function togglePanel(t: PanelTool) {
     setPanelTool(prev => (prev === t ? null : t));
+  }
+
+  // ── Print (5.6) ────────────────────────────────────────────────────────────
+  // Print the current document (working copy if modified) via a hidden iframe so
+  // only the PDF prints, not the app chrome.
+  function printDocument() {
+    const blob: Blob | null = workingBlob ?? file;
+    if (!blob) { showToast("Open a PDF first."); return; }
+    const url = URL.createObjectURL(blob);
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+    iframe.src = url;
+    iframe.onload = () => {
+      try { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); }
+      catch { showToast("Couldn't open the print dialog."); }
+      setTimeout(() => {
+        if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        URL.revokeObjectURL(url);
+      }, 60_000);
+    };
+    document.body.appendChild(iframe);
   }
 
   // ── Zoom (UX-02) ───────────────────────────────────────────────────────────
@@ -1401,6 +1431,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           { label: "Save / Download",      shortcut: "Ctrl+S",       action: () => requestDownload() },
           { type: "separator" },
           { label: "Export Review Report", action: () => downloadAnnotationReport([...bakedAnnotations, ...annotations], filename), disabled: bakedAnnotations.length === 0 && annotations.length === 0 },
+          { label: "Print…",               shortcut: "Ctrl+P", action: () => printDocument(), disabled: !hasDoc },
           { type: "separator" },
           { label: "Settings…",            shortcut: "Ctrl+,", action: () => openSettings() },
         ],
@@ -1445,8 +1476,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           { label: "Mini-map",          action: () => setMiniMapVisible(v => !v),   checked: miniMapVisible },
           { type: "separator" },
           { label: "Annotations panel",  action: () => { setRailCollapsed(false); setRailTab("annotations"); },  disabled: !hasDoc },
-          { label: "Table of Contents",  action: () => { setRailCollapsed(false); setRailTab("outline"); },      disabled: !hasDoc },
-          { label: "Bookmarks",          action: () => { setRailCollapsed(false); setRailTab("bookmarks"); },     disabled: !hasDoc },
+          { label: "Outline & Bookmarks", action: () => { setRailCollapsed(false); setRailTab("document"); },     disabled: !hasDoc },
           { type: "separator" },
           { label: "Side by Side — Same Document",                       action: () => openSideBySide("horizontal", "mirror", workingFile ?? file), disabled: !hasDoc },
           { label: "Side by Side — New Document",   shortcut: "Ctrl+\\",  action: () => openSideBySide("horizontal", "new") },
@@ -2438,6 +2468,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
       { id: "shape",        label: "Shape",            description: "Draw rect / ellipse / arrow",    category: "Annotate",   action: go("annotate", "shape") },
       { id: "stamp",        label: "Stamp",            description: "Place a stamp label",            category: "Annotate",   action: go("annotate", "stamp") },
       { id: "open",         label: "Open PDF…",         description: "Open another file (Ctrl+O)",     category: "File",       action: () => { setPaletteOpen(false); openFilePicker(); } },
+      { id: "print",        label: "Print…",            description: "Print the document (Ctrl+P)",    category: "File",       action: () => { setPaletteOpen(false); printDocument(); } },
       { id: "zoom-in",      label: "Zoom in",           description: "Enlarge the page (+)",           category: "View",       action: () => { zoomBy(1); setPaletteOpen(false); } },
       { id: "zoom-out",     label: "Zoom out",          description: "Shrink the page (−)",            category: "View",       action: () => { zoomBy(-1); setPaletteOpen(false); } },
       { id: "zoom-reset",   label: "Reset zoom",        description: "Back to 100% (Ctrl+0)",          category: "View",       action: () => { resetZoom(); setPaletteOpen(false); } },
@@ -2445,8 +2476,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
       { id: "search",       label: "Search text",       description: "Find text in document (Ctrl+F)", category: "Navigation", action: () => { setSearchOpen(true); setPaletteOpen(false); } },
       { id: "cheatsheet",   label: "Keyboard shortcuts",description: "Show all key bindings (?)",     category: "Help",       action: () => { setCheatSheetOpen(true); setPaletteOpen(false); } },
       { id: "annotations",  label: "Annotations panel", description: "View all annotations",          category: "Navigation", action: () => { setRailTab("annotations"); setPaletteOpen(false); } },
-      { id: "outline",      label: "Table of contents", description: "PDF outline / bookmarks tree",  category: "Navigation", action: () => { setRailTab("outline"); setPaletteOpen(false); } },
-      { id: "bookmarks",    label: "Bookmarks",         description: "Jump to user-created bookmarks",category: "Navigation", action: () => { setRailTab("bookmarks"); setPaletteOpen(false); } },
+      { id: "document",     label: "Outline & Bookmarks", description: "Table of contents + your bookmarks", category: "Navigation", action: () => { setRailCollapsed(false); setRailTab("document"); setPaletteOpen(false); } },
       { id: "bm-add",       label: "Bookmark this page",description: `Bookmark page ${currentPage}`,  category: "Bookmarks",  action: () => { addBookmark(currentPage); setPaletteOpen(false); } },
       { id: "snippets",     label: "Comment snippets",  description: "Manage reusable comment text",  category: "Tools",      action: () => { togglePanel("snippets"); setPaletteOpen(false); } },
       { id: "compress",     label: "Compress PDF",      description: "Reduce file size",              category: "Tools",      action: () => { togglePanel("compress"); setPaletteOpen(false); } },

@@ -15,16 +15,15 @@
  *   Active: background #3c3836 + 2px left border #d97706.
  */
 import { useState } from "react";
-import { List, BookOpen, Bookmark } from "lucide-react";
+import { List, BookOpen } from "lucide-react";
 import { cn } from "../lib/utils";
 import AnnotationsListPanel from "./AnnotationsListPanel";
-import OutlinePanel from "./OutlinePanel";
-import BookmarksPanel from "./BookmarksPanel";
+import DocumentPanel from "./DocumentPanel";
 import type { LocalAnnot, AnnotId, AnnotStatus } from "./AnnotationLayer";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import type { UserBookmark } from "../lib/storage";
 
-export type RailTab = "annotations" | "outline" | "bookmarks";
+export type RailTab = "annotations" | "document";
 
 interface Props {
   // Annotations
@@ -51,8 +50,7 @@ interface Props {
 
 const TABS: { id: RailTab; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "annotations", label: "Notes",     Icon: List     },
-  { id: "outline",     label: "Outline",   Icon: BookOpen },
-  { id: "bookmarks",   label: "Marks",     Icon: Bookmark },
+  { id: "document",    label: "Document",  Icon: BookOpen },
 ];
 
 export default function RightRail({
@@ -105,8 +103,7 @@ export default function RightRail({
           {activeTab === "annotations" && (
             <>Annotations {annotations.length > 0 && <span className="text-stone-600 font-normal">· {annotations.length}</span>}</>
           )}
-          {activeTab === "outline"     && "Table of Contents"}
-          {activeTab === "bookmarks"   && "Bookmarks"}
+          {activeTab === "document"    && "Outline & Bookmarks"}
         </span>
       </div>
 
@@ -126,22 +123,15 @@ export default function RightRail({
           />
         )}
 
-        {activeTab === "outline" && (
-          pdf
-            ? <OutlinePanel pdf={pdf} currentPage={currentPage} onGoTo={onGoToPage} />
-            : <div className="flex-1 flex items-center justify-center p-6">
-                <p className="text-xs text-stone-600 text-center">No PDF loaded.</p>
-              </div>
-        )}
-
-        {activeTab === "bookmarks" && (
-          <BookmarksPanel
-            bookmarks={bookmarks}
+        {activeTab === "document" && (
+          <DocumentPanel
+            pdf={pdf}
             currentPage={currentPage}
             onGoTo={onGoToPage}
-            onDelete={onDeleteBookmark}
-            onRename={onRenameBookmark}
+            bookmarks={bookmarks}
             onAddBookmark={onAddBookmark}
+            onDeleteBookmark={onDeleteBookmark}
+            onRenameBookmark={onRenameBookmark}
           />
         )}
       </div>
