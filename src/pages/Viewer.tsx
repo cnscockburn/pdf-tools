@@ -41,6 +41,18 @@ const HIGHLIGHT_COLORS: HlColor[] = [
   { label: "Pink",   rgb: [1, 0.5, 0.8], bg: "rgba(255,128,200,0.35)", border: "rgba(200,80,150,0.8)" },
 ];
 
+// Ink colours — primary pen colours for freehand drawing (UX-05).
+const INK_COLORS: { label: string; rgb: [number, number, number]; css: string }[] = [
+  { label: "Black", rgb: [0.1, 0.1, 0.1], css: "#1c1917" },
+  { label: "Red",   rgb: [0.85, 0.1, 0.1], css: "#d92020" },
+  { label: "Blue",  rgb: [0.1, 0.3, 0.85], css: "#2563eb" },
+  { label: "Green", rgb: [0.1, 0.6, 0.25], css: "#16a34a" },
+  { label: "Amber", rgb: [0.85, 0.47, 0.02], css: "#d97706" },
+];
+
+// Weighted ink-width scale bound to number keys 1-9 in ink mode (UX-05).
+const INK_WIDTH_SCALE = [1, 1.5, 2, 3, 4, 6, 8, 12, 20];
+
 /** Convert AnnotationLayer's local types to the backend API shape. */
 function toApiAnnotations(localAnns: LocalAnnot[]): Annotation[] {
   return localAnns.map((a) => {
@@ -147,6 +159,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   const [inkStrokeWidth, setInkStrokeWidth]   = useState<number>(
     () => settings.defaultInkWidth ?? 2,
   );
+  const [inkColorIdx, setInkColorIdx]         = useState<number>(0);
 
   // ── Command palette ────────────────────────────────────────────────────────
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -338,8 +351,10 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     filename:      "",
     selectedRedact: null as string | null,
     isSideBySide:  false,
+    canvasMode:    "view" as CanvasMode,
+    annotateSubMode: "note" as CreateMode,
   });
-  kbRef.current = { currentPage, pdf, workingBlob, filename, selectedRedact, isSideBySide };
+  kbRef.current = { currentPage, pdf, workingBlob, filename, selectedRedact, isSideBySide, canvasMode, annotateSubMode };
   annotationsRef.current = annotations;
 
   // ── Effective highlight colors (user-labelled palette) ───────────────────
@@ -824,8 +839,17 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
         if (e.key === "c" || e.key === "C") { e.preventDefault(); switchModeRef.current("crop"); return; }
         if (e.key === "+" || e.key === "=") { zoomByRef.current(1); return; }
         if (e.key === "-")                  { zoomByRef.current(-1); return; }
-        // Highlight colour shortcuts (1-4) while in annotate/highlight mode
-        if (e.key >= "1" && e.key <= "4")  { setHlColor(Number(e.key) - 1); return; }
+        // Number keys: in ink mode 1-9 set stroke width on a weighted scale
+        // (UX-05); otherwise 1-4 pick the highlight colour.
+        if (e.key >= "1" && e.key <= "9") {
+          const n = Number(e.key);
+          if (kbRef.current.annotateSubMode === "ink") {
+            setInkStrokeWidth(INK_WIDTH_SCALE[n - 1]);
+          } else if (n <= 4) {
+            setHlColor(n - 1);
+          }
+          return;
+        }
       }
 
       // ── Navigation ────────────────────────────────────────────────────
@@ -1667,6 +1691,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                 author={settings.author}
                 shapeSubType={shapeSubType}
                 inkStrokeWidth={inkStrokeWidth}
+                inkColor={INK_COLORS[inkColorIdx].rgb}
                 stampLabel={stampLabel}
                 snippets={settings.snippets}
                 visible={annotationsVisible}
@@ -1858,6 +1883,17 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                   <>
                     <div className="w-px h-5 bg-stone-700 shrink-0 mx-0.5" />
                     <div className="flex items-center gap-1">
+                      <span className="text-[9px] text-stone-600 mr-0.5 select-none">Colour</span>
+                      {INK_COLORS.map((c, i) => (
+                        <button key={i} onClick={() => setInkColorIdx(i)} title={c.label}
+                          aria-pressed={inkColorIdx === i}
+                          className={cn("h-5 w-5 rounded-full border-2 transition",
+                            inkColorIdx === i ? "border-white scale-110" : "border-transparent hover:border-stone-500")}
+                          style={{ background: c.css }} />
+                      ))}
+                    </div>
+                    <div className="w-px h-5 bg-stone-700 shrink-0 mx-0.5" />
+                    <div className="flex items-center gap-1">
                       <span className="text-[9px] text-stone-600 mr-0.5 select-none">Width</span>
                       {[1, 2, 4, 8].map(w => (
                         <button key={w} onClick={() => setInkStrokeWidth(w)}
@@ -1868,6 +1904,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                           {w}
                         </button>
                       ))}
+                      <span className="text-[9px] text-stone-600 ml-0.5 select-none">keys 1–9</span>
                     </div>
                   </>
                 )}
