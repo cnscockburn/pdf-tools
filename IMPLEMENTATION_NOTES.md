@@ -13,7 +13,7 @@ Tracks blocked items, decisions needed, and items requiring your manual testing 
 - **Phase 2 (functional bugs, all groups A–F):** done.
 - **Phase 3 (UX improvements):** core set done; deferred items listed below.
 - **Phase 4 (new features):** **complete** — annotation search, custom stamp labels, print, Outline+Bookmarks rail merge, **Tauri-native file intake + recent files**, **password-protected PDFs**, **help mode**, **PDF form filling**. Watermark-from-viewer was already present.
-- **Phase 5 (architecture):** **Organise tool DONE**; remaining — light/dark mode, MiniMap wave-scrub.
+- **Phase 5 (architecture):** **Organise tool + MiniMap wave-scrub DONE**; remaining — light/dark mode only.
 
 Everything committed; tsc clean; 119/119 frontend tests; backend smoke green; production build verified.
 
@@ -27,8 +27,8 @@ Everything committed; tsc clean; 119/119 frontend tests; backend smoke green; pr
 ## 🏛️ Phase 5 (architecture)
 
 - **Unified Organise tool (6.1): DONE (v1).** Rebuilt the Rearrange tab into an Organise grid — click-to-select (+Shift range), grip-drag reorder, rotate L/R, delete, extract; one backend `/organise` call on Save (or Save & open in viewer). Backend `organise(plan)` does reorder+rotate+delete in one pass (smoke-tested). **Follow-ups (optional, task #31):** visual split-divider builder (click between pages / split-every-N), fold the standalone Split tab in, merge-drop additional PDFs. The in-viewer Rotate/Delete/Extract/Split panels were left in place for quick single-doc edits.
-- **Light/Dark mode (6.2): remaining.** Independent app/viewer theme toggles; biggest surface-area change (every component needs variant tokens). Decision: independently toggleable. Needs running-app design review per surface.
-- **MiniMap wave-scrub (6.3): remaining.** Thin strip + dock-magnification hover + thumbnail-on-settle + drag-defers-nav. Complex interaction; needs the running app to tune feel.
+- **Light/Dark mode (6.2): remaining (last Phase 5 item).** Independent app/viewer theme toggles; biggest surface-area change (every component needs variant tokens). Decision: independently toggleable. Needs running-app design review per surface.
+- **MiniMap wave-scrub (6.3): DONE.** Canvas-rendered slim strip; dock-magnification wave on hover; page-number badge; thumbnail-on-settle (on-demand, cached); click jumps, drag scrubs + navigates on release; reduce-motion aware; smooth for 500-page PDFs. **Confirm in the running app:** the wave feel, thumbnail timing, and that drag-release lands on the intended page.
 
 ### Organise tool — confirm in the running app
 Open a multi-page PDF in Organise (Home → Organize, or Document → Organise Pages): click to select pages, Shift-click a range, drag the grip to reorder, rotate/delete/extract the selection, then Save (or Save & open in viewer). Confirm click-vs-drag feels right (5px activation distance) and rotated thumbnails preview correctly.
