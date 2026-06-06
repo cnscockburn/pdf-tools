@@ -81,6 +81,7 @@ export interface InkAnnot {
   strokes: FracPoint[][];
   color?: [number, number, number];
   strokeWidth?: number;
+  author?: string; status?: AnnotStatus;
   tags?: string[];
 }
 export type ShapeSubType = "rect" | "ellipse" | "line" | "arrow";
@@ -502,7 +503,7 @@ export default function AnnotationLayer({
         if (stroke.length < 2) { forceUpdate(n => n + 1); return; }
         const id = newId();
         const bb = boundingBox(stroke.map(p => ({ x0: p.x, y0: p.y, x1: p.x, y1: p.y })));
-        addAnnot({ id, type: "ink", page, strokes: [stroke], color: inkColor, strokeWidth: inkStrokeWidth, ...bb });
+        addAnnot({ id, type: "ink", page, strokes: [stroke], color: inkColor, strokeWidth: inkStrokeWidth, author: author || undefined, ...bb });
         setSelectedId(id); onSelectedChange?.(id);
         forceUpdate(n => n + 1);
       };

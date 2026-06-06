@@ -99,6 +99,57 @@ total3 = sum(len(list(p.annots())) for p in result_doc3)
 check("empty annotations list clears all", total3 == 0, f"got {total3}")
 result_doc3.close()
 
+# Multi-layer bake (E-08c): the frontend sends the FULL authoritative set on each
+# commit (baked + new). Simulate two commits where the second re-sends the first
+# plus a new annotation. Both must survive — no overwrite, no duplication.
+baked = [
+    {"type": "note",      "page": 1, "x": 0.4, "y": 0.4, "text": "layer one"},
+    {"type": "highlight", "page": 1, "x0": 0.05, "y0": 0.6, "x1": 0.9, "y1": 0.64,
+     "color": [0, 1, 1]},
+]
+bytes_layer1 = pdf_engine.annotate(pdf_bytes, baked)
+# Second commit re-sends the full set (baked) + a new stamp.
+full_set = baked + [
+    {"type": "stamp", "page": 1, "x0": 0.3, "y0": 0.8, "x1": 0.7, "y1": 0.88,
+     "label": "DRAFT", "color": [0.6, 0, 0]},
+]
+bytes_layer2 = pdf_engine.annotate(bytes_layer1, full_set)
+layer2_doc = fitz.open(stream=bytes_layer2, filetype="pdf")
+total_layer2 = sum(len(list(p.annots())) for p in layer2_doc)
+check("multi-layer bake keeps all annotations (no overwrite, no duplication)",
+      total_layer2 == len(full_set), f"expected {len(full_set)}, got {total_layer2}")
+layer2_doc.close()
+
+# Author round-trip (P1-34): author must land in the annotation /T (title) field.
+authored = [
+    {"type": "note", "page": 1, "x": 0.5, "y": 0.5, "text": "hi", "author": "Test Reviewer"},
+]
+authored_bytes = pdf_engine.annotate(pdf_bytes, authored)
+authored_doc = fitz.open(stream=authored_bytes, filetype="pdf")
+first_annot = next(authored_doc[0].annots())
+author_title = first_annot.info.get("title", "")
+check("author is written to annotation /T field",
+      author_title == "Test Reviewer", f"got {author_title!r}")
+authored_doc.close()
+
+# Stamp rendering (E-08b): the stamp must NOT set its background ("C") to the
+# stamp colour — that produced an invisible-label red box. Confirm the FreeText
+# stamp has no opaque background colour key equal to the stroke colour.
+stamp_only = [
+    {"type": "stamp", "page": 1, "x0": 0.3, "y0": 0.4, "x1": 0.7, "y1": 0.48,
+     "label": "APPROVED", "color": [0.6, 0, 0]},
+]
+stamp_bytes = pdf_engine.annotate(pdf_bytes, stamp_only)
+stamp_doc = fitz.open(stream=stamp_bytes, filetype="pdf")
+stamp_annot = next(stamp_doc[0].annots())
+# colors["fill"] is the FreeText background; it must be white (or None), not the
+# red stroke colour that caused the box.
+fill = stamp_annot.colors.get("fill")
+check("stamp background is not the stamp colour (no red-box bug)",
+      fill is None or tuple(round(c, 1) for c in fill) != (0.6, 0.0, 0.0),
+      f"got fill={fill}")
+stamp_doc.close()
+
 
 # ── REDACT ───────────────────────────────────────────────────────────────────
 print("\n== redact ==")

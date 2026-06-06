@@ -320,9 +320,15 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
         page = doc[page_idx]
         pb = page.rect
 
+        # Author is written into each annotation's /T (title) field so it survives
+        # the round-trip — visible in external viewers and read back by PDF.js.
+        author = ann.get("author")
+
         if ann["type"] == "note":
             pt = fitz.Point(pb.x0 + ann["x"] * pb.width, pb.y0 + ann["y"] * pb.height)
             a = page.add_text_annot(pt, ann.get("text", ""), icon="Comment")
+            if author:
+                a.set_info(title=author)
             a.update()
 
         elif ann["type"] == "highlight":
@@ -333,6 +339,8 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
             color = ann.get("color", [1, 1, 0])
             a = page.add_highlight_annot(rect)
             a.set_colors(stroke=color)
+            if author:
+                a.set_info(title=author)
             a.update()
 
         elif ann["type"] == "freetext":
@@ -348,6 +356,8 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
                 fill_color=(1, 1, 0.7),
                 align=fitz.TEXT_ALIGN_LEFT,
             )
+            if author:
+                a.set_info(title=author)
             a.update()
 
         elif ann["type"] in ("underline", "strikethrough"):
@@ -369,8 +379,8 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
                 a = page.add_strikeout_annot(quads)
             color = ann.get("color", [0, 0, 0])
             a.set_colors(stroke=color)
-            if ann.get("text"):
-                a.set_info(content=ann["text"])
+            if ann.get("text") or author:
+                a.set_info(content=ann.get("text", ""), title=author or "")
             a.update()
 
         elif ann["type"] == "ink":
@@ -391,6 +401,8 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
             a.set_colors(stroke=color)
             width = ann.get("strokeWidth", 2)
             a.set_border(width=max(0.5, float(width) * 0.5))  # PDF units ≈ 0.5× screen px
+            if author:
+                a.set_info(title=author)
             a.update()
 
         elif ann["type"] == "shape":
@@ -428,8 +440,8 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
             else:
                 a = page.add_rect_annot(rect)
                 a.set_colors(stroke=color)
-            if ann.get("text"):
-                a.set_info(content=ann["text"])
+            if ann.get("text") or author:
+                a.set_info(content=ann.get("text", ""), title=author or "")
             a.update()
 
         elif ann["type"] == "stamp":
@@ -439,10 +451,20 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
             y1 = pb.y0 + ann["y1"] * pb.height
             rect = fitz.Rect(x0, y0, x1, y1)
             label = ann.get("label", "DRAFT")
-            color = tuple(ann.get("color", [0.6, 0, 0]))
-            # FreeText annotation: Helvetica-Bold, white fill, colored 2pt border.
+            color = tuple(float(c) for c in ann.get("color", [0.6, 0, 0]))
+            # FreeText annotation: Helvetica-Bold, white fill, coloured bold text.
             # "hebo" is the PyMuPDF alias for Helvetica-Bold (built-in PDF font).
             # Font size: 55% of box height to match the CSS "55cqh" preview sizing.
+            #
+            # IMPORTANT (fixes E-08b — "stamps render as red boxes"): we must NOT
+            # write the stamp colour into the annotation's "C" key. For a FreeText
+            # annotation, "C" is the *background* colour, not the border. The old
+            # code set C to the stamp colour while also colouring the text the same
+            # — producing coloured text on a same-coloured background, i.e. a solid
+            # red (or whatever) box with the label invisible inside it. We keep the
+            # white fill and coloured bold text instead, which renders correctly in
+            # every viewer. The stamp stays a real annotation (not page content) so
+            # the replace-on-resave clear loop above still removes it cleanly.
             fs = max(6, (y1 - y0) * 0.55)
             a = page.add_freetext_annot(
                 rect, label,
@@ -452,18 +474,11 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
                 fill_color=(1, 1, 1),
                 align=fitz.TEXT_ALIGN_CENTER,
             )
-            # Width 1.5pt ≈ 2px CSS border.
+            # Width 1.5pt ≈ 2px CSS border. PyMuPDF draws the FreeText border in the
+            # text colour by default, which frames the stamp in the stamp colour.
             a.set_border(width=1.5)
-            # PyMuPDF raises ValueError if set_colors() is called on a FreeText
-            # annotation, and border_color= in add_freetext_annot is gated behind
-            # rich_text=True.  Write the "C" (colour) array directly into the PDF
-            # annotation dict instead — this is what set_colors() does for other
-            # types, just without the FreeText guard.
-            try:
-                r, g, b = float(color[0]), float(color[1]), float(color[2])
-                page.parent.xref_set_key(a.xref, "C", f"[{r:.4f} {g:.4f} {b:.4f}]")
-            except Exception:
-                pass  # non-critical — coloured text still identifies the stamp
+            if author:
+                a.set_info(title=author)
             a.update()
 
     return _save(doc)

@@ -137,25 +137,29 @@ export async function redactPDF(file: File, regions: RedactRegion[]): Promise<Bl
   return handleResponse(await fetch(`${BASE}/redact`, { method: "POST", body: form }));
 }
 
+/** Common metadata shared by every annotation variant. `author` is written into
+ *  the PDF annotation's /T field by the backend so it survives the round-trip. */
+type AnnotMeta = { author?: string };
+
 export type Annotation =
-  | { type: "note";          page: number; x: number; y: number; text: string }
-  | { type: "highlight";     page: number; x0: number; y0: number; x1: number; y1: number; color: [number, number, number];
-      rects?: Array<{ x0: number; y0: number; x1: number; y1: number }> }
-  | { type: "freetext";      page: number; x0: number; y0: number; x1: number; y1: number; text: string; fontsize?: number }
-  | { type: "underline";     page: number; x0: number; y0: number; x1: number; y1: number;
+  | ({ type: "note";          page: number; x: number; y: number; text: string } & AnnotMeta)
+  | ({ type: "highlight";     page: number; x0: number; y0: number; x1: number; y1: number; color: [number, number, number];
+      rects?: Array<{ x0: number; y0: number; x1: number; y1: number }> } & AnnotMeta)
+  | ({ type: "freetext";      page: number; x0: number; y0: number; x1: number; y1: number; text: string; fontsize?: number } & AnnotMeta)
+  | ({ type: "underline";     page: number; x0: number; y0: number; x1: number; y1: number;
       rects?: Array<{ x0: number; y0: number; x1: number; y1: number }>;
-      color?: [number, number, number]; text?: string }
-  | { type: "strikethrough"; page: number; x0: number; y0: number; x1: number; y1: number;
+      color?: [number, number, number]; text?: string } & AnnotMeta)
+  | ({ type: "strikethrough"; page: number; x0: number; y0: number; x1: number; y1: number;
       rects?: Array<{ x0: number; y0: number; x1: number; y1: number }>;
-      color?: [number, number, number]; text?: string }
-  | { type: "ink";           page: number;
+      color?: [number, number, number]; text?: string } & AnnotMeta)
+  | ({ type: "ink";           page: number;
       strokes: Array<Array<{ x: number; y: number }>>;
-      color?: [number, number, number]; strokeWidth?: number }
-  | { type: "shape";         page: number; x0: number; y0: number; x1: number; y1: number;
+      color?: [number, number, number]; strokeWidth?: number } & AnnotMeta)
+  | ({ type: "shape";         page: number; x0: number; y0: number; x1: number; y1: number;
       shape: "rect" | "ellipse" | "line" | "arrow";
-      color?: [number, number, number]; strokeWidth?: number; fill?: boolean; text?: string }
-  | { type: "stamp";         page: number; x0: number; y0: number; x1: number; y1: number;
-      label: string; color?: [number, number, number] };
+      color?: [number, number, number]; strokeWidth?: number; fill?: boolean; text?: string } & AnnotMeta)
+  | ({ type: "stamp";         page: number; x0: number; y0: number; x1: number; y1: number;
+      label: string; color?: [number, number, number] } & AnnotMeta);
 
 export async function annotatePDF(file: File, annotations: Annotation[]): Promise<Blob> {
   const form = new FormData();

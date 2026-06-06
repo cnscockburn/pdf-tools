@@ -1,0 +1,158 @@
+{
+  "name": "Stria PDF Toolkit",
+  "creative_north_star": "The Instrument",
+  "brand_personality": {
+    "traits": ["precise", "warm", "capable"],
+    "voice": "direct, clear, peer-to-peer, unhurried"
+  },
+  "palette": {
+    "primary": {
+      "amber-warm": {
+        "hex": "#d97706",
+        "oklch": "oklch(72% 0.14 65)",
+        "description": "Primary accent. Used for interactive triggers, primary active states, and highlights. Max 10% screen space."
+      },
+      "amber-deep": {
+        "hex": "#b45309",
+        "oklch": "oklch(62% 0.16 62)",
+        "description": "Primary hover and pressed state. Never at rest."
+      }
+    },
+    "secondary": {
+      "amber-tint": {
+        "hex": "#fffbeb",
+        "oklch": "oklch(97% 0.025 68)",
+        "description": "Subtle fill for drag-active drop zones and subtle selection rows. Max 5% screen space."
+      }
+    },
+    "neutrals_light": {
+      "surface-light": {
+        "hex": "#fafaf9",
+        "oklch": "oklch(98% 0.003 70)",
+        "description": "Main page canvas. Warm laid-paper look, never pure white."
+      },
+      "surface-white": {
+        "hex": "#ffffff",
+        "oklch": "oklch(100% 0 0)",
+        "description": "Cards and panel backgrounds within light mode."
+      },
+      "border-light": {
+        "hex": "#e7e5e4",
+        "oklch": "oklch(91% 0.006 70)",
+        "description": "Dividers, strokes, card borders in light mode."
+      },
+      "text-strong": {
+        "hex": "#1c1917",
+        "oklch": "oklch(18% 0.01 70)",
+        "description": "Page titles, active labels, primary dark contrast. Not pure black."
+      },
+      "text-base": {
+        "hex": "#44403c",
+        "oklch": "oklch(38% 0.010 70)",
+        "description": "Body copy, primary paragraphs, secondary labels."
+      },
+      "text-muted": {
+        "hex": "#78716c",
+        "oklch": "oklch(52% 0.008 70)",
+        "description": "Descriptions, metadata, subdued text."
+      },
+      "text-faint": {
+        "hex": "#a8a29e",
+        "oklch": "oklch(65% 0.006 70)",
+        "description": "Placeholders, disabled states, timestamps."
+      }
+    },
+    "neutrals_dark": {
+      "canvas-dark": {
+        "hex": "#1c1917",
+        "oklch": "oklch(14% 0.008 70)",
+        "description": "Outermost viewer deep-work background."
+      },
+      "surface-dark": {
+        "hex": "#292524",
+        "oklch": "oklch(18% 0.01 70)",
+        "description": "Inner sidebar and panel backgrounds in dark mode."
+      },
+      "surface-dark-raised": {
+        "hex": "#3c3836",
+        "oklch": "oklch(22% 0.010 70)",
+        "description": "Hover fills, active rows, focus areas in dark mode. Tonal depth layering."
+      },
+      "border-dark": {
+        "hex": "#57534e",
+        "oklch": "oklch(30% 0.012 70)",
+        "description": "Dividers, separator strokes, inputs inside dark mode."
+      },
+      "text-on-dark": {
+        "hex": "#fafaf9",
+        "oklch": "oklch(96% 0.003 70)",
+        "description": "Primary text on dark backgrounds. Matches surface-light."
+      },
+      "text-on-dark-muted": {
+        "hex": "#a8a29e",
+        "oklch": "oklch(65% 0.006 70)",
+        "description": "Secondary text, sub-labels, metadata in dark mode."
+      }
+    },
+    "states": {
+      "focus": {
+        "hex": "#d97706",
+        "description": "1px outlines or focus rings at 30-50% opacity."
+      },
+      "success": {
+        "hex": "#22c55e",
+        "description": "Completed tasks, resolved annotation threads. Icons/text only."
+      },
+      "error": {
+        "hex": "#ef4444",
+        "description": "Validation warnings, destructive actions. Restrained usage."
+      },
+      "warning": {
+        "hex": "#fbbf24",
+        "description": "Soft alerts. Kept amber-adjacent."
+      }
+    }
+  },
+  "typography": {
+    "font_family": "system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif",
+    "hierarchy": {
+      "title": {
+        "size": "16px / 1rem",
+        "weight": "semibold (600)",
+        "line_height": "1.25",
+        "letter_spacing": "-0.01em"
+      },
+      "body": {
+        "size": "14px / 0.875rem",
+        "weight": "regular (400)",
+        "line_height": "1.5",
+        "letter_spacing": "normal"
+      },
+      "label": {
+        "size": "12px / 0.75rem",
+        "weight": "medium (500)",
+        "line_height": "1.33",
+        "letter_spacing": "+0.01em"
+      },
+      "micro": {
+        "size": "10px / 0.625rem",
+        "weight": "medium (500)",
+        "line_height": "1.2",
+        "letter_spacing": "+0.02em"
+      }
+    }
+  },
+  "corner_radii": {
+    "sm": "4px (buttons, micro-chips)",
+    "md": "8px (form inputs, regular buttons)",
+    "lg": "12px (dropdowns, panels, small containers)",
+    "xl": "16px (ToolCards, drop zones, command palette)",
+    "full": "9999px (pill badges)"
+  },
+  "elevation_shadows": {
+    "resting_card": "0 1px 2px 0 rgb(0 0 0 / 0.05) - Subtle edge separation",
+    "hover_lift": "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) - Physical lift behavior (2px rise)",
+    "floating_panel": "0 10px 15px -3px rgb(0 0 0 / 0.1) - Popovers, annotation widgets",
+    "overlay": "0 25px 50px -12px rgb(0 0 0 / 0.25) - Modals, command palette"
+  }
+}

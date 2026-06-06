@@ -44,32 +44,35 @@ const HIGHLIGHT_COLORS: HlColor[] = [
 /** Convert AnnotationLayer's local types to the backend API shape. */
 function toApiAnnotations(localAnns: LocalAnnot[]): Annotation[] {
   return localAnns.map((a) => {
+    // Author is stamped into the PDF annotation's /T field by the backend so it
+    // survives the round-trip (shows in external viewers and on re-open).
+    const meta = a.author ? { author: a.author } : {};
     if (a.type === "note")
-      return { type: "note", page: a.page, x: a.x, y: a.y, text: a.text };
+      return { type: "note", page: a.page, x: a.x, y: a.y, text: a.text, ...meta };
     if (a.type === "highlight")
       return { type: "highlight", page: a.page, x0: a.x0, y0: a.y0, x1: a.x1, y1: a.y1,
-               color: a.color, ...(a.rects ? { rects: a.rects } : {}) };
+               color: a.color, ...(a.rects ? { rects: a.rects } : {}), ...meta };
     if (a.type === "freetext")
-      return { type: "freetext", page: a.page, x0: a.x0, y0: a.y0, x1: a.x1, y1: a.y1, text: a.text };
+      return { type: "freetext", page: a.page, x0: a.x0, y0: a.y0, x1: a.x1, y1: a.y1, text: a.text, ...meta };
     if (a.type === "underline")
       return { type: "underline", page: a.page, x0: a.x0, y0: a.y0, x1: a.x1, y1: a.y1,
-               ...(a.rects ? { rects: a.rects } : {}), ...(a.text ? { text: a.text } : {}) };
+               ...(a.rects ? { rects: a.rects } : {}), ...(a.text ? { text: a.text } : {}), ...meta };
     if (a.type === "strikethrough")
       return { type: "strikethrough", page: a.page, x0: a.x0, y0: a.y0, x1: a.x1, y1: a.y1,
-               ...(a.rects ? { rects: a.rects } : {}), ...(a.text ? { text: a.text } : {}) };
+               ...(a.rects ? { rects: a.rects } : {}), ...(a.text ? { text: a.text } : {}), ...meta };
     if (a.type === "ink")
       return { type: "ink", page: a.page, strokes: a.strokes,
                ...(a.color ? { color: a.color } : {}),
-               ...(a.strokeWidth ? { strokeWidth: a.strokeWidth } : {}) };
+               ...(a.strokeWidth ? { strokeWidth: a.strokeWidth } : {}), ...meta };
     if (a.type === "shape")
       return { type: "shape", page: a.page, x0: a.x0, y0: a.y0, x1: a.x1, y1: a.y1,
                shape: a.shape,
                ...(a.color ? { color: a.color } : {}),
                ...(a.strokeWidth ? { strokeWidth: a.strokeWidth } : {}),
-               ...(a.text ? { text: a.text } : {}) };
+               ...(a.text ? { text: a.text } : {}), ...meta };
     if (a.type === "stamp")
       return { type: "stamp", page: a.page, x0: a.x0, y0: a.y0, x1: a.x1, y1: a.y1,
-               label: a.label, color: a.color };
+               label: a.label, color: a.color, ...meta };
     // fallback
     return { type: "note", page: (a as LocalAnnot).page, x: 0, y: 0, text: "" };
   });
@@ -343,6 +346,14 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   }, [filename, isSecondaryPane]);
 
   // ── PDF canvas render ─────────────────────────────────────────────────────
+  // When the document has no JS-side overlay annotations (a freshly opened PDF,
+  // possibly one we previously baked annotations into), let PDF.js paint the
+  // embedded annotations itself (annotationMode 2 = ENABLE). The moment the user
+  // starts annotating (or we have baked annotations held in JS state that we
+  // re-draw as overlays), switch to annotationMode 0 to avoid double-rendering.
+  // Using a boolean threshold means the canvas only re-renders when crossing the
+  // 0 ↔ non-zero boundary, not on every individual annotation change.
+  const hasOverlayAnnots = bakedAnnotations.length > 0 || annotations.length > 0;
   useEffect(() => {
     if (!pdf || !canvasRef.current) return;
     let cancelled = false;
@@ -363,8 +374,10 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
         const task = page.render({
           canvasContext: ctx,
           viewport: vp,
-          // Always 0: PDF.js annotation widgets are suppressed; we render our own overlay.
-          annotationMode: 0,
+          // ENABLE (2) when we have no overlays to draw, so PDF.js renders any
+          // annotations already embedded in the PDF. DISABLE (0) while we own
+          // the overlay so the two layers don't stack.
+          annotationMode: hasOverlayAnnots ? 0 : 2,
         });
         renderTaskRef.current = task;
         await task.promise;
@@ -393,7 +406,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
 
     return () => { cancelled = true; renderTaskRef.current?.cancel(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pdf, currentPage, scale]);
+  }, [pdf, currentPage, scale, hasOverlayAnnots]);
 
   // ── Build text search index when PDF loads ────────────────────────────────
   useEffect(() => {
@@ -680,7 +693,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           setSearchOpen(v => !v);
           return;
         }
-        if ((e.key === "p" || e.key === "P") && e.shiftKey) {
+        if (((e.key === "p" || e.key === "P") && e.shiftKey) || e.key === "k" || e.key === "K") {
           e.preventDefault();
           setPaletteOpen(v => !v);
           return;
@@ -919,12 +932,17 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   async function autoSaveAnnotations(targetMode: CanvasMode) {
     if (!workingFile || annotations.length === 0) { doSwitchMode(targetMode); return; }
     if (backendOk === false) {
-      setAnnotateError("Backend not running — start it: cd backend && uvicorn main:app --port 7342");
+      setAnnotateError("Annotation service unavailable — the background service isn't running.");
       return;
     }
     setAutoSaving(true); setAnnotateError(null);
     try {
-      const blob = await annotatePDF(workingFile, toApiAnnotations(annotations));
+      // The backend uses replace semantics: it clears every existing annotation
+      // from the PDF, then writes the list we send. So we must send the FULL
+      // authoritative set (already-baked + new draft), otherwise the previously
+      // baked annotations would be wiped on this save. (Fixes E-08c.)
+      const fullSet = [...bakedAnnotations, ...annotations];
+      const blob = await annotatePDF(workingFile, toApiAnnotations(fullSet));
       await applyBlob(blob);
       // Move drafted annotations into the committed (baked) list so they remain
       // visible in the sidebar without being re-sent on the next save.

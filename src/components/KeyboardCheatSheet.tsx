@@ -54,7 +54,8 @@ const SHORTCUTS: Entry[] = [
   { key: "Ctrl+\\",        desc: "Toggle side by side" },
   { key: "Ctrl+F",         desc: "Search in document" },
   { key: "Ctrl+S",         desc: "Download PDF" },
-  { key: "Ctrl+Shift+P",   desc: "Command palette" },
+  { key: "Ctrl+K",         desc: "Command palette" },
+  { key: "Ctrl+Shift+P",   desc: "Command palette (alias)" },
   { key: "?",              desc: "Show / hide this panel" },
 ];
 

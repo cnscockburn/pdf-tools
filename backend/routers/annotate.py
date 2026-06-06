@@ -89,6 +89,14 @@ def _validate_annotation(ann: dict) -> None:
         if len(text) > MAX_TEXT_LEN:
             raise ValueError(f"{t}.text too long (max {MAX_TEXT_LEN} characters)")
 
+    # Author is written into the PDF /T field; cap it like the stamp label.
+    author = ann.get("author")
+    if author is not None:
+        if not isinstance(author, str):
+            raise ValueError(f"{t}.author must be a string")
+        if len(author) > MAX_LABEL_LEN:
+            raise ValueError(f"{t}.author too long (max {MAX_LABEL_LEN} characters)")
+
 
 @router.post("/annotate")
 async def annotate_pdf(
