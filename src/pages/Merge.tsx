@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import * as pdfjsLib from "pdfjs-dist";
 import {
   DndContext,
   closestCenter,
@@ -16,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical } from "lucide-react";
+import { GripVertical, AlertTriangle } from "lucide-react";
 import Layout from "../components/Layout";
 import FileDropZone from "../components/FileDropZone";
 import ProcessButton from "../components/ProcessButton";
@@ -24,13 +25,13 @@ import { mergePDFs } from "../api/client";
 import { downloadBlob, formatBytes } from "../lib/utils";
 import { cn } from "../lib/utils";
 
-type TaggedFile = { id: string; file: File };
+type TaggedFile = { id: string; file: File; pages?: number };
 let _mergeId = 0;
 const tagFile = (f: File): TaggedFile => ({ id: `mf_${++_mergeId}`, file: f });
 
 // ── Sortable file row ────────────────────────────────────────────────────────
 
-function SortableFileRow({ item, onRemove }: { item: TaggedFile; onRemove: (id: string) => void }) {
+function SortableFileRow({ item, isDuplicate, onRemove }: { item: TaggedFile; isDuplicate: boolean; onRemove: (id: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   return (
     <div
@@ -51,7 +52,15 @@ function SortableFileRow({ item, onRemove }: { item: TaggedFile; onRemove: (id: 
       </button>
       <div className="flex-1 min-w-0">
         <p className="text-sm truncate text-stone-800">{item.file.name}</p>
-        <p className="text-[10px] text-stone-400">{formatBytes(item.file.size)}</p>
+        <p className="text-[10px] text-stone-400 flex items-center gap-2">
+          <span>{formatBytes(item.file.size)}</span>
+          {item.pages != null && <span>· {item.pages} page{item.pages !== 1 ? "s" : ""}</span>}
+          {isDuplicate && (
+            <span className="inline-flex items-center gap-1 text-amber-600 font-medium" title="A file with the same name and size is already in the list">
+              <AlertTriangle className="h-3 w-3" /> duplicate
+            </span>
+          )}
+        </p>
       </div>
       <button
         onClick={() => onRemove(item.id)}
@@ -109,6 +118,39 @@ export default function Merge({ initialFile }: MergeProps = {}) {
 
   const currentStep = files.length === 0 ? 1 : files.length >= 2 ? 2 : 1;
 
+  // Load page count for an initial file passed in via tab context (mount-only).
+  useEffect(() => {
+    tagged.filter(t => t.pages == null).forEach(t => loadPageCount(t.id, t.file));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Load each file's page count in the background and patch it into state (UX-16).
+  async function loadPageCount(id: string, file: File) {
+    try {
+      const buf = await file.arrayBuffer();
+      const doc = await pdfjsLib.getDocument({ data: buf }).promise;
+      setTagged(prev => prev.map(t => t.id === id ? { ...t, pages: doc.numPages } : t));
+    } catch { /* not a readable PDF — leave page count blank */ }
+  }
+
+  function addFiles(added: File[]) {
+    const newTagged = added.map(tagFile);
+    setTagged(prev => [...prev, ...newTagged]);
+    setDone(false);
+    newTagged.forEach(t => loadPageCount(t.id, t.file));
+  }
+
+  // Duplicate = same name AND size as an earlier entry (UX-15). Warn, don't block.
+  const dupIds = new Set<string>();
+  {
+    const seen = new Set<string>();
+    for (const t of tagged) {
+      const key = `${t.file.name}::${t.file.size}`;
+      if (seen.has(key)) dupIds.add(t.id);
+      else seen.add(key);
+    }
+  }
+
   async function handleMerge() {
     if (files.length < 2) return;
     setLoading(true);
@@ -148,7 +190,7 @@ export default function Merge({ initialFile }: MergeProps = {}) {
 
         <FileDropZone
           files={[]}
-          onFiles={(added) => { setTagged((prev) => [...prev, ...added.map(tagFile)]); setDone(false); }}
+          onFiles={addFiles}
           multiple
           accept={{ "application/pdf": [".pdf"] }}
           label="Drop PDFs here (add as many as you need)"
@@ -170,7 +212,7 @@ export default function Merge({ initialFile }: MergeProps = {}) {
                   )}
                 </div>
                 {tagged.map((t) => (
-                  <SortableFileRow key={t.id} item={t} onRemove={removeFile} />
+                  <SortableFileRow key={t.id} item={t} isDuplicate={dupIds.has(t.id)} onRemove={removeFile} />
                 ))}
               </div>
             </SortableContext>

@@ -22,6 +22,7 @@ import FileDropZone from "../components/FileDropZone";
 import ProcessButton from "../components/ProcessButton";
 import { reorderPages } from "../api/client";
 import { downloadBlob } from "../lib/utils";
+import { useTabContext } from "../lib/tabs";
 
 function SortablePage({ id, thumb, label }: { id: string; thumb?: string; label: string }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
@@ -50,9 +51,11 @@ interface RearrangeProps {
 }
 
 export default function Rearrange({ initialFile }: RearrangeProps = {}) {
+  const { openTab } = useTabContext();
   const [file, setFile] = useState<File | null>(initialFile ?? null);
   const [order, setOrder] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
+  const [openingViewer, setOpeningViewer] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { thumbnails, pageCount } = usePdfThumbnails(file);
@@ -90,6 +93,24 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
     }
   }
 
+  // UX-17: apply the new order and open the result straight in a Viewer tab,
+  // so you can review/annotate without a download → re-open round trip.
+  async function handleOpenInViewer() {
+    if (!file) return;
+    setOpeningViewer(true);
+    setError(null);
+    try {
+      const blob = await reorderPages(file, order);
+      const name = `reordered_${file.name}`;
+      const reordered = new File([blob], name, { type: "application/pdf" });
+      openTab("viewer", { file: reordered, title: name });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Reorder failed. Check that the PDF is valid.");
+    } finally {
+      setOpeningViewer(false);
+    }
+  }
+
   return (
     <Layout title="Rearrange Pages" description="Drag pages into the order you want">
       <div className="space-y-6">
@@ -104,11 +125,14 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
           <>
             {/* Status bar */}
             <div className="flex items-center justify-between text-[10px] text-stone-400">
-              <span>{pageCount} page{pageCount !== 1 ? "s" : ""} — drag to rearrange</span>
+              <span>
+                {pageCount} page{pageCount !== 1 ? "s" : ""} — drag to rearrange
+                <span className="text-stone-300"> · keyboard: Tab to a page, Space to lift, arrows to move, Space to drop</span>
+              </span>
               {order.some((p, i) => p !== i + 1) && (
                 <button
                   onClick={() => setOrder(Array.from({ length: pageCount }, (_, i) => i + 1))}
-                  className="text-amber-600 hover:text-amber-500 transition-colors"
+                  className="text-brand-600 hover:text-brand-500 transition-colors"
                 >
                   Reset to original order
                 </button>
@@ -137,12 +161,23 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
           </p>
         )}
 
-        <ProcessButton
-          onClick={handleApply}
-          loading={loading}
-          disabled={!file || order.length === 0 || order.every((p, i) => p === i + 1)}
-          label={order.every((p, i) => p === i + 1) ? "Rearrange pages to enable save" : "Save reordered PDF"}
-        />
+        <div className="flex flex-col gap-2">
+          <ProcessButton
+            onClick={handleApply}
+            loading={loading}
+            disabled={!file || order.length === 0 || order.every((p, i) => p === i + 1)}
+            label={order.every((p, i) => p === i + 1) ? "Rearrange pages to enable save" : "Save reordered PDF"}
+          />
+          {file && order.length > 0 && !order.every((p, i) => p === i + 1) && (
+            <button
+              onClick={handleOpenInViewer}
+              disabled={openingViewer}
+              className="text-xs text-brand-600 hover:text-brand-500 disabled:opacity-50 transition-colors"
+            >
+              {openingViewer ? "Opening…" : "Or open the reordered PDF in the viewer"}
+            </button>
+          )}
+        </div>
       </div>
     </Layout>
   );
