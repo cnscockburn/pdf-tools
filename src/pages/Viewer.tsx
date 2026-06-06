@@ -26,7 +26,7 @@ import CommandPalette, { type PaletteCommand } from "../components/CommandPalett
 // SettingsDialog is now rendered by TabShell; Viewer only calls openSettings() from context.
 import MiniMap from "../components/MiniMap";
 import MenuBar, { type MenuDef } from "../components/MenuBar";
-import { annotatePDF, redactPDF, cropPDF, checkHealth, type Annotation, type RedactRegion } from "../api/client";
+import { annotatePDF, redactPDF, cropPDF, decryptPDF, checkHealth, type Annotation, type RedactRegion } from "../api/client";
 import { useBookmarks } from "../lib/storage";
 import { useSettingsContext } from "../lib/settingsContext";
 import { downloadAnnotationReport } from "../lib/annotationReport";
@@ -305,6 +305,12 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
 
   // ── Download guard (uncommitted annotations) ───────────────────────────────
   const [downloadGuard, setDownloadGuard] = useState(false);
+
+  // ── Password-protected PDFs (5.2) ──────────────────────────────────────────
+  const [passwordPrompt, setPasswordPrompt] = useState<{ file: File } | null>(null);
+  const [passwordInput, setPasswordInput]   = useState("");
+  const [passwordError, setPasswordError]   = useState<string | null>(null);
+  const [passwordBusy, setPasswordBusy]     = useState(false);
 
   // ── Multi-level undo / redo ────────────────────────────────────────────────
   const [undoStack, setUndoStack] = useState<LocalAnnot[][]>([]);
@@ -937,13 +943,44 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     setSearchQuery("");
     setSearchResults([]);
     setQuickBar(null);
+    setPasswordPrompt(null); setPasswordError(null); setPasswordInput("");
     const buf = await f.arrayBuffer();
-    const doc = await pdfjsLib.getDocument({ data: buf }).promise;
-    setPdf(doc);
+    try {
+      const doc = await pdfjsLib.getDocument({ data: buf }).promise;
+      setPdf(doc);
+    } catch (e) {
+      // Password-protected PDF — prompt to unlock instead of failing (5.2).
+      if (e instanceof Error && e.name === "PasswordException") {
+        setPasswordPrompt({ file: f });
+        return;
+      }
+      throw e;
+    }
     // Schedule default fit mode application for the first render of this PDF
     fitOnLoadRef.current = settings.defaultFitMode ?? "width";
     // Activate any pending tool hint (from Home page card clicks)
     activatePendingTool();
+  }
+
+  // Unlock a password-protected PDF: decrypt once via the backend, then load the
+  // decrypted copy so every later operation works without the password.
+  async function unlockPdf() {
+    if (!passwordPrompt) return;
+    if (backendOk === false) {
+      setPasswordError("The background service isn't running — can't unlock this PDF.");
+      return;
+    }
+    setPasswordBusy(true); setPasswordError(null);
+    try {
+      const blob = await decryptPDF(passwordPrompt.file, passwordInput);
+      const decrypted = new File([blob], passwordPrompt.file.name, { type: "application/pdf" });
+      setPasswordPrompt(null); setPasswordInput("");
+      await loadFile(decrypted);
+    } catch {
+      setPasswordError("Incorrect password, or this PDF can't be unlocked.");
+    } finally {
+      setPasswordBusy(false);
+    }
   }
 
   async function applyBlob(blob: Blob) {
@@ -2449,6 +2486,50 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[400] pointer-events-none">
           <div className="bg-stone-900 border border-stone-600 rounded-lg shadow-2xl px-4 py-2 text-xs text-stone-200">
             {toast}
+          </div>
+        </div>
+      )}
+
+      {/* ── Password unlock dialog (5.2) ───────────────────────────────────── */}
+      {passwordPrompt && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Password required"
+          className="fixed inset-0 z-[350] flex items-center justify-center bg-black/70"
+        >
+          <div className="bg-stone-900 border border-stone-700 rounded-2xl shadow-2xl w-[360px] max-w-[90vw] p-6 flex flex-col gap-4">
+            <div>
+              <h2 className="text-sm font-semibold text-white">This PDF is password-protected</h2>
+              <p className="mt-1.5 text-xs text-stone-400 leading-relaxed truncate" title={passwordPrompt.file.name}>
+                Enter the password to open <span className="text-stone-300">{passwordPrompt.file.name}</span>.
+              </p>
+            </div>
+            <input
+              type="password"
+              autoFocus
+              value={passwordInput}
+              onChange={e => setPasswordInput(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") unlockPdf(); if (e.key === "Escape") setPasswordPrompt(null); }}
+              placeholder="Password"
+              className="w-full bg-stone-800 border border-stone-600 rounded-lg px-3 py-2 text-sm text-white placeholder-stone-600 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/30 transition"
+            />
+            {passwordError && <p className="text-[11px] text-red-400">{passwordError}</p>}
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => { setPasswordPrompt(null); setPasswordInput(""); setPasswordError(null); }}
+                className="px-3.5 py-1.5 rounded-lg text-xs text-stone-400 hover:text-white hover:bg-stone-700 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => unlockPdf()}
+                disabled={passwordBusy || !passwordInput}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 text-xs font-semibold text-white transition disabled:opacity-50"
+              >
+                {passwordBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} Unlock
+              </button>
+            </div>
           </div>
         </div>
       )}

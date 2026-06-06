@@ -204,6 +204,20 @@ cropped = pdf_engine.crop(pdf_bytes, 0.1, 0.1, 0.9, 0.9)
 check("crop returns valid PDF", cropped.startswith(b"%PDF"))
 
 
+# ── ENCRYPT / DECRYPT (password unlock flow, 5.2) ────────────────────────────
+print("\n== encrypt / decrypt ==")
+from services import pikepdf_engine
+encrypted = pikepdf_engine.encrypt(pdf_bytes, "s3cret")
+check("encrypt returns valid PDF", encrypted.startswith(b"%PDF"))
+decrypted = pikepdf_engine.decrypt(encrypted, "s3cret")
+check("decrypt with correct password returns valid PDF", decrypted.startswith(b"%PDF"))
+try:
+    pikepdf_engine.decrypt(encrypted, "wrong")
+    check("decrypt with wrong password raises", False, "no error raised")
+except ValueError:
+    check("decrypt with wrong password raises", True)
+
+
 # ── PDF → IMAGES ─────────────────────────────────────────────────────────────
 print("\n== pdf_to_images ==")
 zip_bytes = pdf_engine.pdf_to_images(pdf_bytes, dpi=72, fmt="png")
