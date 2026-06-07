@@ -1,5 +1,6 @@
 import sys
 import os
+import hmac
 import uvicorn
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
@@ -61,7 +62,9 @@ app.add_middleware(
 @app.middleware("http")
 async def require_api_token(request: Request, call_next) -> Response:
     if API_TOKEN and request.method != "OPTIONS" and request.url.path.startswith("/api"):
-        if request.headers.get("X-Stria-Token") != API_TOKEN:
+        # Constant-time compare to avoid leaking the token via response timing.
+        presented = request.headers.get("X-Stria-Token", "")
+        if not hmac.compare_digest(presented, API_TOKEN):
             return JSONResponse(status_code=403, content={"detail": "Forbidden."})
     return await call_next(request)
 
