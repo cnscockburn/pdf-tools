@@ -62,6 +62,14 @@ export default function TabShell() {
     document.documentElement.classList.toggle("reduce-motion", settings.reduceMotion ?? false);
   }, [settings.reduceMotion]);
 
+  // Apply the two independent theme axes to <html> (light/dark mode).
+  useEffect(() => {
+    document.documentElement.classList.toggle("app-dark", (settings.appTheme ?? "light") === "dark");
+  }, [settings.appTheme]);
+  useEffect(() => {
+    document.documentElement.classList.toggle("viewer-light", (settings.viewerTheme ?? "dark") === "light");
+  }, [settings.viewerTheme]);
+
   // ── Tab state ──────────────────────────────────────────────────────────────
   const [tabs, setTabs] = useState<Tab[]>([makeHomeTab(false)]);
   const [activeTabId, setActiveTabId] = useState(tabs[0].id);

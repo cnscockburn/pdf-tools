@@ -45,9 +45,9 @@ function SortablePage({
       style={{ transform: CSS.Transform.toString(transform), transition }}
       onClick={(e) => onSelect(item.id, e.shiftKey)}
       className={cn(
-        "relative flex flex-col items-center gap-1 rounded-lg p-1 bg-white cursor-pointer select-none transition",
+        "relative flex flex-col items-center gap-1 rounded-lg p-1 bg-white app-dark:bg-stone-900 cursor-pointer select-none transition",
         isDragging ? "opacity-50 scale-105 shadow-lg z-10" : "",
-        selected ? "ring-2 ring-brand-500 bg-amber-50/40" : "border border-stone-200 hover:border-stone-300",
+        selected ? "ring-2 ring-brand-500 bg-amber-50/40 app-dark:bg-brand-950/40" : "border border-stone-200 hover:border-stone-300 app-dark:border-stone-800 app-dark:hover:border-stone-700",
       )}
     >
       {/* Drag handle */}
@@ -56,7 +56,7 @@ function SortablePage({
         {...listeners}
         onClick={(e) => e.stopPropagation()}
         aria-label={`Reorder page ${item.src}`}
-        className="absolute top-1 left-1 z-10 rounded bg-white/85 text-stone-400 hover:text-stone-600 cursor-grab active:cursor-grabbing touch-none p-0.5 shadow-sm"
+        className="absolute top-1 left-1 z-10 rounded bg-white/85 app-dark:bg-stone-800/85 text-stone-400 hover:text-stone-600 app-dark:text-stone-500 app-dark:hover:text-stone-300 cursor-grab active:cursor-grabbing touch-none p-0.5 shadow-sm"
       >
         <GripVertical className="h-3.5 w-3.5" />
       </button>
@@ -77,9 +77,9 @@ function SortablePage({
         <div className="w-full aspect-[3/4] bg-stone-100 rounded animate-pulse" />
       )}
 
-      <span className="text-[10px] text-stone-500">
+      <span className="text-[10px] text-stone-500 app-dark:text-stone-400">
         {index + 1}
-        {item.src !== index + 1 && <span className="text-stone-400"> · p.{item.src}</span>}
+        {item.src !== index + 1 && <span className="text-stone-400 app-dark:text-stone-500"> · p.{item.src}</span>}
         {item.rotate !== 0 && <span className="text-brand-600"> · {item.rotate}°</span>}
       </span>
     </div>
@@ -222,31 +222,31 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
         {file && plan.length > 0 && (
           <>
             {/* Toolbar */}
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2">
-              <span className="text-[11px] text-stone-500">
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-white app-dark:border-stone-800 app-dark:bg-stone-900 px-3 py-2">
+              <span className="text-[11px] text-stone-500 app-dark:text-stone-400">
                 {selected.size > 0 ? `${selected.size} selected` : `${plan.length} page${plan.length !== 1 ? "s" : ""}`}
               </span>
-              <div className="w-px h-5 bg-stone-200" />
+              <div className="w-px h-5 bg-stone-200 app-dark:bg-stone-700" />
               <button onClick={() => rotateSelected(-1)} disabled={!hasSel}
-                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-stone-600 hover:bg-stone-100 disabled:opacity-40 transition" title="Rotate left">
+                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-stone-600 hover:bg-stone-100 app-dark:text-stone-300 app-dark:hover:bg-stone-800 disabled:opacity-40 transition" title="Rotate left">
                 <RotateCcw className="h-3.5 w-3.5" /> Left
               </button>
               <button onClick={() => rotateSelected(1)} disabled={!hasSel}
-                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-stone-600 hover:bg-stone-100 disabled:opacity-40 transition" title="Rotate right">
+                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-stone-600 hover:bg-stone-100 app-dark:text-stone-300 app-dark:hover:bg-stone-800 disabled:opacity-40 transition" title="Rotate right">
                 <RotateCw className="h-3.5 w-3.5" /> Right
               </button>
               <button onClick={deleteSelected} disabled={!hasSel}
-                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-red-500 hover:bg-red-50 disabled:opacity-40 transition" title="Delete selected pages">
+                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-red-500 hover:bg-red-50 app-dark:hover:bg-red-950/40 disabled:opacity-40 transition" title="Delete selected pages">
                 <Trash2 className="h-3.5 w-3.5" /> Delete
               </button>
               <button onClick={handleExtract} disabled={!hasSel || loading}
-                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-stone-600 hover:bg-stone-100 disabled:opacity-40 transition" title="Extract selected pages to a new PDF">
+                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-stone-600 hover:bg-stone-100 app-dark:text-stone-300 app-dark:hover:bg-stone-800 disabled:opacity-40 transition" title="Extract selected pages to a new PDF">
                 <FileOutput className="h-3.5 w-3.5" /> Extract
               </button>
               <div className="ml-auto flex items-center gap-1.5">
                 {hasSel
-                  ? <button onClick={clearSel} className="text-[11px] text-stone-400 hover:text-stone-600 transition">Clear</button>
-                  : <button onClick={selectAll} className="text-[11px] text-stone-400 hover:text-stone-600 transition">Select all</button>}
+                  ? <button onClick={clearSel} className="text-[11px] text-stone-400 hover:text-stone-600 app-dark:hover:text-stone-200 transition">Clear</button>
+                  : <button onClick={selectAll} className="text-[11px] text-stone-400 hover:text-stone-600 app-dark:hover:text-stone-200 transition">Select all</button>}
                 {dirty && (
                   <button
                     onClick={() => setPlan(Array.from({ length: pageCount }, (_, i) => ({ id: `p${i + 1}`, src: i + 1, rotate: 0 })))}
@@ -258,7 +258,7 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
               </div>
             </div>
 
-            <p className="text-[10px] text-stone-400 -mt-3">
+            <p className="text-[10px] text-stone-400 app-dark:text-stone-500 -mt-3">
               Click a page to select · Shift-click for a range · drag the grip to reorder · keyboard: Tab, Space to lift, arrows, Space to drop.
             </p>
 

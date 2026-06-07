@@ -38,13 +38,13 @@ function SortableImageRow({ item, thumb, onRemove }: { item: TaggedImage; thumb:
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
         "flex items-center gap-3 px-4 py-3 transition-colors",
-        isDragging ? "bg-amber-50/50 shadow-sm z-10 relative" : "bg-white",
+        isDragging ? "bg-amber-50/50 app-dark:bg-brand-950/40 shadow-sm z-10 relative" : "bg-white app-dark:bg-stone-900",
       )}
     >
       <button
         {...attributes}
         {...listeners}
-        className="shrink-0 text-stone-300 hover:text-stone-500 cursor-grab active:cursor-grabbing transition-colors touch-none"
+        className="shrink-0 text-stone-300 hover:text-stone-500 app-dark:text-stone-600 app-dark:hover:text-stone-400 cursor-grab active:cursor-grabbing transition-colors touch-none"
         aria-label={`Reorder ${item.file.name}`}
       >
         <GripVertical className="h-4 w-4" />
@@ -52,11 +52,11 @@ function SortableImageRow({ item, thumb, onRemove }: { item: TaggedImage; thumb:
       <img
         src={thumb}
         alt={item.file.name}
-        className="h-12 w-10 object-cover rounded border border-stone-200"
+        className="h-12 w-10 object-cover rounded border border-stone-200 app-dark:border-stone-700"
       />
       <div className="flex-1 min-w-0">
-        <p className="text-sm truncate text-stone-800">{item.file.name}</p>
-        <p className="text-xs text-stone-400">{formatBytes(item.file.size)}</p>
+        <p className="text-sm truncate text-stone-800 app-dark:text-stone-200">{item.file.name}</p>
+        <p className="text-xs text-stone-400 app-dark:text-stone-500">{formatBytes(item.file.size)}</p>
       </div>
       <button
         onClick={() => onRemove(item.id)}
@@ -145,8 +145,8 @@ export default function ImagesToPDF() {
         {tagged.length > 0 && (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={tagged.map(t => t.id)} strategy={verticalListSortingStrategy}>
-              <div className="rounded-xl border border-stone-200 bg-white divide-y divide-stone-100 overflow-hidden">
-                <div className="px-4 py-2.5 flex items-center justify-between bg-stone-50/50">
+              <div className="rounded-xl border border-stone-200 bg-white divide-y divide-stone-100 app-dark:border-stone-800 app-dark:bg-stone-900 app-dark:divide-stone-800 overflow-hidden">
+                <div className="px-4 py-2.5 flex items-center justify-between bg-stone-50/50 app-dark:bg-stone-800/50">
                   <span className="text-[10px] font-medium text-stone-400 uppercase tracking-wide">
                     {tagged.length} image{tagged.length !== 1 ? "s" : ""} — {tagged.length} page{tagged.length !== 1 ? "s" : ""} in output
                   </span>

@@ -42,6 +42,10 @@ export interface Settings {
   thumbnailsOpenDefault: boolean;
   /** Whether the right rail (annotations / outline / bookmarks) starts open. */
   rightRailOpenDefault: boolean;
+  /** Theme for the app surfaces (home, tools, settings, tab bar). */
+  appTheme: "light" | "dark";
+  /** Theme for the viewer surfaces. */
+  viewerTheme: "light" | "dark";
 
   // ── Annotation defaults ─────────────────────────────────────────────────────
   /**
@@ -82,6 +86,8 @@ function defaults(): Settings {
     defaultFitMode: "width",
     thumbnailsOpenDefault: false,
     rightRailOpenDefault: true,
+    appTheme: "light",
+    viewerTheme: "dark",
     defaultHighlightColor: 0,
     defaultInkWidth: 2,
     customStampLabels: [],
@@ -113,6 +119,8 @@ export function loadSettings(): Settings {
           : d.defaultFitMode,
         thumbnailsOpenDefault: parsed.thumbnailsOpenDefault ?? d.thumbnailsOpenDefault,
         rightRailOpenDefault: parsed.rightRailOpenDefault ?? d.rightRailOpenDefault,
+        appTheme: parsed.appTheme === "dark" ? "dark" : d.appTheme,
+        viewerTheme: parsed.viewerTheme === "light" ? "light" : d.viewerTheme,
         defaultHighlightColor: ([0, 1, 2, 3] as const).includes(parsed.defaultHighlightColor as 0)
           ? (parsed.defaultHighlightColor as 0 | 1 | 2 | 3)
           : d.defaultHighlightColor,

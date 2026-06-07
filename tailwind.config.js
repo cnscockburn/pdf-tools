@@ -1,3 +1,5 @@
+import plugin from "tailwindcss/plugin";
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
@@ -36,5 +38,14 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // Two independent theme axes (light/dark mode):
+    //   app-dark      → app surfaces (home, tools, settings, tab bar) go dark
+    //   viewer-light  → the dark viewer surfaces go light
+    // Classes are toggled on <html> by TabShell from the user's settings.
+    plugin(({ addVariant }) => {
+      addVariant("app-dark", ".app-dark &");
+      addVariant("viewer-light", ".viewer-light &");
+    }),
+  ],
 };

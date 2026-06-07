@@ -139,13 +139,13 @@ export default function Home() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-stone-50 overflow-hidden">
+    <div className="h-full flex flex-col bg-stone-50 app-dark:bg-stone-950 overflow-hidden">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="shrink-0 h-11 bg-white border-b border-stone-200 px-6 flex items-center gap-3">
+      <header className="shrink-0 h-11 bg-white border-b border-stone-200 app-dark:bg-stone-900 app-dark:border-stone-800 px-6 flex items-center gap-3">
         <img src={striaLogo} alt="" aria-hidden="true" className="h-6 w-auto object-contain" />
         <div className="leading-none">
-          <p className="text-[15px] font-semibold text-stone-900 tracking-[-0.01em] leading-[1.25]">Stria</p>
+          <p className="text-[15px] font-semibold text-stone-900 app-dark:text-stone-100 tracking-[-0.01em] leading-[1.25]">Stria</p>
         </div>
         <span className="text-[11px] text-stone-400 ml-1">Local PDF toolkit</span>
       </header>
@@ -163,13 +163,13 @@ export default function Home() {
                 "border-2 border-dashed transition-colors duration-200 cursor-pointer",
                 "py-14 px-8",
                 isDragActive
-                  ? "border-brand-500 bg-[#fffbeb] scale-[1.005]"
-                  : "border-stone-300 bg-white hover:border-[#d4c5a0] hover:shadow-sm"
+                  ? "border-brand-500 bg-[#fffbeb] app-dark:bg-brand-950/40 scale-[1.005]"
+                  : "border-stone-300 bg-white hover:border-[#d4c5a0] hover:shadow-sm app-dark:border-stone-700 app-dark:bg-stone-900 app-dark:hover:border-brand-500/60"
               )}
             >
               <input {...getInputProps()} />
               <svg
-                className={cn("h-11 w-11 transition-colors duration-200", isDragActive ? "text-brand-500" : "text-stone-300")}
+                className={cn("h-11 w-11 transition-colors duration-200", isDragActive ? "text-brand-500" : "text-stone-300 app-dark:text-stone-600")}
                 viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5"
                 aria-hidden="true"
               >
@@ -177,10 +177,10 @@ export default function Home() {
                 <path d="M20 6v12h18M22 28l6-6 6 6M28 22v10" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
               <div className="text-center">
-                <p className="text-sm font-semibold text-stone-700">
+                <p className="text-sm font-semibold text-stone-700 app-dark:text-stone-200">
                   {isDragActive ? "Drop the PDF here" : "Open a PDF to start reviewing"}
                 </p>
-                <p className="mt-1.5 text-xs text-stone-400">
+                <p className="mt-1.5 text-xs text-stone-400 app-dark:text-stone-500">
                   Drop a file, or click to browse
                 </p>
               </div>
@@ -193,11 +193,11 @@ export default function Home() {
                   key={i}
                   onClick={() => openToolFilePicker(cap.toolHint)}
                   title={`Open a PDF and ${cap.text.toLowerCase()}`}
-                  className="group flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-[11px] text-stone-500 hover:border-stone-300 hover:text-stone-700 hover:shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
+                  className="group flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white app-dark:bg-stone-900 app-dark:border-stone-800 px-2.5 py-1.5 text-[11px] text-stone-500 app-dark:text-stone-400 hover:border-stone-300 hover:text-stone-700 app-dark:hover:text-stone-200 app-dark:hover:border-stone-700 hover:shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
                 >
-                  <span className="text-stone-300 group-hover:text-amber-600 transition-colors">{cap.icon}</span>
+                  <span className="text-stone-300 app-dark:text-stone-600 group-hover:text-amber-600 transition-colors">{cap.icon}</span>
                   {cap.text}
-                  <kbd className="rounded border border-stone-200 bg-stone-50 px-1 text-[9px] font-mono text-stone-400">{cap.kbd}</kbd>
+                  <kbd className="rounded border border-stone-200 bg-stone-50 app-dark:bg-stone-800 app-dark:border-stone-700 px-1 text-[9px] font-mono text-stone-400 app-dark:text-stone-500">{cap.kbd}</kbd>
                 </button>
               ))}
             </div>
@@ -212,7 +212,7 @@ export default function Home() {
                 </span>
                 <button
                   onClick={() => { clearRecentFiles(); setRecents([]); }}
-                  className="text-[10px] text-stone-400 hover:text-stone-600 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded px-1"
+                  className="text-[10px] text-stone-400 hover:text-stone-600 app-dark:hover:text-stone-200 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded px-1"
                 >
                   Clear
                 </button>
@@ -226,12 +226,12 @@ export default function Home() {
                     key={r.path}
                     onClick={() => openRecent(r)}
                     title={r.path}
-                    className="group flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-left hover:border-stone-300 hover:shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
+                    className="group flex items-center gap-2 rounded-lg border border-stone-200 bg-white app-dark:bg-stone-900 app-dark:border-stone-800 px-2.5 py-2 text-left hover:border-stone-300 app-dark:hover:border-stone-700 hover:shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
                   >
-                    <FileText className="h-4 w-4 shrink-0 text-stone-300 group-hover:text-amber-600 transition-colors" />
+                    <FileText className="h-4 w-4 shrink-0 text-stone-300 app-dark:text-stone-600 group-hover:text-amber-600 transition-colors" />
                     <span className="flex-1 min-w-0">
-                      <span className="block truncate text-[12px] text-stone-700 group-hover:text-stone-900">{r.name}</span>
-                      <span className="block text-[10px] text-stone-400">{formatBytes(r.size)}</span>
+                      <span className="block truncate text-[12px] text-stone-700 app-dark:text-stone-200 group-hover:text-stone-900 app-dark:group-hover:text-white">{r.name}</span>
+                      <span className="block text-[10px] text-stone-400 app-dark:text-stone-500">{formatBytes(r.size)}</span>
                     </span>
                   </button>
                 ))}
@@ -241,9 +241,9 @@ export default function Home() {
 
           {/* ── Divider ──────────────────────────────────────────────────── */}
           <div className="w-full flex items-center gap-3">
-            <div className="flex-1 h-px bg-stone-200" />
+            <div className="flex-1 h-px bg-stone-200 app-dark:bg-stone-800" />
             <span className="text-[10px] font-medium text-stone-400 uppercase tracking-[0.1em]">or use a tool directly</span>
-            <div className="flex-1 h-px bg-stone-200" />
+            <div className="flex-1 h-px bg-stone-200 app-dark:bg-stone-800" />
           </div>
 
           {/* ── Secondary: tool grid ─────────────────────────────────────── */}
@@ -262,21 +262,23 @@ export default function Home() {
                     "transition-[border-color,box-shadow] duration-150 ease-out",
                     "bg-white border border-stone-200",
                     "hover:border-stone-300 hover:shadow-sm",
+                    "app-dark:bg-stone-900 app-dark:border-stone-800 app-dark:hover:border-stone-700",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50",
                   )}
                 >
                   <div className={cn(
                     "shrink-0 w-8 h-8 rounded-lg flex items-center justify-center",
                     "bg-stone-100 text-stone-400 transition-colors duration-150",
-                    "group-hover:bg-amber-50 group-hover:text-amber-600",
+                    "app-dark:bg-stone-800 app-dark:text-stone-500",
+                    "group-hover:bg-amber-50 group-hover:text-amber-600 app-dark:group-hover:bg-brand-950/50",
                   )}>
                     {tool.icon}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-semibold text-stone-700 group-hover:text-stone-900 transition-colors duration-150 leading-tight">
+                    <p className="text-[12px] font-semibold text-stone-700 app-dark:text-stone-200 group-hover:text-stone-900 app-dark:group-hover:text-white transition-colors duration-150 leading-tight">
                       {tool.title}
                     </p>
-                    <p className="text-[10px] text-stone-400 leading-snug mt-0.5">
+                    <p className="text-[10px] text-stone-400 app-dark:text-stone-500 leading-snug mt-0.5">
                       {tool.description}
                     </p>
                   </div>
@@ -288,9 +290,9 @@ export default function Home() {
           {/* ── Privacy footer ────────────────────────────────────────────── */}
           <button
             onClick={() => setPrivacyOpen(true)}
-            className="group flex items-center gap-1.5 text-[10px] text-stone-400 hover:text-stone-600 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded px-2 py-1"
+            className="group flex items-center gap-1.5 text-[10px] text-stone-400 hover:text-stone-600 app-dark:hover:text-stone-200 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded px-2 py-1"
           >
-            <ShieldCheck className="h-3 w-3 text-stone-300 group-hover:text-green-600 transition-colors" />
+            <ShieldCheck className="h-3 w-3 text-stone-300 app-dark:text-stone-600 group-hover:text-green-600 transition-colors" />
             Everything runs on your machine — nothing is uploaded.
             <span className="underline decoration-dotted underline-offset-2">How it works</span>
           </button>
@@ -306,17 +308,17 @@ export default function Home() {
           className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40"
           onClick={e => { if (e.target === e.currentTarget) setPrivacyOpen(false); }}
         >
-          <div ref={privacyTrapRef} className="bg-white border border-stone-200 rounded-2xl shadow-2xl w-[420px] max-w-[90vw] p-6">
+          <div ref={privacyTrapRef} className="bg-white border border-stone-200 app-dark:bg-stone-900 app-dark:border-stone-700 rounded-2xl shadow-2xl w-[420px] max-w-[90vw] p-6">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5 text-green-600" />
-                <h2 className="text-sm font-semibold text-stone-900">Private by design</h2>
+                <h2 className="text-sm font-semibold text-stone-900 app-dark:text-stone-100">Private by design</h2>
               </div>
-              <button onClick={() => setPrivacyOpen(false)} aria-label="Close" className="text-stone-400 hover:text-stone-700 rounded p-0.5 hover:bg-stone-100 transition">
+              <button onClick={() => setPrivacyOpen(false)} aria-label="Close" className="text-stone-400 hover:text-stone-700 app-dark:hover:text-white rounded p-0.5 hover:bg-stone-100 app-dark:hover:bg-stone-800 transition">
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <ul className="space-y-2.5 text-xs text-stone-600 leading-relaxed">
+            <ul className="space-y-2.5 text-xs text-stone-600 app-dark:text-stone-300 leading-relaxed">
               <li className="flex gap-2"><span className="text-green-600">•</span> Your PDFs never leave your computer. There is no cloud, no account, and no upload.</li>
               <li className="flex gap-2"><span className="text-green-600">•</span> All processing (annotate, redact, compress, crop, merge) runs in a local background service bundled with the app.</li>
               <li className="flex gap-2"><span className="text-green-600">•</span> Files are not cached or retained — close a tab and the document is gone from memory.</li>

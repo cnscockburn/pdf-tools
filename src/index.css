@@ -8,6 +8,11 @@
     @apply bg-stone-50 text-stone-900 antialiased;
   }
 
+  /* App dark mode — base surface behind the light-toolbox pages. */
+  html.app-dark body {
+    @apply bg-stone-950 text-stone-100;
+  }
+
   /* Honor reduced-motion globally (DESIGN.md Do: prefers-reduced-motion → duration-0). */
   @media (prefers-reduced-motion: reduce) {
     *,

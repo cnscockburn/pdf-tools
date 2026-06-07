@@ -39,20 +39,20 @@ function SortableFileRow({ item, isDuplicate, onRemove }: { item: TaggedFile; is
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
         "flex items-center gap-3 px-4 py-3 transition-colors",
-        isDragging ? "bg-amber-50/50 shadow-sm z-10 relative" : "bg-white",
+        isDragging ? "bg-amber-50/50 app-dark:bg-brand-950/40 shadow-sm z-10 relative" : "bg-white app-dark:bg-stone-900",
       )}
     >
       <button
         {...attributes}
         {...listeners}
-        className="shrink-0 text-stone-300 hover:text-stone-500 cursor-grab active:cursor-grabbing transition-colors touch-none"
+        className="shrink-0 text-stone-300 hover:text-stone-500 app-dark:text-stone-600 app-dark:hover:text-stone-400 cursor-grab active:cursor-grabbing transition-colors touch-none"
         aria-label={`Reorder ${item.file.name}`}
       >
         <GripVertical className="h-4 w-4" />
       </button>
       <div className="flex-1 min-w-0">
-        <p className="text-sm truncate text-stone-800">{item.file.name}</p>
-        <p className="text-[10px] text-stone-400 flex items-center gap-2">
+        <p className="text-sm truncate text-stone-800 app-dark:text-stone-200">{item.file.name}</p>
+        <p className="text-[10px] text-stone-400 app-dark:text-stone-500 flex items-center gap-2">
           <span>{formatBytes(item.file.size)}</span>
           {item.pages != null && <span>· {item.pages} page{item.pages !== 1 ? "s" : ""}</span>}
           {isDuplicate && (
@@ -85,7 +85,7 @@ function StepIndicator({ step }: { step: number }) {
     <div className="flex items-center gap-1.5 mb-1">
       {steps.map((s, i) => (
         <span key={i} className="flex items-center gap-1.5">
-          {i > 0 && <span className="w-4 h-px bg-stone-200" />}
+          {i > 0 && <span className="w-4 h-px bg-stone-200 app-dark:bg-stone-700" />}
           <span className={cn(
             "text-[10px] font-medium transition-colors",
             i + 1 === step ? "text-amber-600" : s.done ? "text-stone-500" : "text-stone-300",
@@ -200,8 +200,8 @@ export default function Merge({ initialFile }: MergeProps = {}) {
         {tagged.length > 0 && (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={tagged.map(t => t.id)} strategy={verticalListSortingStrategy}>
-              <div className="rounded-xl border border-stone-200 bg-white divide-y divide-stone-100 overflow-hidden">
-                <div className="px-4 py-2.5 flex items-center justify-between bg-stone-50/50">
+              <div className="rounded-xl border border-stone-200 bg-white divide-y divide-stone-100 app-dark:border-stone-800 app-dark:bg-stone-900 app-dark:divide-stone-800 overflow-hidden">
+                <div className="px-4 py-2.5 flex items-center justify-between bg-stone-50/50 app-dark:bg-stone-800/50">
                   <span className="text-[10px] font-medium text-stone-400 uppercase tracking-wide">
                     {tagged.length} file{tagged.length !== 1 ? "s" : ""} — drag to reorder
                   </span>

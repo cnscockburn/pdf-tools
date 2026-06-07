@@ -135,6 +135,8 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
   // Local draft state — committed on Save
   const [authorDraft, setAuthorDraft]     = useState(settings.author);
   const [uiScale, setUiScale]             = useState<UiScale>(settings.uiScale ?? 1.25);
+  const [appTheme, setAppTheme]           = useState<"light"|"dark">(settings.appTheme ?? "light");
+  const [viewerTheme, setViewerTheme]     = useState<"light"|"dark">(settings.viewerTheme ?? "dark");
   const [reduceMotion, setReduceMotion]   = useState(settings.reduceMotion ?? false);
   const [fitMode, setFitMode]             = useState<FitMode>(settings.defaultFitMode ?? "width");
   const [thumbsDefault, setThumbsDefault] = useState(settings.thumbnailsOpenDefault ?? false);
@@ -168,6 +170,8 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
       author:                authorDraft.trim(),
       uiScale,
       reduceMotion,
+      appTheme,
+      viewerTheme,
       defaultFitMode:        fitMode,
       thumbnailsOpenDefault: thumbsDefault,
       rightRailOpenDefault:  railDefault,
@@ -234,6 +238,30 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
           {/* ── Interface ────────────────────────────────────────────────────── */}
           <section className="space-y-4">
             <SectionLabel>Interface</SectionLabel>
+
+            <div>
+              <p className="text-xs font-medium text-stone-300 mb-1.5">App theme</p>
+              <SegmentedControl
+                options={[{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }]}
+                value={appTheme}
+                onChange={setAppTheme}
+              />
+              <p className="mt-1.5 text-[11px] text-stone-600 leading-snug">
+                Home, tools, and settings surfaces.
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-stone-300 mb-1.5">Viewer theme</p>
+              <SegmentedControl
+                options={[{ value: "dark", label: "Dark" }, { value: "light", label: "Light" }]}
+                value={viewerTheme}
+                onChange={setViewerTheme}
+              />
+              <p className="mt-1.5 text-[11px] text-stone-600 leading-snug">
+                The document viewer chrome. The page itself is always on white.
+              </p>
+            </div>
 
             <div>
               <p className="text-xs font-medium text-stone-300 mb-1.5">UI scale</p>
