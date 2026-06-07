@@ -1,0 +1,28 @@
+# Runtime dependencies for the Stria backend sidecar, pinned for reproducible
+# builds and stable security audits (regenerate from the venv with: pip freeze).
+# Build-only tools (pyinstaller, ruff) are intentionally excluded.
+PyMuPDF==1.27.2.3
+PyYAML==6.0.3
+annotated-doc==0.0.4
+annotated-types==0.7.0
+anyio==4.13.0
+click==8.4.1
+colorama==0.4.6
+fastapi==0.136.3
+h11==0.16.0
+httptools==0.7.1
+idna==3.16
+lxml==6.1.1
+packaging==26.2
+pikepdf==10.7.1
+pillow==12.2.0
+pydantic==2.13.4
+pydantic_core==2.46.4
+python-dotenv==1.2.2
+python-multipart==0.0.29
+starlette==1.1.0
+typing-inspection==0.4.2
+typing_extensions==4.15.0
+uvicorn==0.47.0
+watchfiles==1.2.0
+websockets==16.0

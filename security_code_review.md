@@ -18,8 +18,8 @@ Each finding was assessed and actioned. Summary:
 | 4 | Sidecar path hijacking | High | **Mitigated** — perMachine install; signing recommended |
 | 5 | Arbitrary local PDF read via IPC | Medium | **Accepted** — gated by #2; by-design file access |
 | 6 | Sync CPU-bound work on event loop | Medium | **Fixed** — offloaded to bounded threadpool |
-| 7 | In-memory ZIP construction (OOM) | Medium | **Partially mitigated** — DPI clamp; streaming deferred |
-| 8 | Unbounded concurrent uploads | Medium | **Mitigated** — concurrency limiter + size caps |
+| 7 | In-memory ZIP construction (OOM) | Medium | **Fixed** — streamed via SpooledTemporaryFile + output cap |
+| 8 | Unbounded concurrent uploads | Medium | **Fixed** — upload-read semaphore + concurrency limiter + size caps |
 | 9 | Hardcoded port 7342 | Low | **Accepted** — documented; dynamic port deferred |
 | 10 | Broad DOMPurify allowlist | Low | **Fixed** — removed `foreignObject` |
 | 11 | Error masking leaks class names | Low | **Fixed** — generic client message |
@@ -119,7 +119,7 @@ When processing operations that generate massive outputs—such as splitting a 1
 **Locations:**
 * `backend/services/pdf_engine.py` (In the `split()` and `pdf_to_images()` functions).
 
-**➤ Resolution — Partially mitigated; full fix deferred.** The new `_ENGINE_LIMITER` (capacity 4) bounds how many heavy operations run concurrently, and the `pdf_to_images` DPI clamp caps per-page bitmap size, which together cut peak memory substantially. The archives are still assembled in `io.BytesIO`; converting `split()`/`pdf_to_images()` to stream into a `SpooledTemporaryFile`/`tempfile` and return a `FileResponse` is the complete fix and is **deferred** (contained change, but touches the response contract and warrants its own test pass). Tracked as follow-up.
+**➤ Resolution — Fixed.** `split()` (multi-range) and `pdf_to_images()` now write their archives into a `tempfile.SpooledTemporaryFile` (16 MB in-memory threshold, then spills to disk) and return that file object; the routers stream it to the response with `StreamingResponse` + `stream_file()` (64 KB chunks, closes/deletes the temp file when done). Peak memory is therefore bounded regardless of output size. `pdf_to_images` also enforces a 1 GB cumulative output cap (raises 400 "lower the DPI or export fewer pages") on top of the existing DPI clamp and the `_ENGINE_LIMITER` concurrency cap. Verified end-to-end over HTTP (multi-range ZIP, to-images ZIP, single PDF) and via smoke tests.
 
 ### 8. Unbounded Concurrent Upload Allocations (CWE-770)
 **Description:** 
@@ -131,7 +131,7 @@ A client can open dozens of simultaneous connections, each uploading a 100MB fil
 **Locations:**
 * `backend/routers/_deps.py` (`_read_capped` function reads chunks continuously into memory).
 
-**➤ Resolution — Mitigated.** The `_ENGINE_LIMITER` (capacity 4) bounds concurrent CPU/RAM-heavy processing, and the existing per-file (100 MB) and per-request total (300 MB) caps remain. Combined with the token gating from #1 (only this app's WebView can reach the API at all), the practical exposure for a single-user desktop app is low. A strict cap on total concurrent in-flight *upload bytes* (a global byte semaphore around `_read_capped`) is a reasonable further hardening and is noted as follow-up.
+**➤ Resolution — Fixed.** `read_pdf_upload` and `read_multiple_uploads` now acquire a global `asyncio.Semaphore(4)` (`_UPLOAD_SLOTS`) around the buffering read, capping concurrent in-flight upload buffers at ~4 × 100 MB. This stacks with the existing per-file (100 MB) and per-request total (300 MB) caps, the `_ENGINE_LIMITER` processing cap, and the token gating from #1. A flood of simultaneous large uploads can no longer allocate unbounded memory.
 
 ---
 
@@ -174,3 +174,39 @@ This behavior obscures the stack trace from backend terminal logs (making legiti
 * `backend/routers/_deps.py` (Exception handling block in `run_engine`).
 
 **➤ Resolution — Fixed.** The unexpected-exception branch in `run_engine` now returns a generic `"PDF processing failed."` (no `type(e).__name__`) to the client, while the full exception and traceback are still printed to stderr (captured to `sidecar.log` in packaged builds) for debugging.
+
+---
+
+## Addendum — full-project review (2026-06-07)
+
+A second, whole-codebase pass (backend routers + engines, Rust launcher, frontend, config, `cargo audit` / `npm audit`, installed-version CVE checks) produced these additional findings:
+
+### N1. Unused `shell` plugin + capability (attack surface)
+The `tauri-plugin-shell` was initialised and `shell:default` was granted in `capabilities/default.json`, but the plugin was never used (the sidecar is spawned via `std::process::Command`; no frontend import). `shell:default` includes `shell:allow-open`, which an XSS foothold could abuse.
+**➤ Resolution — Fixed.** Removed the plugin from `Cargo.toml` + `lib.rs` and the `shell:default` grant from the capability file. Capabilities are now `core` + `dialog` only. `cargo check` clean.
+
+### N2. Dead `react-router-dom` with a known advisory
+`react-router-dom` remained in `package.json` after the migration to the tab system but had no imports. It carried the moderate open-redirect advisory GHSA-2j2x-hqr9-3h42.
+**➤ Resolution — Fixed.** Uninstalled the dead dependency. `npm audit` now reports 0 vulnerabilities.
+
+### N3. Non-constant-time token comparison
+The token middleware compared the header with `!=`.
+**➤ Resolution — Fixed.** Switched to `hmac.compare_digest`.
+
+### N4. Unpinned backend dependencies
+`pyproject.toml` used open-ended `>=` ranges with no lockfile, hurting reproducibility and audit stability.
+**➤ Resolution — Fixed.** Added `backend/requirements.txt` pinning every runtime dependency to the audited-clean versions (regenerate with `pip freeze`).
+
+### N5. No element-count cap on some list inputs
+`_read_page_list` / `read_multiple_uploads` don't cap the number of elements/files.
+**➤ Resolution — Accepted.** Bounded in practice by the 300 MB request-body cap, the new upload-read semaphore, and token gating. The dedicated PDF routes also cap regions/annotations/plan items explicitly.
+
+### Audited clean (no change required)
+- **Redaction** uses `apply_redactions(text=PDF_REDACT_TEXT_REMOVE, images=PDF_REDACT_IMAGE_PIXELS)` — genuinely removes underlying content, no black-box leak.
+- **Annotation text/author** written via PyMuPDF `set_info(...)` (escaped); no raw `xref_set_key` of user strings — no PDF-syntax injection.
+- **Dependencies:** `cargo audit` 0 advisories; installed Python deps post-date their CVEs (h11 0.16.0, starlette 1.1.0, python-multipart 0.0.29, pillow 12.2.0).
+- **Router input validation:** bounds + JSON-shape checks throughout (coords clamped to [0,1], page ≤ 100k, length caps).
+
+### Still open (require external resources / larger refactor)
+- **#4 code-signing** — Authenticode signing of the exe + sidecar is the real tamper fix; needs a certificate (release/ops step). perMachine install is the current mitigation.
+- **#9 dynamic port** — Low severity; the single-instance plugin already prevents the two-instance conflict. A Rust→backend→frontend port handshake (paralleling the token handshake) would remove the remaining external-conflict case.

@@ -162,10 +162,13 @@ redact_doc.close()
 
 # ── SPLIT ────────────────────────────────────────────────────────────────────
 print("\n== split ==")
-single = pdf_engine.split(pdf_bytes, [(1, 2)])
+single = pdf_engine.split(pdf_bytes, [(1, 2)]).read()  # split now returns a file object
 single_doc = fitz.open(stream=single, filetype="pdf")
 check("split single range returns a PDF", single_doc.page_count == 2)
 single_doc.close()
+
+multi = pdf_engine.split(pdf_bytes, [(1, 1), (2, 2)]).read()
+check("split multiple ranges returns a ZIP", multi.startswith(b"PK"))
 
 
 # ── ROTATE / DELETE / REORDER / EXTRACT ──────────────────────────────────────
@@ -255,7 +258,7 @@ check("fill_form sets the value",
 
 # ── PDF → IMAGES ─────────────────────────────────────────────────────────────
 print("\n== pdf_to_images ==")
-zip_bytes = pdf_engine.pdf_to_images(pdf_bytes, dpi=72, fmt="png")
+zip_bytes = pdf_engine.pdf_to_images(pdf_bytes, dpi=72, fmt="png").read()  # now a file object
 # A ZIP file starts with PK\x03\x04
 check("pdf_to_images returns a ZIP", zip_bytes.startswith(b"PK"))
 

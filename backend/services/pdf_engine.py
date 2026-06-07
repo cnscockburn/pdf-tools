@@ -1,8 +1,28 @@
-"""PyMuPDF-based PDF operations. All functions accept/return raw bytes."""
+"""PyMuPDF-based PDF operations.
+
+Most functions accept/return raw bytes. The archive-producing operations
+(`split` with multiple ranges, `pdf_to_images`) return a seekable file object
+(a SpooledTemporaryFile) instead, so large archives spill to disk rather than
+being held entirely in memory; routers stream them to the response.
+"""
 import io
+import tempfile
 import zipfile
+from typing import IO
 
 import fitz  # PyMuPDF
+
+# Archives up to this size stay in RAM; larger ones transparently spill to a
+# temp file on disk. Keeps peak memory bounded for big split/to-images outputs.
+_ZIP_SPOOL_MAX = 16 * 1024 * 1024  # 16 MB
+# Hard ceiling on total rendered-image bytes for pdf_to_images, so a high page
+# count can't fill memory/disk without bound. Exceeding it is a 400 (user error).
+_MAX_IMAGES_OUTPUT_BYTES = 1024 * 1024 * 1024  # 1 GB
+
+
+def _new_spool() -> IO[bytes]:
+    """A seekable temp file that stays in memory until it grows past the spool size."""
+    return tempfile.SpooledTemporaryFile(max_size=_ZIP_SPOOL_MAX, suffix=".zip")
 
 
 def _open(data: bytes) -> fitz.Document:
@@ -30,32 +50,38 @@ def merge(file_bytes_list: list[bytes]) -> bytes:
 # Split
 # ---------------------------------------------------------------------------
 
-def split(file_bytes: bytes, ranges: list[tuple[int, int]]) -> bytes:
+def split(file_bytes: bytes, ranges: list[tuple[int, int]]) -> IO[bytes]:
     """Split PDF into parts defined by 1-indexed [start, end] ranges.
 
-    Returns a single PDF if one range given, otherwise a ZIP archive.
+    Returns a seekable file object (positioned at 0): a single PDF if one range
+    is given, otherwise a ZIP archive. The caller streams and closes it.
     """
     doc = _open(file_bytes)
-    parts: list[tuple[str, bytes]] = []
+    out = _new_spool()
 
-    for start, end in ranges:
+    if len(ranges) == 1:
+        start, end = ranges[0]
         s = max(0, start - 1)
         e = min(end - 1, doc.page_count - 1)
         new_doc = fitz.open()
         new_doc.insert_pdf(doc, from_page=s, to_page=e)
-        parts.append((f"part_{start}-{end}.pdf", _save(new_doc)))
+        out.write(_save(new_doc))
         new_doc.close()
+        doc.close()
+        out.seek(0)
+        return out
 
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+        for start, end in ranges:
+            s = max(0, start - 1)
+            e = min(end - 1, doc.page_count - 1)
+            new_doc = fitz.open()
+            new_doc.insert_pdf(doc, from_page=s, to_page=e)
+            zf.writestr(f"part_{start}-{end}.pdf", _save(new_doc))
+            new_doc.close()
     doc.close()
-
-    if len(parts) == 1:
-        return parts[0][1]
-
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for name, data in parts:
-            zf.writestr(name, data)
-    return buf.getvalue()
+    out.seek(0)
+    return out
 
 
 def split_returns_zip(ranges: list[tuple[int, int]]) -> bool:
@@ -586,8 +612,12 @@ def fill_form(file_bytes: bytes, values: dict) -> bytes:
 # PDF → Images
 # ---------------------------------------------------------------------------
 
-def pdf_to_images(file_bytes: bytes, dpi: int = 150, fmt: str = "png") -> bytes:
-    """Render every page to an image and return a ZIP archive."""
+def pdf_to_images(file_bytes: bytes, dpi: int = 150, fmt: str = "png") -> IO[bytes]:
+    """Render every page to an image and return a ZIP archive as a file object.
+
+    The archive is streamed into a SpooledTemporaryFile (spills to disk) and a
+    cumulative-size cap guards against unbounded output from large page counts.
+    """
     # Clamp DPI: at very high DPI a single page renders to a multi-gigapixel
     # bitmap and exhausts memory. 600 DPI is print-quality and a safe ceiling.
     dpi = max(36, min(int(dpi), 600))
@@ -596,10 +626,21 @@ def pdf_to_images(file_bytes: bytes, dpi: int = 150, fmt: str = "png") -> bytes:
     ext = "jpeg" if fmt == "jpg" else fmt
     mime_ext = "jpg" if fmt == "jpg" else fmt
 
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+    out = _new_spool()
+    total = 0
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
         for i, page in enumerate(doc):
             pix = page.get_pixmap(matrix=mat, alpha=False)
-            zf.writestr(f"page_{i + 1:03d}.{mime_ext}", pix.tobytes(ext))
+            img = pix.tobytes(ext)
+            total += len(img)
+            if total > _MAX_IMAGES_OUTPUT_BYTES:
+                doc.close()
+                out.close()
+                raise ValueError(
+                    "Rendered output is too large. Lower the DPI or export fewer pages."
+                )
+            zf.writestr(f"page_{i + 1:03d}.{mime_ext}", img)
 
-    return buf.getvalue()
+    doc.close()
+    out.seek(0)
+    return out

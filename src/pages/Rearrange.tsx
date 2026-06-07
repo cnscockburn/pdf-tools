@@ -16,7 +16,7 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, RotateCw, RotateCcw, Trash2, FileOutput, Eye } from "lucide-react";
+import { GripVertical, RotateCw, RotateCcw, Trash2, FileOutput, Eye, Check } from "lucide-react";
 import { usePdfThumbnails } from "../components/PageThumbnailGrid";
 import Layout from "../components/Layout";
 import FileDropZone from "../components/FileDropZone";
@@ -63,7 +63,7 @@ function SortablePage({
 
       {/* Selection tick */}
       {selected && (
-        <span className="absolute top-1 right-1 z-10 h-4 w-4 rounded-full bg-brand-500 text-white text-[9px] font-bold flex items-center justify-center shadow">✓</span>
+        <span className="absolute top-1 right-1 z-10 h-4 w-4 rounded-full bg-brand-500 text-white flex items-center justify-center shadow"><Check className="h-2.5 w-2.5" strokeWidth={3} /></span>
       )}
 
       {thumb ? (

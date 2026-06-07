@@ -1,11 +1,11 @@
 import json
 
 from fastapi import APIRouter, Depends, Form, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import StreamingResponse
 
 from services import pdf_engine
 
-from ._deps import content_disposition, read_pdf_upload, run_engine
+from ._deps import content_disposition, read_pdf_upload, run_engine, stream_file
 
 router = APIRouter()
 
@@ -32,13 +32,13 @@ async def split_pdf(
     is_zip = pdf_engine.split_returns_zip(parsed)
 
     if is_zip:
-        return Response(
-            content=result,
+        return StreamingResponse(
+            stream_file(result),
             media_type="application/zip",
             headers=content_disposition("split.zip", default="split.zip"),
         )
-    return Response(
-        content=result,
+    return StreamingResponse(
+        stream_file(result),
         media_type="application/pdf",
         headers=content_disposition("split.pdf"),
     )

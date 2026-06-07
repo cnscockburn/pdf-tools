@@ -8,9 +8,10 @@ Centralises:
 """
 from __future__ import annotations
 
+import asyncio
 import functools
 import re
-from typing import Annotated
+from typing import IO, Annotated, Iterator
 from urllib.parse import quote
 
 import anyio
@@ -23,6 +24,29 @@ MAX_UPLOAD_BYTES = 100 * 1024 * 1024  # 100 MB
 # Limit for multi-file routes (merge, images-to-pdf).
 MAX_TOTAL_UPLOAD_BYTES = 300 * 1024 * 1024  # 300 MB
 
+# Cap how many uploads are buffered into memory concurrently. Without this, many
+# simultaneous requests could each allocate up to MAX_UPLOAD_BYTES at once and
+# exhaust RAM (CWE-770). 4 in-flight reads ⇒ ≤ ~400 MB of upload buffers.
+_UPLOAD_SLOTS = asyncio.Semaphore(4)
+
+
+def stream_file(f: IO[bytes], chunk_size: int = 64 * 1024) -> Iterator[bytes]:
+    """Yield a file-like object in chunks, then close it.
+
+    Used to stream large archives (ZIPs from split / to-images) straight from a
+    SpooledTemporaryFile to the HTTP response without holding the whole payload
+    in memory a second time. The `finally` closes the temp file, which also
+    deletes it if it had spilled to disk.
+    """
+    try:
+        while True:
+            block = f.read(chunk_size)
+            if not block:
+                break
+            yield block
+    finally:
+        f.close()
+
 
 # --------------------------------------------------------------------------- #
 # Single PDF upload
@@ -33,7 +57,8 @@ async def read_pdf_upload(file: Annotated[UploadFile, File(...)]) -> tuple[bytes
 
     Returns (raw_bytes, original_filename). Raises HTTPException on bad input.
     """
-    data = await _read_capped(file, MAX_UPLOAD_BYTES)
+    async with _UPLOAD_SLOTS:
+        data = await _read_capped(file, MAX_UPLOAD_BYTES)
     if not data.startswith(b"%PDF"):
         raise HTTPException(status_code=400, detail="Not a valid PDF.")
     return data, file.filename or "document.pdf"
@@ -64,15 +89,16 @@ async def read_multiple_uploads(files: list[UploadFile], per_file_cap: int = MAX
     """Read multiple uploads with per-file and total caps."""
     out: list[tuple[bytes, UploadFile]] = []
     total = 0
-    for f in files:
-        data = await _read_capped(f, per_file_cap)
-        total += len(data)
-        if total > total_cap:
-            raise HTTPException(
-                status_code=413,
-                detail=f"Combined upload too large. Maximum {total_cap // (1024 * 1024)} MB.",
-            )
-        out.append((data, f))
+    async with _UPLOAD_SLOTS:
+        for f in files:
+            data = await _read_capped(f, per_file_cap)
+            total += len(data)
+            if total > total_cap:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Combined upload too large. Maximum {total_cap // (1024 * 1024)} MB.",
+                )
+            out.append((data, f))
     return out
 
 

@@ -284,12 +284,13 @@ export default function TabShell() {
               ))}
             </div>
 
-            {/* Divider */}
+            {/* Divider — 2px and a lighter tone so the seam stays visible
+                between two dark panes on a wide monitor. */}
             <div
               className={
                 sideBySideDirection === "horizontal"
-                  ? "w-px bg-stone-700 shrink-0"
-                  : "h-px bg-stone-700 shrink-0"
+                  ? "w-0.5 bg-stone-600 shrink-0"
+                  : "h-0.5 bg-stone-600 shrink-0"
               }
             />
 

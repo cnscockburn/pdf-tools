@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, Form, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import StreamingResponse
 
 from services import pdf_engine
 
-from ._deps import content_disposition, read_pdf_upload, run_engine
+from ._deps import content_disposition, read_pdf_upload, run_engine, stream_file
 
 router = APIRouter()
 
@@ -29,8 +29,8 @@ async def pdf_to_images(
             break
     if not stem:
         stem = "pages"
-    return Response(
-        content=result,
+    return StreamingResponse(
+        stream_file(result),
         media_type="application/zip",
         headers=content_disposition(f"{stem}_images.zip", default="images.zip"),
     )

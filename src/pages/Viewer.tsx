@@ -1576,6 +1576,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           </div>
         ) : (
           <button onClick={() => { setFilenameInput(filename); setEditingFilename(true); }} title="Click to rename"
+            aria-label={filename ? `Rename file (currently ${filename})` : "Open or rename file"}
             className="flex items-center gap-1 group min-w-0 max-w-[200px]">
             <span className="text-xs text-stone-300 truncate group-hover:text-white transition">{filename || "No file"}</span>
             <Pencil className="h-2.5 w-2.5 text-stone-600 group-hover:text-stone-400 shrink-0 transition" />
@@ -1643,7 +1644,8 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
             )
           )}
 
-          {/* Backend status dot — primary pane only */}
+          {/* Backend status — primary pane only. When offline, show a visible
+              label so the failure isn't communicated by a tiny dot alone. */}
           {!isSecondaryPane && (
             <>
               <div
@@ -1653,6 +1655,14 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                 className={cn("w-2 h-2 rounded-full shrink-0 transition-colors",
                   backendOk === null ? "bg-stone-600" : backendOk ? "bg-green-500" : "bg-red-500 animate-pulse")}
               />
+              {backendOk === false && (
+                <span
+                  title="Background service unavailable — annotation saving, redaction, compression, and cropping require it"
+                  className="text-[10px] font-medium text-red-400 shrink-0 hidden sm:inline"
+                >
+                  Service offline
+                </span>
+              )}
               {rendering && <span className="text-[10px] text-stone-500 animate-pulse">Rendering…</span>}
             </>
           )}
