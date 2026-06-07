@@ -16,10 +16,14 @@ import "katex/dist/katex.min.css";
 // KaTeX generates a fixed set of HTML elements — allow only those and nothing
 // that could execute scripts.  This is intentionally narrow rather than
 // using DOMPurify.sanitize() with default (permissive) settings.
+// KaTeX's HTML+MathML output uses spans, plain SVG (path/line/rect/…) and
+// MathML elements. It does NOT emit <foreignObject>, which is a known mXSS
+// vector (it switches the parser back to HTML context), so it is deliberately
+// excluded from the allowlist.
 const KATEX_ALLOWED_TAGS = [
   "span", "svg", "path", "line", "rect", "circle", "ellipse", "polygon",
   "g", "use", "defs", "symbol", "clipPath", "mask", "marker", "text",
-  "tspan", "textPath", "foreignObject", "annotation", "annotation-xml",
+  "tspan", "textPath", "annotation", "annotation-xml",
   "math", "mrow", "mi", "mo", "mn", "msup", "msub", "msubsup", "mfrac",
   "mroot", "msqrt", "mtable", "mtr", "mtd", "mtext", "mspace", "mover",
   "munder", "munderover", "mpadded", "mphantom", "mstyle", "merror",

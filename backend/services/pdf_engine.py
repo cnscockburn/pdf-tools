@@ -184,6 +184,12 @@ def compress(file_bytes: bytes, quality: str = "ebook") -> bytes:
 
     from PIL import Image
 
+    # Cap pixel count to defuse decompression bombs: a tiny compressed image
+    # can claim enormous dimensions and exhaust RAM when Pillow decodes it.
+    # Above this Pillow raises DecompressionBombError, which the per-image
+    # try/except below catches so we simply leave that image untouched.
+    Image.MAX_IMAGE_PIXELS = 64_000_000  # 64 MP (~8000x8000)
+
     jpeg_quality = {"screen": 25, "ebook": 55, "printer": 82}.get(quality, 55)
 
     doc = _open(file_bytes)
@@ -582,6 +588,9 @@ def fill_form(file_bytes: bytes, values: dict) -> bytes:
 
 def pdf_to_images(file_bytes: bytes, dpi: int = 150, fmt: str = "png") -> bytes:
     """Render every page to an image and return a ZIP archive."""
+    # Clamp DPI: at very high DPI a single page renders to a multi-gigapixel
+    # bitmap and exhausts memory. 600 DPI is print-quality and a safe ceiling.
+    dpi = max(36, min(int(dpi), 600))
     doc = _open(file_bytes)
     mat = fitz.Matrix(dpi / 72, dpi / 72)
     ext = "jpeg" if fmt == "jpg" else fmt

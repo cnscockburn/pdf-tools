@@ -20,7 +20,7 @@ async def merge_pdfs(files: list[UploadFile] = File(...)):
             raise HTTPException(status_code=400, detail=f"{f.filename or 'file'} is not a valid PDF.")
         file_bytes.append(data)
 
-    result = run_engine(pdf_engine.merge, file_bytes)
+    result = await run_engine(pdf_engine.merge, file_bytes)
     return Response(
         content=result,
         media_type="application/pdf",

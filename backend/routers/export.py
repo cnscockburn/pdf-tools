@@ -20,7 +20,7 @@ async def pdf_to_images(
     if not (36 <= dpi <= 600):
         raise HTTPException(status_code=400, detail="dpi must be between 36 and 600.")
 
-    result = run_engine(pdf_engine.pdf_to_images, data, dpi=dpi, fmt=fmt)
+    result = await run_engine(pdf_engine.pdf_to_images, data, dpi=dpi, fmt=fmt)
     # Strip .pdf extension case-insensitively
     stem = filename
     for ext in (".pdf", ".PDF"):

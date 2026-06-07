@@ -8,6 +8,40 @@ const BASE = isTauri && import.meta.env.PROD
   ? "http://127.0.0.1:7342/api"
   : "/api";
 
+// ── Per-launch API token ──────────────────────────────────────────────────────
+// In packaged Tauri builds the Rust launcher generates a random token, passes it
+// to the sidecar (env) and exposes it to the WebView via the `api_token` command.
+// Every request must carry it in `X-Stria-Token`, which both blocks malicious web
+// pages (a custom header forces a CORS preflight the sidecar rejects) and other
+// local processes (they don't know the token). In dev we talk to the Vite proxy
+// and no token is configured, so this is skipped.
+const tokenEnabled = isTauri && import.meta.env.PROD;
+let apiTokenPromise: Promise<string> | null = null;
+
+async function getApiToken(): Promise<string> {
+  if (!tokenEnabled) return "";
+  if (!apiTokenPromise) {
+    apiTokenPromise = (async () => {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        return await invoke<string>("api_token");
+      } catch {
+        return "";
+      }
+    })();
+  }
+  return apiTokenPromise;
+}
+
+/** fetch wrapper that attaches the API token header when one is configured. */
+async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  const token = await getApiToken();
+  if (!token) return fetch(input, init);
+  const headers = new Headers(init.headers);
+  headers.set("X-Stria-Token", token);
+  return fetch(input, { ...init, headers });
+}
+
 async function handleResponse(res: Response): Promise<Blob> {
   if (!res.ok) {
     let msg = `Server error ${res.status}`;
@@ -24,7 +58,7 @@ async function handleResponse(res: Response): Promise<Blob> {
 
 export async function checkHealth(): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE}/health`);
+    const res = await apiFetch(`${BASE}/health`);
     return res.ok;
   } catch {
     return false;
@@ -34,7 +68,7 @@ export async function checkHealth(): Promise<boolean> {
 export async function mergePDFs(files: File[]): Promise<Blob> {
   const form = new FormData();
   files.forEach((f) => form.append("files", f));
-  return handleResponse(await fetch(`${BASE}/merge`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(`${BASE}/merge`, { method: "POST", body: form }));
 }
 
 export async function splitPDF(
@@ -44,7 +78,7 @@ export async function splitPDF(
   const form = new FormData();
   form.append("file", file);
   form.append("ranges", JSON.stringify(ranges));
-  return handleResponse(await fetch(`${BASE}/split`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(`${BASE}/split`, { method: "POST", body: form }));
 }
 
 export async function rotatePages(
@@ -56,28 +90,28 @@ export async function rotatePages(
   form.append("file", file);
   form.append("pages", JSON.stringify(pages));
   form.append("angle", String(angle));
-  return handleResponse(await fetch(`${BASE}/rotate`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(`${BASE}/rotate`, { method: "POST", body: form }));
 }
 
 export async function deletePages(file: File, pages: number[]): Promise<Blob> {
   const form = new FormData();
   form.append("file", file);
   form.append("pages", JSON.stringify(pages));
-  return handleResponse(await fetch(`${BASE}/delete-pages`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(`${BASE}/delete-pages`, { method: "POST", body: form }));
 }
 
 export async function reorderPages(file: File, order: number[]): Promise<Blob> {
   const form = new FormData();
   form.append("file", file);
   form.append("order", JSON.stringify(order));
-  return handleResponse(await fetch(`${BASE}/reorder`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(`${BASE}/reorder`, { method: "POST", body: form }));
 }
 
 export async function extractPages(file: File, pages: number[]): Promise<Blob> {
   const form = new FormData();
   form.append("file", file);
   form.append("pages", JSON.stringify(pages));
-  return handleResponse(await fetch(`${BASE}/extract`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(`${BASE}/extract`, { method: "POST", body: form }));
 }
 
 /** A single page in an Organise plan: source page (1-indexed) + added rotation. */
@@ -87,20 +121,20 @@ export async function organisePdf(file: File, plan: OrganisePlanItem[]): Promise
   const form = new FormData();
   form.append("file", file);
   form.append("plan", JSON.stringify(plan));
-  return handleResponse(await fetch(`${BASE}/organise`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(`${BASE}/organise`, { method: "POST", body: form }));
 }
 
 export async function imagesToPDF(images: File[]): Promise<Blob> {
   const form = new FormData();
   images.forEach((f) => form.append("files", f));
-  return handleResponse(await fetch(`${BASE}/images-to-pdf`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(`${BASE}/images-to-pdf`, { method: "POST", body: form }));
 }
 
 export async function compressPDF(file: File, quality: string): Promise<Blob> {
   const form = new FormData();
   form.append("file", file);
   form.append("quality", quality);
-  return handleResponse(await fetch(`${BASE}/compress`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(`${BASE}/compress`, { method: "POST", body: form }));
 }
 
 export interface WatermarkOptions {
@@ -118,7 +152,7 @@ export async function watermarkPDF(file: File, opts: WatermarkOptions): Promise<
   form.append("angle", String(opts.angle));
   form.append("fontsize", String(opts.fontsize));
   form.append("color", opts.color);
-  return handleResponse(await fetch(`${BASE}/watermark`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(`${BASE}/watermark`, { method: "POST", body: form }));
 }
 
 export async function cropPDF(
@@ -133,7 +167,7 @@ export async function cropPDF(
   form.append("x1", String(x1));
   form.append("y1", String(y1));
   form.append("pages", pages === "all" ? "all" : JSON.stringify(pages));
-  return handleResponse(await fetch(`${BASE}/crop`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(`${BASE}/crop`, { method: "POST", body: form }));
 }
 
 export interface RedactRegion {
@@ -144,7 +178,7 @@ export async function redactPDF(file: File, regions: RedactRegion[]): Promise<Bl
   const form = new FormData();
   form.append("file", file);
   form.append("regions", JSON.stringify(regions));
-  return handleResponse(await fetch(`${BASE}/redact`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(`${BASE}/redact`, { method: "POST", body: form }));
 }
 
 /** Common metadata shared by every annotation variant. `author` is written into
@@ -175,7 +209,7 @@ export async function annotatePDF(file: File, annotations: Annotation[]): Promis
   const form = new FormData();
   form.append("file", file);
   form.append("annotations", JSON.stringify(annotations));
-  return handleResponse(await fetch(`${BASE}/annotate`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(`${BASE}/annotate`, { method: "POST", body: form }));
 }
 
 export async function encryptPDF(file: File, password: string, ownerPassword?: string): Promise<Blob> {
@@ -183,14 +217,14 @@ export async function encryptPDF(file: File, password: string, ownerPassword?: s
   form.append("file", file);
   form.append("password", password);
   form.append("owner_password", ownerPassword ?? "");
-  return handleResponse(await fetch(`${BASE}/encrypt`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(`${BASE}/encrypt`, { method: "POST", body: form }));
 }
 
 export async function decryptPDF(file: File, password: string): Promise<Blob> {
   const form = new FormData();
   form.append("file", file);
   form.append("password", password);
-  return handleResponse(await fetch(`${BASE}/decrypt`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(`${BASE}/decrypt`, { method: "POST", body: form }));
 }
 
 export async function pdfToImages(file: File, dpi: number, fmt: "png" | "jpg"): Promise<Blob> {
@@ -198,7 +232,7 @@ export async function pdfToImages(file: File, dpi: number, fmt: "png" | "jpg"): 
   form.append("file", file);
   form.append("dpi", String(dpi));
   form.append("fmt", fmt);
-  return handleResponse(await fetch(`${BASE}/to-images`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(`${BASE}/to-images`, { method: "POST", body: form }));
 }
 
 // ── Form fields (5.3) ────────────────────────────────────────────────────────
@@ -214,7 +248,7 @@ export interface FormField {
 export async function getFormFields(file: File): Promise<FormField[]> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${BASE}/form-fields`, { method: "POST", body: form });
+  const res = await apiFetch(`${BASE}/form-fields`, { method: "POST", body: form });
   if (!res.ok) {
     let msg = `Server error ${res.status}`;
     try { msg = (await res.json()).detail ?? msg; } catch { /* ignore */ }
@@ -228,5 +262,5 @@ export async function fillForm(file: File, values: Record<string, string>): Prom
   const form = new FormData();
   form.append("file", file);
   form.append("values", JSON.stringify(values));
-  return handleResponse(await fetch(`${BASE}/fill-form`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(`${BASE}/fill-form`, { method: "POST", body: form }));
 }

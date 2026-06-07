@@ -17,7 +17,7 @@ MAX_VALUE_LEN = 10_000
 async def form_fields(payload: tuple[bytes, str] = Depends(read_pdf_upload)):
     """Return the fillable form fields in a PDF as JSON."""
     data, _ = payload
-    fields = run_engine(pdf_engine.list_form_fields, data)
+    fields = await run_engine(pdf_engine.list_form_fields, data)
     return JSONResponse({"fields": fields})
 
 
@@ -43,7 +43,7 @@ async def fill_form(
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="values must be valid JSON.")
 
-    result = run_engine(pdf_engine.fill_form, data, parsed)
+    result = await run_engine(pdf_engine.fill_form, data, parsed)
     return Response(
         content=result,
         media_type="application/pdf",

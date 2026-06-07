@@ -53,7 +53,7 @@ async def redact_pdf(
     if not region_list:
         raise HTTPException(status_code=400, detail="Provide at least one redaction region.")
 
-    result = run_engine(pdf_engine.redact, data, region_list)
+    result = await run_engine(pdf_engine.redact, data, region_list)
     return Response(
         content=result,
         media_type="application/pdf",

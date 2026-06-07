@@ -50,7 +50,7 @@ async def images_to_pdf(files: list[UploadFile] = File(...)):
             )
         image_data.append((data, mime))
 
-    result = run_engine(pdf_engine.images_to_pdf, image_data)
+    result = await run_engine(pdf_engine.images_to_pdf, image_data)
     return Response(
         content=result,
         media_type="application/pdf",

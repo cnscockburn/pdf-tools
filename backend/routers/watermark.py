@@ -33,7 +33,7 @@ async def watermark_pdf(
     except Exception:
         color_tuple = (0.5, 0.5, 0.5)
 
-    result = run_engine(
+    result = await run_engine(
         pdf_engine.watermark_text,
         data,
         text=text,

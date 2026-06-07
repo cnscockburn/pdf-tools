@@ -28,7 +28,7 @@ async def split_pdf(
     if not parsed:
         raise HTTPException(status_code=400, detail="Provide at least one range.")
 
-    result = run_engine(pdf_engine.split, data, parsed)
+    result = await run_engine(pdf_engine.split, data, parsed)
     is_zip = pdf_engine.split_returns_zip(parsed)
 
     if is_zip:

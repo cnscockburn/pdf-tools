@@ -16,7 +16,7 @@ async def compress_pdf(
     if quality not in ("screen", "ebook", "printer", "lossless"):
         raise HTTPException(status_code=400, detail="quality must be screen, ebook, printer, or lossless.")
     data, filename = payload
-    result = run_engine(pdf_engine.compress, data, quality)
+    result = await run_engine(pdf_engine.compress, data, quality)
     return Response(
         content=result,
         media_type="application/pdf",

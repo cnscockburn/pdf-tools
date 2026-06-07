@@ -31,7 +31,7 @@ async def rotate_pages(
         raise HTTPException(status_code=400, detail="angle must be 90, 180, or 270.")
 
     page_list = _read_page_list(pages)
-    result = run_engine(pdf_engine.rotate, data, page_list, angle)
+    result = await run_engine(pdf_engine.rotate, data, page_list, angle)
     return Response(
         content=result,
         media_type="application/pdf",
@@ -49,7 +49,7 @@ async def delete_pages(
     if not page_list:
         raise HTTPException(status_code=400, detail="Provide at least one page to delete.")
 
-    result = run_engine(pdf_engine.delete_pages, data, page_list)
+    result = await run_engine(pdf_engine.delete_pages, data, page_list)
     return Response(
         content=result,
         media_type="application/pdf",
@@ -66,7 +66,7 @@ async def reorder_pages(
     order_list = _read_page_list(order, "order")
     if not order_list:
         raise HTTPException(status_code=400, detail="Provide at least one page in the order.")
-    result = run_engine(pdf_engine.reorder, data, order_list)
+    result = await run_engine(pdf_engine.reorder, data, order_list)
     return Response(
         content=result,
         media_type="application/pdf",
@@ -84,7 +84,7 @@ async def extract_pages(
     if not page_list:
         raise HTTPException(status_code=400, detail="Provide at least one page to extract.")
 
-    result = run_engine(pdf_engine.extract, data, page_list)
+    result = await run_engine(pdf_engine.extract, data, page_list)
     return Response(
         content=result,
         media_type="application/pdf",
@@ -122,7 +122,7 @@ async def organise_pages(
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="plan must be valid JSON.")
 
-    result = run_engine(pdf_engine.organise, data, clean)
+    result = await run_engine(pdf_engine.organise, data, clean)
     return Response(
         content=result,
         media_type="application/pdf",

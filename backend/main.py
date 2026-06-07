@@ -2,7 +2,20 @@ import sys
 import os
 import uvicorn
 from fastapi import FastAPI, Request, Response
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+
+# Per-launch shared secret. The Rust launcher generates a random token and
+# passes it to this sidecar via the STRIA_API_TOKEN env var, then hands the
+# same token to the WebView through a Tauri command. Every API request must
+# carry it in the `X-Stria-Token` header. This defeats:
+#   * malicious web pages the user visits (they cannot read the token, and
+#     sending a custom header forces a CORS preflight that our origin list
+#     rejects), and
+#   * other unprivileged local processes (they don't know the per-launch token).
+# When the env var is absent (local dev), enforcement is disabled so the Vite
+# proxy and manual curl testing keep working.
+API_TOKEN = os.environ.get("STRIA_API_TOKEN", "").strip()
 
 # When bundled as a PyInstaller exe with console=False, sys.stdout/stderr
 # are None. Uvicorn's DefaultFormatter calls .isatty() on them and crashes.
@@ -35,9 +48,22 @@ app.add_middleware(
         "tauri://localhost",       # production Tauri WebView
     ],
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "Accept"],
+    allow_headers=["Content-Type", "Accept", "X-Stria-Token"],
     expose_headers=["Content-Disposition"],
 )
+
+
+# ── Token authentication ──────────────────────────────────────────────────────
+# Rejects any /api request that doesn't present the per-launch token. Skipped
+# entirely when no token is configured (dev). OPTIONS preflights pass through so
+# CORSMiddleware can answer them (the browser never attaches custom headers to a
+# preflight anyway).
+@app.middleware("http")
+async def require_api_token(request: Request, call_next) -> Response:
+    if API_TOKEN and request.method != "OPTIONS" and request.url.path.startswith("/api"):
+        if request.headers.get("X-Stria-Token") != API_TOKEN:
+            return JSONResponse(status_code=403, content={"detail": "Forbidden."})
+    return await call_next(request)
 
 
 # ── Security headers ──────────────────────────────────────────────────────────
@@ -75,12 +101,21 @@ async def health():
 if __name__ == "__main__":
     frozen = getattr(sys, "frozen", False)
     # When frozen (PyInstaller bundle):
-    #   - reload=False  — subprocess watcher is unsafe in a frozen exe
+    #   - Pass the `app` OBJECT, not the "main:app" import string. Inside a
+    #     PyInstaller bundle the entry script runs as `__main__`, so uvicorn's
+    #     import-by-name machinery cannot find a module called "main" and exits
+    #     with "Error loading ASGI app. Could not import module 'main'." Handing
+    #     uvicorn the already-constructed app object sidesteps the import entirely.
+    #   - reload=False — the reloader needs an import string and spawns a
+    #     subprocess watcher, which is unsafe in a frozen exe.
     #   - log_config=None — disables uvicorn's DefaultFormatter entirely,
-    #     which avoids any remaining .isatty() calls on the devnull streams
-    #   - access_log=False — no request logging needed for the background sidecar
+    #     which avoids any remaining .isatty() calls on the devnull streams.
+    #   - access_log=False — no request logging needed for the background sidecar.
+    #
+    # In dev (not frozen) we keep the "main:app" string so --reload works.
+    target = app if frozen else "main:app"
     run_kwargs: dict = {"host": "127.0.0.1", "port": 7342, "reload": not frozen}
     if frozen:
         run_kwargs["log_config"] = None
         run_kwargs["access_log"] = False
-    uvicorn.run("main:app", **run_kwargs)
+    uvicorn.run(target, **run_kwargs)

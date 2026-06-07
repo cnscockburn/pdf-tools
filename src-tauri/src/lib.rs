@@ -1,12 +1,9 @@
-use std::net::TcpStream;
 use std::path::Path;
 use std::process::{Child, Command};
 use std::sync::Mutex;
-use std::time::Duration;
-use tauri::{Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
-const BACKEND_PORT: u16 = 7342;
-
+/// Handle to the spawned Python sidecar. Killed when the app exits (Drop).
 struct BackendServer(Mutex<Option<Child>>);
 
 impl Drop for BackendServer {
@@ -19,16 +16,80 @@ impl Drop for BackendServer {
     }
 }
 
-fn wait_for_backend(port: u16, timeout_secs: u64) -> bool {
-    let addr = format!("127.0.0.1:{}", port);
-    let deadline = std::time::Instant::now() + Duration::from_secs(timeout_secs);
-    while std::time::Instant::now() < deadline {
-        if TcpStream::connect(&addr).is_ok() {
-            return true;
-        }
-        std::thread::sleep(Duration::from_millis(200));
+/// Per-launch random token shared with the sidecar and the WebView so only this
+/// app's frontend can call the local API. See `api_token` and the backend's
+/// `require_api_token` middleware.
+struct ApiToken(String);
+
+/// Generate a 256-bit random token, hex-encoded.
+fn generate_token() -> String {
+    let mut buf = [0u8; 32];
+    getrandom::getrandom(&mut buf).expect("failed to obtain OS randomness for API token");
+    buf.iter().map(|b| format!("{:02x}", b)).collect()
+}
+
+/// Expose the per-launch API token to the WebView. The frontend attaches it as
+/// the `X-Stria-Token` header on every request to the sidecar.
+#[tauri::command]
+fn api_token(state: tauri::State<'_, ApiToken>) -> String {
+    state.0.clone()
+}
+
+/// Spawn the bundled Python sidecar. Never panics: on failure it logs and
+/// returns, leaving the window up. The frontend polls `/api/health` and shows a
+/// "backend offline" indicator, so a sidecar problem degrades gracefully instead
+/// of taking down the whole app (which is what a panic here used to do).
+fn start_backend(app: &AppHandle, token: String) {
+    use std::io::Write;
+    use std::process::Stdio;
+
+    let log_dir = app
+        .path()
+        .app_log_dir()
+        .unwrap_or_else(|_| std::env::temp_dir());
+    let _ = std::fs::create_dir_all(&log_dir);
+    let log_path = log_dir.join("sidecar.log");
+
+    let exe = sidecar_path();
+
+    let mut cmd = Command::new(&exe);
+    cmd.env("STRIA_API_TOKEN", &token);
+    cmd.stdout(Stdio::null());
+    // Capture the sidecar's stderr to a log file so startup failures are
+    // diagnosable in packaged builds (the exe is windowed / has no console).
+    if let Ok(f) = std::fs::File::create(&log_path) {
+        cmd.stderr(Stdio::from(f));
     }
-    false
+    // Don't flash a console window on Windows.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    match cmd.spawn() {
+        Ok(child) => {
+            if let Some(state) = app.try_state::<BackendServer>() {
+                if let Ok(mut guard) = state.0.lock() {
+                    *guard = Some(child);
+                }
+            }
+        }
+        Err(e) => {
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&log_path)
+            {
+                let _ = writeln!(
+                    f,
+                    "[launcher] failed to spawn sidecar {}: {e}",
+                    exe.display()
+                );
+            }
+        }
+    }
 }
 
 /// Resolve the bundled sidecar path.
@@ -122,21 +183,8 @@ fn get_cli_file_path() -> Option<String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // In release mode, spawn the bundled Python sidecar server.
-    // In debug mode, the developer starts the backend manually:
-    //   cd backend && .venv\Scripts\uvicorn.exe main:app --port 7342 --reload
-    let backend = if cfg!(not(debug_assertions)) {
-        let exe = sidecar_path();
-        let child = Command::new(&exe)
-            .spawn()
-            .unwrap_or_else(|e| panic!("failed to start backend sidecar {}: {e}", exe.display()));
-        if !wait_for_backend(BACKEND_PORT, 20) {
-            panic!("backend did not become ready on port {BACKEND_PORT} within 20 seconds");
-        }
-        Some(child)
-    } else {
-        None
-    };
+    // Per-launch token shared with the sidecar (env) and the WebView (command).
+    let token = generate_token();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -159,8 +207,22 @@ pub fn run() {
                 let _ = w.set_focus();
             }
         }))
-        .invoke_handler(tauri::generate_handler![read_file_bytes, get_cli_file_path])
-        .manage(BackendServer(Mutex::new(backend)))
+        .invoke_handler(tauri::generate_handler![read_file_bytes, get_cli_file_path, api_token])
+        .manage(ApiToken(token.clone()))
+        .manage(BackendServer(Mutex::new(None)))
+        .setup(move |app| {
+            // Spawn the bundled sidecar only in release builds. In debug the
+            // developer runs the backend manually:
+            //   cd backend && .venv\Scripts\python.exe main.py
+            // Spawn on a background thread so the window appears immediately and
+            // a slow/failed backend never blocks or crashes startup.
+            if cfg!(not(debug_assertions)) {
+                let handle = app.handle().clone();
+                let tok = token.clone();
+                std::thread::spawn(move || start_backend(&handle, tok));
+            }
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

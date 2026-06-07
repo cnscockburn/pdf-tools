@@ -34,7 +34,7 @@ async def crop_pdf(
         except Exception:
             raise HTTPException(status_code=400, detail="pages must be 'all' or a JSON int array.")
 
-    result = run_engine(pdf_engine.crop, data, x0=x0, y0=y0, x1=x1, y1=y1, pages=page_list)
+    result = await run_engine(pdf_engine.crop, data, x0=x0, y0=y0, x1=x1, y1=y1, pages=page_list)
     return Response(
         content=result,
         media_type="application/pdf",

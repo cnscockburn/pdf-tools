@@ -8,10 +8,12 @@ Centralises:
 """
 from __future__ import annotations
 
+import functools
 import re
 from typing import Annotated
 from urllib.parse import quote
 
+import anyio
 from fastapi import File, HTTPException, UploadFile
 
 # Upload size cap — refuse files larger than this to prevent OOM/DoS.
@@ -110,26 +112,38 @@ def content_disposition(filename: str, default: str = "document.pdf") -> dict[st
 # Engine call wrapper
 # --------------------------------------------------------------------------- #
 
-def run_engine(fn, *args, **kwargs) -> bytes:
-    """Invoke an engine function, mapping exceptions to clean HTTP errors.
+# Bound the number of CPU-bound engine operations running at once. Each call
+# can consume significant RAM/CPU (a 100 MB PDF, image recompression, page
+# rendering), so a flood of concurrent requests could otherwise exhaust memory.
+# This caps that, and also bounds the worker-thread pool used for offloading.
+_ENGINE_LIMITER = anyio.CapacityLimiter(4)
 
-    PyMuPDF and pikepdf both throw a variety of exceptions for corrupt or
-    unsupported PDFs. We want to expose those as 4xx (user input is bad) and
-    leak nothing about internals.
+
+async def run_engine(fn, *args, **kwargs):
+    """Run a synchronous engine function in a worker thread, mapping exceptions
+    to clean HTTP errors.
+
+    PyMuPDF, pikepdf, and Pillow are synchronous and CPU-bound. Running them
+    directly inside an ``async def`` handler would block the asyncio event loop,
+    freezing health checks and every other in-flight request until the operation
+    finished. Offloading to a thread (bounded by ``_ENGINE_LIMITER``) keeps the
+    server responsive.
+
+    Corrupt or unsupported PDFs throw a variety of exceptions; we expose those
+    as 4xx (bad user input) and leak nothing about internals to the client.
     """
+    call = functools.partial(fn, *args, **kwargs)
     try:
-        return fn(*args, **kwargs)
+        return await anyio.to_thread.run_sync(call, limiter=_ENGINE_LIMITER)
     except HTTPException:
         raise
     except ValueError as e:
         # Engine ValueErrors are user-input failures (e.g. wrong password).
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        # Unexpected — log to stderr for debugging but return a clean 422.
+        # Unexpected — log full detail to stderr for debugging, but return a
+        # generic message so we don't leak the internal exception class name.
         import sys, traceback
-        print(f"[engine error] {fn.__name__}: {e}", file=sys.stderr)
+        print(f"[engine error] {getattr(fn, '__name__', 'engine')}: {e}", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
-        raise HTTPException(
-            status_code=422,
-            detail=f"PDF processing failed: {type(e).__name__}",
-        )
+        raise HTTPException(status_code=422, detail="PDF processing failed.")

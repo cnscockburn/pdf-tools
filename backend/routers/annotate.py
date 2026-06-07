@@ -120,7 +120,7 @@ async def annotate_pdf(
 
     # Empty list is valid — frontend uses replace-semantics: an empty list
     # means "clear all annotations".
-    result = run_engine(pdf_engine.annotate, data, ann_list)
+    result = await run_engine(pdf_engine.annotate, data, ann_list)
     return Response(
         content=result,
         media_type="application/pdf",

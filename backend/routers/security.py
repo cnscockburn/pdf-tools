@@ -23,7 +23,7 @@ async def encrypt_pdf(
     if len(password) > MAX_PASSWORD_LEN or len(owner_password) > MAX_PASSWORD_LEN:
         raise HTTPException(status_code=400, detail=f"Password too long (max {MAX_PASSWORD_LEN} chars).")
 
-    result = run_engine(pikepdf_engine.encrypt, data, password, owner_password or password)
+    result = await run_engine(pikepdf_engine.encrypt, data, password, owner_password or password)
     return Response(
         content=result,
         media_type="application/pdf",
@@ -37,7 +37,7 @@ async def decrypt_pdf(
     password: str = Form(...),
 ):
     data, filename = payload
-    result = run_engine(pikepdf_engine.decrypt, data, password)
+    result = await run_engine(pikepdf_engine.decrypt, data, password)
     return Response(
         content=result,
         media_type="application/pdf",
