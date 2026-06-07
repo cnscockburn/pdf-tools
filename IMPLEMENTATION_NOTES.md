@@ -13,7 +13,10 @@ Tracks blocked items, decisions needed, and items requiring your manual testing 
 - **Phase 2 (functional bugs, all groups A–F):** done.
 - **Phase 3 (UX improvements):** core set done; deferred items listed below.
 - **Phase 4 (new features):** **complete** — annotation search, custom stamp labels, print, Outline+Bookmarks rail merge, **Tauri-native file intake + recent files**, **password-protected PDFs**, **help mode**, **PDF form filling**. Watermark-from-viewer was already present.
-- **Phase 5 (architecture):** **Organise tool + MiniMap wave-scrub DONE**; remaining — light/dark mode only.
+- **Phase 5 (architecture):** **COMPLETE** — Organise tool, MiniMap wave-scrub, and light/dark mode all done. (Optional follow-up #31: Organise split-divider builder / fold-in Split.)
+
+## ✅ Everything in IMPLEMENTATION_PLAN is now implemented or explicitly deferred.
+Phases 1–5 done. Remaining are the documented optional/deferred items (Organise v2 split builder; viewer-light full panel theming; in-canvas form widgets; re-editable baked annotations) and the manual/live verifications below.
 
 Everything committed; tsc clean; 119/119 frontend tests; backend smoke green; production build verified.
 
@@ -32,6 +35,22 @@ Everything committed; tsc clean; 119/119 frontend tests; backend smoke green; pr
 
 ### Organise tool — confirm in the running app
 Open a multi-page PDF in Organise (Home → Organize, or Document → Organise Pages): click to select pages, Shift-click a range, drag the grip to reorder, rotate/delete/extract the selection, then Save (or Save & open in viewer). Confirm click-vs-drag feels right (5px activation distance) and rotated thumbnails preview correctly.
+
+### Light/Dark mode — confirm in the running app
+Settings → Interface → App theme (Light/Dark) and Viewer theme (Dark/Light). App-dark recolours Home/tools/settings; viewer-light gives a lighter reading surround behind the page (chrome + overlays stay dark by design). Confirm contrast on each app surface in dark mode.
+
+### Security tools — re-run in your environment
+`bandit`, `semgrep`, and `cargo audit` aren't installed in this shell. Per CLAUDE.md, please run `scripts/security-audit.ps1` to confirm no regressions from the new backend routes and the Tauri dialog plugin.
+
+## 🔎 Full code review (end of session)
+
+Reviewed the whole session diff (~28 commits, 42 files). Findings, all addressed:
+- **CSP / Print (fixed):** the Print iframe uses a `blob:` URL; the Tauri CSP had no `frame-src`, so `default-src 'self'` would have blocked it in the packaged app (worked in dev only). Added `frame-src 'self' blob:`.
+- **Viewer-light empty state (fixed):** reverted the empty-state surround to dark — its light-grey text sits directly on the surround. Only the main viewer surround (white page + dark chrome chips on it) goes light.
+- **Recent-files key (fixed):** replaced a hardcoded localStorage key string in Home with a `removeRecentFile()` helper.
+- **No debug code / TODOs** left in new code. tsc clean, 119/119 tests, backend smoke green, production build green, `cargo check` green.
+- **Security (manual — scanners not installed here):** new backend routes (`/organise`, `/form-fields`, `/fill-form`) all go through the size-limited, PDF-validated `read_pdf_upload` dependency and validate/cap their JSON inputs; form values are written as PDF field values (no exec path). Rust `read_file_bytes` still canonicalises + checks the `.pdf` extension; the dialog plugin only returns user-picked paths. **Please re-run `scripts/security-audit.ps1` (bandit + semgrep + cargo audit) in your environment — those tools aren't installed in this shell.**
+- **Minor (left as-is):** `reorderPages` API client fn is now unused by the UI (Organise uses `organisePdf`) but its `/reorder` route remains valid and smoke-tested — kept to avoid churn.
 
 ## 🔴 Needs Your Decision
 
