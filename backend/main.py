@@ -116,8 +116,12 @@ if __name__ == "__main__":
     #   - access_log=False — no request logging needed for the background sidecar.
     #
     # In dev (not frozen) we keep the "main:app" string so --reload works.
+    # In packaged builds the Rust launcher negotiates an ephemeral port and
+    # passes it via STRIA_API_PORT. In dev we fall back to 7342 so that the
+    # Vite proxy (which is hardcoded to /api → 7342) keeps working.
+    port = int(os.environ.get("STRIA_API_PORT", "7342"))
     target = app if frozen else "main:app"
-    run_kwargs: dict = {"host": "127.0.0.1", "port": 7342, "reload": not frozen}
+    run_kwargs: dict = {"host": "127.0.0.1", "port": port, "reload": not frozen}
     if frozen:
         run_kwargs["log_config"] = None
         run_kwargs["access_log"] = False

@@ -116,6 +116,7 @@ export default function AnnotationsListPanel({
   const [search,        setSearch]        = useState("");
   const [markupOpen,    setMarkupOpen]    = useState(true);
   const [collapsedPages, setCollapsedPages] = useState<Set<string>>(new Set());
+  const [statsOpen,     setStatsOpen]     = useState(false);
 
   // Free-text match across content, author, type label and tags (5.4).
   const q = search.trim().toLowerCase();
@@ -129,6 +130,22 @@ export default function AnnotationsListPanel({
     ].join(" ").toLowerCase();
     return hay.includes(q);
   }
+
+  // ── Annotation statistics (B7) ──────────────────────────────────────────────
+
+  const stats = useMemo(() => {
+    const byType: Record<string, number> = {};
+    const byStatus: Record<string, number> = { open: 0, resolved: 0, wontfix: 0 };
+    const byAuthor: Record<string, number> = {};
+    for (const ann of annotations) {
+      byType[ann.type] = (byType[ann.type] ?? 0) + 1;
+      const status = (ann as { status?: string }).status ?? "open";
+      byStatus[status] = (byStatus[status] ?? 0) + 1;
+      const author = (ann as { author?: string }).author;
+      if (author) byAuthor[author] = (byAuthor[author] ?? 0) + 1;
+    }
+    return { byType, byStatus, byAuthor };
+  }, [annotations]);
 
   // All unique tags in use across all annotations
   const allTags = useMemo(() => {
@@ -377,6 +394,50 @@ export default function AnnotationsListPanel({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
+
+      {/* ── Statistics summary (B7) ─────────────────────────────────────── */}
+      {annotations.length > 0 && (
+        <div className="border-b border-stone-700 shrink-0">
+          <button
+            onClick={() => setStatsOpen(v => !v)}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-[10px] text-stone-500 hover:text-stone-300 hover:bg-stone-800/50 transition"
+          >
+            <span className="font-medium text-stone-400">{annotations.length} annotation{annotations.length !== 1 ? "s" : ""}</span>
+            <span className="text-stone-600">—</span>
+            <span>{stats.byStatus.open ?? 0} open</span>
+            {(stats.byStatus.resolved ?? 0) > 0 && <span className="text-green-600">{stats.byStatus.resolved} resolved</span>}
+            <ChevronDown className={cn("h-3 w-3 ml-auto transition-transform", statsOpen && "rotate-180")} />
+          </button>
+          {statsOpen && (
+            <div className="px-3 pb-2 space-y-2 text-[10px] text-stone-400">
+              {/* By type */}
+              <div>
+                <p className="text-stone-600 uppercase tracking-wider mb-1 font-medium">By type</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.entries(stats.byType).sort((a,b)=>b[1]-a[1]).map(([t,n]) => (
+                    <span key={t} className="flex items-center gap-1 bg-stone-800 rounded px-1.5 py-0.5">
+                      {typeIcon(t)}<span className="text-stone-300">{typeLabel(t)}</span><span className="text-stone-500">{n}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+              {/* By author */}
+              {Object.keys(stats.byAuthor).length > 0 && (
+                <div>
+                  <p className="text-stone-600 uppercase tracking-wider mb-1 font-medium">By author</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(stats.byAuthor).sort((a,b)=>b[1]-a[1]).map(([auth,n]) => (
+                      <span key={auth} className="bg-stone-800 rounded px-1.5 py-0.5 text-stone-300">
+                        {auth} <span className="text-stone-500">{n}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Search within annotations (5.4) ──────────────────────────────── */}
       <div className="px-3 pt-2 pb-2 border-b border-stone-700 shrink-0">

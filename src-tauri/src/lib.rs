@@ -1,3 +1,4 @@
+use std::net::TcpListener;
 use std::path::Path;
 use std::process::{Child, Command};
 use std::sync::Mutex;
@@ -21,6 +22,18 @@ impl Drop for BackendServer {
 /// `require_api_token` middleware.
 struct ApiToken(String);
 
+/// Per-launch port the sidecar is listening on (ephemeral; negotiated at startup
+/// to eliminate the hardcoded-7342 port conflict failure mode).
+struct ApiPort(u16);
+
+/// Bind an ephemeral OS-assigned port and return its number.
+/// If the OS cannot assign a port, fall back to a specific port as a last resort.
+fn bind_free_port() -> u16 {
+    TcpListener::bind("127.0.0.1:0")
+        .map(|l| l.local_addr().map(|a| a.port()).unwrap_or(7342))
+        .unwrap_or(7342)
+}
+
 /// Generate a 256-bit random token, hex-encoded.
 fn generate_token() -> String {
     let mut buf = [0u8; 32];
@@ -35,11 +48,18 @@ fn api_token(state: tauri::State<'_, ApiToken>) -> String {
     state.0.clone()
 }
 
+/// Expose the ephemeral port the sidecar is listening on to the WebView.
+/// The frontend reads this once at startup instead of using a hardcoded port.
+#[tauri::command]
+fn api_port(state: tauri::State<'_, ApiPort>) -> u16 {
+    state.0
+}
+
 /// Spawn the bundled Python sidecar. Never panics: on failure it logs and
 /// returns, leaving the window up. The frontend polls `/api/health` and shows a
 /// "backend offline" indicator, so a sidecar problem degrades gracefully instead
 /// of taking down the whole app (which is what a panic here used to do).
-fn start_backend(app: &AppHandle, token: String) {
+fn start_backend(app: &AppHandle, token: String, port: u16) {
     use std::io::Write;
     use std::process::Stdio;
 
@@ -54,6 +74,7 @@ fn start_backend(app: &AppHandle, token: String) {
 
     let mut cmd = Command::new(&exe);
     cmd.env("STRIA_API_TOKEN", &token);
+    cmd.env("STRIA_API_PORT", port.to_string());
     cmd.stdout(Stdio::null());
     // Capture the sidecar's stderr to a log file so startup failures are
     // diagnosable in packaged builds (the exe is windowed / has no console).
@@ -183,8 +204,11 @@ fn get_cli_file_path() -> Option<String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Per-launch token shared with the sidecar (env) and the WebView (command).
+    // Per-launch token and ephemeral port shared with the sidecar (env) and
+    // the WebView (commands). The port is bound, closed, then passed to the
+    // sidecar via env so it binds the same number.
     let token = generate_token();
+    let port  = bind_free_port();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -206,8 +230,9 @@ pub fn run() {
                 let _ = w.set_focus();
             }
         }))
-        .invoke_handler(tauri::generate_handler![read_file_bytes, get_cli_file_path, api_token])
+        .invoke_handler(tauri::generate_handler![read_file_bytes, get_cli_file_path, api_token, api_port])
         .manage(ApiToken(token.clone()))
+        .manage(ApiPort(port))
         .manage(BackendServer(Mutex::new(None)))
         .setup(move |app| {
             // Spawn the bundled sidecar only in release builds. In debug the
@@ -218,7 +243,7 @@ pub fn run() {
             if cfg!(not(debug_assertions)) {
                 let handle = app.handle().clone();
                 let tok = token.clone();
-                std::thread::spawn(move || start_backend(&handle, tok));
+                std::thread::spawn(move || start_backend(&handle, tok, port));
             }
             Ok(())
         })

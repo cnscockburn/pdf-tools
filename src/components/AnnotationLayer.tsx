@@ -338,6 +338,8 @@ export default function AnnotationLayer({
   const [replyingId,  setReplyingId]  = useState<AnnotId | null>(null);
   const [replyText,   setReplyText]   = useState("");
   const [showReplies, setShowReplies] = useState<AnnotId | null>(null);
+  // B8: snippet quick-insert — tracks whether the Ctrl+Space picker is open in the edit textarea
+  const [snippetPickerOpen, setSnippetPickerOpen] = useState(false);
   const [, forceUpdate] = useState(0);
 
   // Live ink stroke (current drawing, not yet committed)
@@ -778,22 +780,60 @@ export default function AnnotationLayer({
         onMouseDown={e => e.stopPropagation()}
       >
         <div className="bg-stone-900 border border-brand-500/50 rounded-xl shadow-xl p-2 w-52 space-y-1.5">
-          <textarea
-            autoFocus rows={2} value={editText}
-            onChange={e => setEditText(e.target.value)}
-            onKeyDown={e => {
-              e.stopPropagation();
-              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                e.preventDefault();
-                updateAnnot({ ...ann, text: editText.trim() } as LocalAnnot);
-                setEditingId(null);
-              }
-              if (e.key === "Escape") { e.preventDefault(); setEditingId(null); }
-            }}
-            onBlur={() => { updateAnnot({ ...ann, text: editText.trim() } as LocalAnnot); setEditingId(null); }}
-            placeholder="Add comment…"
-            className="w-full rounded border border-stone-600 bg-stone-800 px-2 py-1 text-xs text-stone-100 resize-none focus:outline-none focus:ring-1 focus:ring-brand-500/60 placeholder:text-stone-500"
-          />
+          <div className="relative">
+            <textarea
+              autoFocus rows={2} value={editText}
+              onChange={e => setEditText(e.target.value)}
+              onKeyDown={e => {
+                e.stopPropagation();
+                // B8: Ctrl+Space opens snippet quick-insert picker
+                if ((e.ctrlKey || e.metaKey) && e.key === " ") {
+                  e.preventDefault();
+                  if (snippets.length > 0) setSnippetPickerOpen(v => !v);
+                  return;
+                }
+                if (snippetPickerOpen && e.key === "Escape") { e.preventDefault(); setSnippetPickerOpen(false); return; }
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  updateAnnot({ ...ann, text: editText.trim() } as LocalAnnot);
+                  setEditingId(null);
+                }
+                if (e.key === "Escape") { e.preventDefault(); setEditingId(null); }
+              }}
+              onBlur={() => { updateAnnot({ ...ann, text: editText.trim() } as LocalAnnot); setEditingId(null); }}
+              placeholder={snippets.length > 0 ? "Add comment… (Ctrl+Space for snippets)" : "Add comment…"}
+              className="w-full rounded border border-stone-600 bg-stone-800 px-2 py-1 text-xs text-stone-100 resize-none focus:outline-none focus:ring-1 focus:ring-brand-500/60 placeholder:text-stone-500"
+            />
+            {snippetPickerOpen && snippets.length > 0 && (
+              <div className="absolute top-full left-0 mt-0.5 z-50 bg-stone-800 border border-stone-600 rounded-lg shadow-xl min-w-44 max-h-40 overflow-y-auto">
+                <div className="px-2 py-1 text-[9px] text-stone-500 uppercase tracking-wider border-b border-stone-700">
+                  Snippets — click to insert
+                </div>
+                {snippets.map(s => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onMouseDown={e => {
+                      // mouseDown so we fire before the textarea's onBlur
+                      e.preventDefault();
+                      const ta = e.currentTarget.closest(".relative")?.querySelector("textarea") as HTMLTextAreaElement | null;
+                      if (ta) {
+                        const start = ta.selectionStart ?? editText.length;
+                        const end   = ta.selectionEnd   ?? editText.length;
+                        setEditText(editText.slice(0, start) + s.text + editText.slice(end));
+                      } else {
+                        setEditText(prev => prev + s.text);
+                      }
+                      setSnippetPickerOpen(false);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 text-[11px] text-stone-300 hover:bg-stone-700 truncate transition"
+                  >
+                    {s.text}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="flex gap-1">
             <button onClick={() => { updateAnnot({ ...ann, text: editText.trim() } as LocalAnnot); setEditingId(null); }}
               className="flex-1 rounded bg-brand-500 hover:bg-brand-600 py-0.5 text-xs font-semibold text-white transition">Save</button>

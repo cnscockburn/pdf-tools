@@ -4,9 +4,36 @@
  * so we need to hit the sidecar server directly.
  */
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-const BASE = isTauri && import.meta.env.PROD
-  ? "http://127.0.0.1:7342/api"
-  : "/api";
+
+// ── Dynamic port (A6) ─────────────────────────────────────────────────────────
+// In packaged Tauri builds the Rust launcher negotiates an ephemeral port and
+// exposes it via the api_port command, eliminating the hardcoded-7342 failure
+// mode. The promise is created once and shared across all callers.
+let apiPortPromise: Promise<number> | null = null;
+
+async function getApiPort(): Promise<number> {
+  if (!isTauri || !import.meta.env.PROD) return 7342;
+  if (!apiPortPromise) {
+    apiPortPromise = (async () => {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        return await invoke<number>("api_port");
+      } catch {
+        return 7342; // fallback
+      }
+    })();
+  }
+  return apiPortPromise;
+}
+
+// In dev mode we always use the Vite-proxied /api path.
+// In prod Tauri the BASE is resolved lazily from the negotiated port.
+const BASE_DEV = "/api";
+async function getBase(): Promise<string> {
+  if (!isTauri || !import.meta.env.PROD) return BASE_DEV;
+  const port = await getApiPort();
+  return `http://127.0.0.1:${port}/api`;
+}
 
 // ── Per-launch API token ──────────────────────────────────────────────────────
 // In packaged Tauri builds the Rust launcher generates a random token, passes it
@@ -31,6 +58,12 @@ async function getApiToken(): Promise<string> {
     })();
   }
   return apiTokenPromise;
+}
+
+/** Build a full API URL for the given path (e.g. "/health" → "http://127.0.0.1:PORT/api/health") */
+async function apiUrl(path: string): Promise<string> {
+  const base = await getBase();
+  return `${base}${path}`;
 }
 
 /** fetch wrapper that attaches the API token header when one is configured. */
@@ -58,7 +91,7 @@ async function handleResponse(res: Response): Promise<Blob> {
 
 export async function checkHealth(): Promise<boolean> {
   try {
-    const res = await apiFetch(`${BASE}/health`);
+    const res = await apiFetch(await apiUrl("/health"));
     return res.ok;
   } catch {
     return false;
@@ -68,7 +101,7 @@ export async function checkHealth(): Promise<boolean> {
 export async function mergePDFs(files: File[]): Promise<Blob> {
   const form = new FormData();
   files.forEach((f) => form.append("files", f));
-  return handleResponse(await apiFetch(`${BASE}/merge`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(await apiUrl("/merge"), { method: "POST", body: form }));
 }
 
 export async function splitPDF(
@@ -78,7 +111,7 @@ export async function splitPDF(
   const form = new FormData();
   form.append("file", file);
   form.append("ranges", JSON.stringify(ranges));
-  return handleResponse(await apiFetch(`${BASE}/split`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(await apiUrl("/split"), { method: "POST", body: form }));
 }
 
 export async function rotatePages(
@@ -90,28 +123,28 @@ export async function rotatePages(
   form.append("file", file);
   form.append("pages", JSON.stringify(pages));
   form.append("angle", String(angle));
-  return handleResponse(await apiFetch(`${BASE}/rotate`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(await apiUrl("/rotate"), { method: "POST", body: form }));
 }
 
 export async function deletePages(file: File, pages: number[]): Promise<Blob> {
   const form = new FormData();
   form.append("file", file);
   form.append("pages", JSON.stringify(pages));
-  return handleResponse(await apiFetch(`${BASE}/delete-pages`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(await apiUrl("/delete-pages"), { method: "POST", body: form }));
 }
 
 export async function reorderPages(file: File, order: number[]): Promise<Blob> {
   const form = new FormData();
   form.append("file", file);
   form.append("order", JSON.stringify(order));
-  return handleResponse(await apiFetch(`${BASE}/reorder`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(await apiUrl("/reorder"), { method: "POST", body: form }));
 }
 
 export async function extractPages(file: File, pages: number[]): Promise<Blob> {
   const form = new FormData();
   form.append("file", file);
   form.append("pages", JSON.stringify(pages));
-  return handleResponse(await apiFetch(`${BASE}/extract`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(await apiUrl("/extract"), { method: "POST", body: form }));
 }
 
 /** A single page in an Organise plan: source page (1-indexed) + added rotation. */
@@ -121,20 +154,20 @@ export async function organisePdf(file: File, plan: OrganisePlanItem[]): Promise
   const form = new FormData();
   form.append("file", file);
   form.append("plan", JSON.stringify(plan));
-  return handleResponse(await apiFetch(`${BASE}/organise`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(await apiUrl("/organise"), { method: "POST", body: form }));
 }
 
 export async function imagesToPDF(images: File[]): Promise<Blob> {
   const form = new FormData();
   images.forEach((f) => form.append("files", f));
-  return handleResponse(await apiFetch(`${BASE}/images-to-pdf`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(await apiUrl("/images-to-pdf"), { method: "POST", body: form }));
 }
 
 export async function compressPDF(file: File, quality: string): Promise<Blob> {
   const form = new FormData();
   form.append("file", file);
   form.append("quality", quality);
-  return handleResponse(await apiFetch(`${BASE}/compress`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(await apiUrl("/compress"), { method: "POST", body: form }));
 }
 
 export interface WatermarkOptions {
@@ -152,7 +185,7 @@ export async function watermarkPDF(file: File, opts: WatermarkOptions): Promise<
   form.append("angle", String(opts.angle));
   form.append("fontsize", String(opts.fontsize));
   form.append("color", opts.color);
-  return handleResponse(await apiFetch(`${BASE}/watermark`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(await apiUrl("/watermark"), { method: "POST", body: form }));
 }
 
 export async function cropPDF(
@@ -167,7 +200,7 @@ export async function cropPDF(
   form.append("x1", String(x1));
   form.append("y1", String(y1));
   form.append("pages", pages === "all" ? "all" : JSON.stringify(pages));
-  return handleResponse(await apiFetch(`${BASE}/crop`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(await apiUrl("/crop"), { method: "POST", body: form }));
 }
 
 export interface RedactRegion {
@@ -178,7 +211,7 @@ export async function redactPDF(file: File, regions: RedactRegion[]): Promise<Bl
   const form = new FormData();
   form.append("file", file);
   form.append("regions", JSON.stringify(regions));
-  return handleResponse(await apiFetch(`${BASE}/redact`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(await apiUrl("/redact"), { method: "POST", body: form }));
 }
 
 /** Common metadata shared by every annotation variant. `author` is written into
@@ -209,7 +242,7 @@ export async function annotatePDF(file: File, annotations: Annotation[]): Promis
   const form = new FormData();
   form.append("file", file);
   form.append("annotations", JSON.stringify(annotations));
-  return handleResponse(await apiFetch(`${BASE}/annotate`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(await apiUrl("/annotate"), { method: "POST", body: form }));
 }
 
 export async function encryptPDF(file: File, password: string, ownerPassword?: string): Promise<Blob> {
@@ -217,14 +250,14 @@ export async function encryptPDF(file: File, password: string, ownerPassword?: s
   form.append("file", file);
   form.append("password", password);
   form.append("owner_password", ownerPassword ?? "");
-  return handleResponse(await apiFetch(`${BASE}/encrypt`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(await apiUrl("/encrypt"), { method: "POST", body: form }));
 }
 
 export async function decryptPDF(file: File, password: string): Promise<Blob> {
   const form = new FormData();
   form.append("file", file);
   form.append("password", password);
-  return handleResponse(await apiFetch(`${BASE}/decrypt`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(await apiUrl("/decrypt"), { method: "POST", body: form }));
 }
 
 export async function pdfToImages(file: File, dpi: number, fmt: "png" | "jpg"): Promise<Blob> {
@@ -232,7 +265,7 @@ export async function pdfToImages(file: File, dpi: number, fmt: "png" | "jpg"): 
   form.append("file", file);
   form.append("dpi", String(dpi));
   form.append("fmt", fmt);
-  return handleResponse(await apiFetch(`${BASE}/to-images`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(await apiUrl("/to-images"), { method: "POST", body: form }));
 }
 
 // ── Form fields (5.3) ────────────────────────────────────────────────────────
@@ -248,7 +281,7 @@ export interface FormField {
 export async function getFormFields(file: File): Promise<FormField[]> {
   const form = new FormData();
   form.append("file", file);
-  const res = await apiFetch(`${BASE}/form-fields`, { method: "POST", body: form });
+  const res = await apiFetch(await apiUrl("/form-fields"), { method: "POST", body: form });
   if (!res.ok) {
     let msg = `Server error ${res.status}`;
     try { msg = (await res.json()).detail ?? msg; } catch { /* ignore */ }
@@ -262,5 +295,5 @@ export async function fillForm(file: File, values: Record<string, string>): Prom
   const form = new FormData();
   form.append("file", file);
   form.append("values", JSON.stringify(values));
-  return handleResponse(await apiFetch(`${BASE}/fill-form`, { method: "POST", body: form }));
+  return handleResponse(await apiFetch(await apiUrl("/fill-form"), { method: "POST", body: form }));
 }
