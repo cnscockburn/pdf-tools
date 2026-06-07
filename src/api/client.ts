@@ -233,7 +233,7 @@ export type Annotation =
       strokes: Array<Array<{ x: number; y: number }>>;
       color?: [number, number, number]; strokeWidth?: number } & AnnotMeta)
   | ({ type: "shape";         page: number; x0: number; y0: number; x1: number; y1: number;
-      shape: "rect" | "ellipse" | "line" | "arrow";
+      shape: "rect" | "ellipse" | "line" | "arrow" | "arrowOpen";
       color?: [number, number, number]; strokeWidth?: number; fill?: boolean; text?: string } & AnnotMeta)
   | ({ type: "stamp";         page: number; x0: number; y0: number; x1: number; y1: number;
       label: string; color?: [number, number, number] } & AnnotMeta);

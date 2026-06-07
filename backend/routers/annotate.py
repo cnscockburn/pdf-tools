@@ -16,7 +16,7 @@ VALID_TYPES = {
     "ink", "shape", "stamp",
 }
 
-VALID_SHAPES = {"rect", "ellipse", "line", "arrow"}
+VALID_SHAPES = {"rect", "ellipse", "line", "arrow", "arrowOpen"}
 
 # Hard caps on text content to prevent DoS via oversized string processing.
 MAX_TEXT_LEN   = 10_000   # note/freetext/underline/strikethrough content

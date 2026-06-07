@@ -485,7 +485,7 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
             elif shape == "ellipse":
                 a = page.add_circle_annot(rect)
                 a.set_colors(stroke=color)
-            elif shape in ("line", "arrow"):
+            elif shape in ("line", "arrow", "arrowOpen"):
                 p1 = fitz.Point(x0, y0)
                 p2 = fitz.Point(x1, y1)
                 a = page.add_line_annot(p1, p2)
@@ -501,6 +501,12 @@ def annotate(file_bytes: bytes, annotations: list[dict]) -> bytes:
                         # ClosedArrow = filled triangle, matching the SVG polygon preview.
                         a.set_line_ends(fitz.PDF_ANNOT_LE_NONE, fitz.PDF_ANNOT_LE_CLOSED_ARROW)
                         a.set_colors(stroke=color, fill=color)
+                    except Exception:
+                        pass  # older PyMuPDF may use different API
+                elif shape == "arrowOpen":
+                    try:
+                        # OpenArrow = open chevron, matching the SVG polyline preview.
+                        a.set_line_ends(fitz.PDF_ANNOT_LE_NONE, fitz.PDF_ANNOT_LE_OPEN_ARROW)
                     except Exception:
                         pass  # older PyMuPDF may use different API
             else:

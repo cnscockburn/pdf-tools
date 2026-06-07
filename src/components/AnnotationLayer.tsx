@@ -84,7 +84,8 @@ export interface InkAnnot {
   author?: string; status?: AnnotStatus;
   tags?: string[];
 }
-export type ShapeSubType = "rect" | "ellipse" | "line" | "arrow";
+/** shape sub-types: rect, ellipse, line, arrow (closed head), arrowOpen (open/chevron head) */
+export type ShapeSubType = "rect" | "ellipse" | "line" | "arrow" | "arrowOpen";
 export interface ShapeAnnot {
   id: AnnotId; type: "shape"; page: number;
   x0: number; y0: number; x1: number; y1: number;
@@ -590,7 +591,7 @@ export default function AnnotationLayer({
       live: { x0: startFrac.x, y0: startFrac.y, x1: startFrac.x, y1: startFrac.y },
     };
 
-    const isLineShape = createMode === "shape" && (shapeSubType === "line" || shapeSubType === "arrow");
+    const isLineShape = createMode === "shape" && (shapeSubType === "line" || shapeSubType === "arrow" || shapeSubType === "arrowOpen");
 
     const onMove = (me: MouseEvent) => {
       if (!dragRef.current || dragRef.current.kind !== "create") return;
@@ -938,6 +939,7 @@ export default function AnnotationLayer({
   // Size is proportional to strokeWidth in screen pixels, converted to the
   // SVG's fractional coordinate space via a fixed page-width assumption.
   // This keeps the head the same visual size regardless of line length.
+  /** Returns points string for a CLOSED (filled) arrowhead polygon. */
   function arrowheadPoints(
     x0: number, y0: number, x1: number, y1: number,
     strokeWidth: number = 2,
@@ -946,8 +948,6 @@ export default function AnnotationLayer({
     const len = Math.sqrt(dx * dx + dy * dy);
     if (len < 0.005) return "";
     const ux = dx / len, uy = dy / len;
-    // headLen ≈ 4× stroke width, expressed as fraction of page width.
-    // 800px is a reasonable page-width baseline; adjust keeps it visually stable.
     const baseLen = (strokeWidth * 4) / 800;
     const headLen = Math.max(baseLen, Math.min(0.025, len * 0.25));
     const headW   = headLen * 0.55;
@@ -956,6 +956,28 @@ export default function AnnotationLayer({
     return [
       `${x1},${y1}`,
       `${bx + perpX * headW},${by + perpY * headW}`,
+      `${bx - perpX * headW},${by - perpY * headW}`,
+    ].join(" ");
+  }
+
+  /** Returns { tip, left, right } for an OPEN (chevron) arrowhead polyline. */
+  function openArrowheadPoints(
+    x0: number, y0: number, x1: number, y1: number,
+    strokeWidth: number = 2,
+  ): string {
+    const dx = x1 - x0, dy = y1 - y0;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.005) return "";
+    const ux = dx / len, uy = dy / len;
+    const baseLen = (strokeWidth * 4) / 800;
+    const headLen = Math.max(baseLen, Math.min(0.025, len * 0.25));
+    const headW   = headLen * 0.65;
+    const perpX = -uy, perpY = ux;
+    const bx = x1 - ux * headLen, by = y1 - uy * headLen;
+    // Returns the three points of the open chevron: left-wing, tip, right-wing
+    return [
+      `${bx + perpX * headW},${by + perpY * headW}`,
+      `${x1},${y1}`,
       `${bx - perpX * headW},${by - perpY * headW}`,
     ].join(" ");
   }
@@ -1047,9 +1069,19 @@ export default function AnnotationLayer({
                     <line x1={x0} y1={y0} x2={x1} y2={y1}
                       stroke={stroke} strokeWidth={sw}
                       vectorEffect="non-scaling-stroke" strokeLinecap="round" {...selProps} />
-                    {pts && (
-                      <polygon points={pts} fill={stroke} vectorEffect="non-scaling-stroke" />
-                    )}
+                    {pts && <polygon points={pts} fill={stroke} vectorEffect="non-scaling-stroke" />}
+                  </g>
+                );
+              }
+              case "arrowOpen": {
+                const pts = openArrowheadPoints(x0, y0, x1, y1, sw);
+                return (
+                  <g key={ann.id}>
+                    <line x1={x0} y1={y0} x2={x1} y2={y1}
+                      stroke={stroke} strokeWidth={sw}
+                      vectorEffect="non-scaling-stroke" strokeLinecap="round" {...selProps} />
+                    {pts && <polyline points={pts} fill="none" stroke={stroke} strokeWidth={sw}
+                      vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />}
                   </g>
                 );
               }
@@ -1583,6 +1615,18 @@ export default function AnnotationLayer({
                     </g>
                   );
                 }
+                case "arrowOpen": {
+                  const pts = openArrowheadPoints(x0, y0, x1, y1, sw);
+                  return (
+                    <g key={`ro-${ann.id}`}>
+                      <line x1={x0} y1={y0} x2={x1} y2={y1}
+                        stroke={stroke} strokeWidth={sw}
+                        vectorEffect="non-scaling-stroke" strokeLinecap="round" />
+                      {pts && <polyline points={pts} fill="none" stroke={stroke} strokeWidth={sw}
+                        vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />}
+                    </g>
+                  );
+                }
                 default: return null;
               }
             }
@@ -1746,7 +1790,7 @@ export default function AnnotationLayer({
 
       {/* ── In-progress drag preview ────────────────────────────────────────── */}
       {live && createMode !== "ink" && (() => {
-        const isLineDrag = createMode === "shape" && (shapeSubType === "line" || shapeSubType === "arrow");
+        const isLineDrag = createMode === "shape" && (shapeSubType === "line" || shapeSubType === "arrow" || shapeSubType === "arrowOpen");
         if (isLineDrag) {
           // Render a line preview in the SVG, not a rectangle
           const dx = live.x1 - live.x0, dy = live.y1 - live.y0;
@@ -1761,6 +1805,11 @@ export default function AnnotationLayer({
               {shapeSubType === "arrow" && (() => {
                 const pts = arrowheadPoints(live.x0, live.y0, live.x1, live.y1, inkStrokeWidth);
                 return pts ? <polygon points={pts} fill={dragColor} vectorEffect="non-scaling-stroke" opacity={0.6} /> : null;
+              })()}
+              {shapeSubType === "arrowOpen" && (() => {
+                const pts = openArrowheadPoints(live.x0, live.y0, live.x1, live.y1, inkStrokeWidth);
+                return pts ? <polyline points={pts} fill="none" stroke={dragColor} strokeWidth={2}
+                  vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" opacity={0.6} /> : null;
               })()}
             </svg>
           );

@@ -205,17 +205,32 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   const mirrorRecvVersionRef = useRef(0);
   const mirrorLastPublishedVersionRef = useRef(0);
 
-  // Subscribe to mirror channel
+  // A2: Sync navigation between split panes. On by default for mirror groups
+  // (same document) — can be toggled via View menu. Defaults off for two different documents.
+  const [syncNavigation, setSyncNavigation] = useState(() => !!mirrorGroupId);
+  // Guard against page-nav echo: true while applying a received page jump.
+  const receivingNavRef = useRef(false);
+
+  // Subscribe to mirror channel — annotations + optional page nav
   useEffect(() => {
     if (!mirrorGroupId) return;
-    const unsub = subscribe<{ annotations: LocalAnnot[]; baked: LocalAnnot[] }>(
+    const unsub = subscribe<{ annotations?: LocalAnnot[]; baked?: LocalAnnot[]; page?: number }>(
       mirrorGroupId,
       (data, senderId) => {
-        // Ignore our own broadcasts
         if (senderId === mirrorSenderIdRef.current) return;
-        mirrorRecvVersionRef.current += 1;
-        setAnnotations(data.annotations);
-        setBakedAnnotations(data.baked);
+        // Annotation payload
+        if (data.annotations !== undefined && data.baked !== undefined) {
+          mirrorRecvVersionRef.current += 1;
+          setAnnotations(data.annotations);
+          setBakedAnnotations(data.baked);
+        }
+        // Page navigation payload (A2)
+        if (data.page !== undefined) {
+          receivingNavRef.current = true;
+          setCurrentPage(data.page);
+          setPageInput(String(data.page));
+          receivingNavRef.current = false;
+        }
       },
     );
     return unsub;
@@ -234,6 +249,13 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
       baked: bakedAnnotations,
     });
   }, [mirrorGroupId, annotations, bakedAnnotations]);
+
+  // A2: Publish page navigation to the mirror channel
+  useEffect(() => {
+    if (!mirrorGroupId || !syncNavigation) return;
+    if (receivingNavRef.current) return; // don't echo back
+    publish(mirrorGroupId, mirrorSenderIdRef.current, { page: currentPage });
+  }, [mirrorGroupId, syncNavigation, currentPage]); // eslint-disable-line
 
   // ── Text selection / QuickActionBar ───────────────────────────────────────
   const [textSelectActive, setTextSelectActive] = useState(false);
@@ -1544,6 +1566,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           { label: "Side by Side — Same Document",                       action: () => openSideBySide("horizontal", "mirror", workingFile ?? file), disabled: !hasDoc },
           { label: "Side by Side — New Document",   shortcut: "Ctrl+\\",  action: () => openSideBySide("horizontal", "new") },
           ...(isSideBySide ? [{ label: "Close Side by Side",  shortcut: "Ctrl+\\", action: () => closeSideBySide() }] : []),
+          ...(isSideBySide ? [{ label: syncNavigation ? "Sync navigation: On" : "Sync navigation: Off", checked: syncNavigation, action: () => setSyncNavigation(v => !v) }] : []),
         ],
       },
     ];
@@ -1992,13 +2015,13 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                   <>
                     <div className="w-px h-5 bg-stone-700 shrink-0 mx-0.5" />
                     <div className="flex items-center gap-0.5">
-                      {(["rect", "ellipse", "line", "arrow"] as ShapeSubType[]).map(s => (
+                      {(["rect", "ellipse", "line", "arrow", "arrowOpen"] as ShapeSubType[]).map(s => (
                         <button key={s} onClick={() => setShapeSubType(s)}
-                          title={s === "rect" ? "Rectangle" : s === "ellipse" ? "Ellipse" : s === "line" ? "Straight line" : "Arrow"}
+                          title={s === "rect" ? "Rectangle" : s === "ellipse" ? "Ellipse" : s === "line" ? "Straight line" : s === "arrow" ? "Arrow (filled head)" : "Arrow (open head)"}
                           aria-pressed={shapeSubType === s}
-                          className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium transition capitalize",
+                          className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium transition",
                             shapeSubType === s ? "bg-brand-600 text-white" : "text-stone-400 hover:bg-stone-700 hover:text-stone-200")}>
-                          {s === "rect" ? "Rect" : s}
+                          {s === "rect" ? "Rect" : s === "arrowOpen" ? "Arrow (open)" : s.charAt(0).toUpperCase() + s.slice(1)}
                         </button>
                       ))}
                     </div>
