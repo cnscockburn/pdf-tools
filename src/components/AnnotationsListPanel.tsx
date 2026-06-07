@@ -90,21 +90,25 @@ type FilterStatus = "all" | AnnotStatus;
 interface Props {
   annotations: LocalAnnot[];
   currentPage: number;
-  onGoTo:         (page: number) => void;
-  onDelete:       (id: AnnotId) => void;
-  onStatusChange: (id: AnnotId, status: AnnotStatus) => void;
-  onExportReport: () => void;
-  onFocusAnnot?:  (id: AnnotId) => void;
+  onGoTo:           (page: number) => void;
+  onDelete:         (id: AnnotId) => void;
+  onStatusChange:   (id: AnnotId, status: AnnotStatus) => void;
+  onExportReport:   () => void;
+  onExportCsv?:     () => void;
+  onExportJson?:    () => void;
+  onFocusAnnot?:    (id: AnnotId) => void;
+  onEditAnnot?:     (id: AnnotId) => void;
   /** Active annotation id — highlighted in the list (P1-11 / UX-11) */
-  focusAnnotId?:  AnnotId | null;
+  focusAnnotId?:    AnnotId | null;
   /** User-customised highlight colour labels, indexed by colorIdx (P1-15) */
-  colorLabels?:   string[];
+  colorLabels?:     string[];
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function AnnotationsListPanel({
-  annotations, currentPage, onGoTo, onFocusAnnot, onDelete, onStatusChange, onExportReport,
+  annotations, currentPage, onGoTo, onFocusAnnot, onEditAnnot, onDelete, onStatusChange,
+  onExportReport, onExportCsv, onExportJson,
   focusAnnotId, colorLabels,
 }: Props) {
   const [filterStatus,  setFilterStatus]  = useState<FilterStatus>("all");
@@ -219,6 +223,12 @@ export default function AnnotationsListPanel({
       onFocusAnnot?.(ann.id);
     }
 
+    function handleRowDblClick() {
+      onGoTo(ann.page);
+      onFocusAnnot?.(ann.id);
+      onEditAnnot?.(ann.id);
+    }
+
     const isFocused = focusAnnotId != null && ann.id === focusAnnotId;
     // Highlights show their (possibly user-renamed) colour label instead of the
     // generic "Highlight" (P1-15).
@@ -234,6 +244,8 @@ export default function AnnotationsListPanel({
           isFocused ? "bg-brand-500/15 ring-1 ring-inset ring-brand-500/40" : "hover:bg-stone-800",
         )}
         onClick={handleRowClick}
+        onDoubleClick={handleRowDblClick}
+        title={onEditAnnot ? "Click to jump · Double-click to edit" : undefined}
       >
         {/* Type icon */}
         <div className="mt-0.5 shrink-0">{typeIcon(ann.type)}</div>
@@ -468,15 +480,38 @@ export default function AnnotationsListPanel({
 
       </div>
 
-      {/* ── Footer ───────────────────────────────────────────────────────── */}
-      <div className="px-3 py-2.5 border-t border-stone-700 shrink-0">
+      {/* ── Footer — export buttons ──────────────────────────────────────── */}
+      <div className="px-3 py-2.5 border-t border-stone-700 shrink-0 flex flex-col gap-1.5">
         <button
           onClick={onExportReport}
           className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 px-3 py-1.5 text-xs text-stone-300 hover:text-white transition"
+          title="Export as Markdown document"
         >
           <FileText className="h-3.5 w-3.5" />
           Export report (.md)
         </button>
+        {(onExportCsv || onExportJson) && (
+          <div className="flex gap-1.5">
+            {onExportCsv && (
+              <button
+                onClick={onExportCsv}
+                className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-stone-800 hover:bg-stone-700 px-2 py-1.5 text-[11px] text-stone-400 hover:text-white transition"
+                title="Export as CSV spreadsheet"
+              >
+                .csv
+              </button>
+            )}
+            {onExportJson && (
+              <button
+                onClick={onExportJson}
+                className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-stone-800 hover:bg-stone-700 px-2 py-1.5 text-[11px] text-stone-400 hover:text-white transition"
+                title="Export as JSON"
+              >
+                .json
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

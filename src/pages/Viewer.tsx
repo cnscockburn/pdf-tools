@@ -29,7 +29,7 @@ import MenuBar, { type MenuDef } from "../components/MenuBar";
 import { annotatePDF, redactPDF, cropPDF, decryptPDF, checkHealth, type Annotation, type RedactRegion } from "../api/client";
 import { useBookmarks } from "../lib/storage";
 import { useSettingsContext } from "../lib/settingsContext";
-import { downloadAnnotationReport } from "../lib/annotationReport";
+import { downloadAnnotationReport, downloadAnnotationCsv, downloadAnnotationJson } from "../lib/annotationReport";
 import { subscribe, publish } from "../lib/mirrorSync";
 import { pickPdfFiles } from "../lib/fileIntake";
 import { useHelpMode, helpForMode } from "../lib/helpMode";
@@ -188,8 +188,12 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   const [bakedAnnotations, setBakedAnnotations] = useState<LocalAnnot[]>([]);
   /** Externally-requested annotation to select (from sidebar / popup nav arrows). */
   const [focusAnnotId, setFocusAnnotId]       = useState<AnnotId | null>(null);
+  // A4: id of annotation the user wants to immediately enter edit mode on (from rail double-click)
+  const [forceEditAnnotId, setForceEditAnnotId] = useState<AnnotId | null>(null);
   const [autoSaving, setAutoSaving]           = useState(false);
   const [annotateError, setAnnotateError]     = useState<string | null>(null);
+  // A1: track whether the working blob was modified since the last download
+  const [modifiedSinceDownload, setModifiedSinceDownload] = useState(false);
 
   // ── Mirror sync (same-document side-by-side) ─────────────────────────────
   // Uses a monotonic version counter instead of a boolean flag to prevent echo.
@@ -898,16 +902,24 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     return () => window.removeEventListener("keydown", onKey);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Tab close guard: warn before closing with uncommitted annotations ──────
-  // (P1-03 / P1-24). The guard reads the live annotation count via the ref, so
-  // it stays correct without re-registering on every annotation change.
+  // Live ref for modifiedSinceDownload so close guard always sees the current value.
+  const modifiedSinceDownloadRef = useRef(false);
+  modifiedSinceDownloadRef.current = modifiedSinceDownload;
+
+  // ── Tab close guard: warn before closing with uncommitted annotations or
+  //    an undownloaded modified blob (A1 + P1-03 / P1-24). Both guards read
+  //    live refs so they don't need to re-register on every state change.
   useEffect(() => {
     if (!tabId) return;
     registerCloseGuard(tabId, () => {
       const n = annotationsRef.current.length;
-      return n === 0
-        ? { safe: true }
-        : { safe: false, message: `You have ${n} uncommitted annotation${n !== 1 ? "s" : ""} that haven't been saved into the PDF.`, details: "Commit them with “Done” first if you want to keep them." };
+      if (n > 0) {
+        return { safe: false, message: `You have ${n} uncommitted annotation${n !== 1 ? "s" : ""} that haven't been saved into the PDF.`, details: 'Commit them with "Done" first if you want to keep them.' };
+      }
+      if (modifiedSinceDownloadRef.current) {
+        return { safe: false, message: "You have unsaved changes that have not been downloaded.", details: 'Click "Save / Download" (Ctrl+S) to save your work first.' };
+      }
+      return { safe: true };
     });
     return () => unregisterCloseGuard(tabId);
   }, [tabId, registerCloseGuard, unregisterCloseGuard]);
@@ -932,6 +944,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     setPdf(null);
     setFile(f);
     setWorkingBlob(null);
+    setModifiedSinceDownload(false); // A1: new file, nothing unsaved yet
     setFilename(f.name);
     setCurrentPage(1);
     setPageInput("1");
@@ -989,6 +1002,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     if (renderTaskRef.current) { renderTaskRef.current.cancel(); renderTaskRef.current = null; }
     setPdf(null);
     setWorkingBlob(blob);
+    setModifiedSinceDownload(true); // A1: any backend result means unsaved changes
     const buf = await blob.arrayBuffer();
     const doc = await pdfjsLib.getDocument({ data: buf }).promise;
     const page = Math.min(currentPage, doc.numPages);
@@ -1124,6 +1138,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
       return;
     }
     downloadBlob(workingBlob, filename);
+    setModifiedSinceDownload(false); // A1: cleared on download
   }
 
   function togglePanel(t: PanelTool) {
@@ -1804,6 +1819,8 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                 snippets={settings.snippets}
                 visible={annotationsVisible}
                 focusAnnotId={focusAnnotId}
+                forceEditAnnotId={forceEditAnnotId}
+                onForceEditConsumed={() => setForceEditAnnotId(null)}
                 onNavigateAnnot={focusAnnotation}
                 readOnly={canvasMode !== "annotate"}
               />
@@ -2368,9 +2385,18 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
               currentPage={currentPage}
               onGoToPage={goTo}
               onFocusAnnot={focusAnnotation}
+              onEditAnnot={id => {
+                // A4: jump to the annotation's page, focus it, switch to annotate
+                // mode, and set forceEditAnnotId so AnnotationLayer opens the editor.
+                focusAnnotation(id);
+                switchMode("annotate");
+                setForceEditAnnotId(id);
+              }}
               onDeleteAnnot={deleteAnnot}
               onStatusChange={changeAnnotStatus}
               onExportReport={() => downloadAnnotationReport([...bakedAnnotations, ...annotations], filename)}
+              onExportCsv={() => downloadAnnotationCsv([...bakedAnnotations, ...annotations], filename)}
+              onExportJson={() => downloadAnnotationJson([...bakedAnnotations, ...annotations], filename)}
               focusAnnotId={focusAnnotId}
               colorLabels={settings.colorLabels}
               pdf={pdf}

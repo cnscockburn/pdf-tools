@@ -284,6 +284,13 @@ interface Props {
    * receives pointer events; only note pins keep pointer-events for hover.
    */
   readOnly?: boolean;
+  /**
+   * A4: When set, immediately opens the edit UI for this annotation (triggered
+   * by double-click in the right-rail annotation list).
+   */
+  forceEditAnnotId?: AnnotId | null;
+  /** Called once after forceEditAnnotId has been consumed, so Viewer can clear it. */
+  onForceEditConsumed?: () => void;
 }
 
 // Only note and freetext are "comments" with status / resolution workflow.
@@ -314,6 +321,7 @@ export default function AnnotationLayer({
   stampLabel = "DRAFT", stampColor = [0.6, 0, 0],
   snippets = [], visible = true, focusAnnotId, onNavigateAnnot,
   readOnlyAnnotations = [], readOnly = false,
+  forceEditAnnotId, onForceEditConsumed,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -352,6 +360,19 @@ export default function AnnotationLayer({
       onSelectedChange?.(focusAnnotId);
     }
   }, [focusAnnotId]); // eslint-disable-line
+
+  // A4: Rail double-click — immediately open the editor for the specified annotation.
+  useEffect(() => {
+    if (!forceEditAnnotId) return;
+    const ann = annotations.find(a => a.id === forceEditAnnotId);
+    if (ann && (ann.type === "note" || ann.type === "freetext")) {
+      startEdit(ann);
+    } else if (ann) {
+      setSelectedId(ann.id);
+      onSelectedChange?.(ann.id);
+    }
+    onForceEditConsumed?.();
+  }, [forceEditAnnotId]); // eslint-disable-line
 
   // Sync selection to parent
   useEffect(() => { onSelectedChange?.(selectedId); }, [selectedId]); // eslint-disable-line
