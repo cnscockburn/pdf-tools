@@ -137,3 +137,13 @@ export function clearRecentFiles(): void {
     window.dispatchEvent(new Event("recent-files-changed"));
   } catch { /* ignore */ }
 }
+
+/** Drop a single recent entry (e.g. a file that has since moved/been deleted). */
+export function removeRecentFile(path: string): RecentFile[] {
+  const next = loadRecentFiles().filter(r => r.path !== path);
+  try {
+    localStorage.setItem(RECENTS_KEY, JSON.stringify(next));
+    window.dispatchEvent(new Event("recent-files-changed"));
+  } catch { /* ignore */ }
+  return next;
+}

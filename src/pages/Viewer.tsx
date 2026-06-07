@@ -1411,7 +1411,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   // ── Empty state ────────────────────────────────────────────────────────────
   if (!pdf || !file) {
     return (
-      <div className="min-h-screen bg-stone-800 viewer-light:bg-stone-100 flex flex-col">
+      <div className="min-h-screen bg-stone-800 flex flex-col">
         <div className="bg-stone-900 border-b border-stone-700 px-4 py-3 flex items-center gap-3">
           <button onClick={() => openTab("home")} className="text-xs text-stone-400 hover:text-white flex items-center gap-1 transition">
             <ChevronLeft className="h-4 w-4" /> All tools

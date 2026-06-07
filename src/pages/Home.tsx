@@ -9,7 +9,7 @@ import { useTabContext, type TabType } from "../lib/tabs";
 import { useFocusTrap } from "../lib/useFocusTrap";
 import {
   isTauri, pickPdfFiles, openPathAsFile,
-  loadRecentFiles, clearRecentFiles, type RecentFile,
+  loadRecentFiles, clearRecentFiles, removeRecentFile, type RecentFile,
 } from "../lib/fileIntake";
 import striaLogo from "../assets/stria-logo.png";
 
@@ -131,10 +131,7 @@ export default function Home() {
       openTab("viewer", { file, title: file.name });
     } catch {
       setRecentError(`Couldn't open ${r.name} — it may have been moved or deleted.`);
-      // Drop the stale entry.
-      const next = loadRecentFiles().filter(x => x.path !== r.path);
-      try { localStorage.setItem("pdf-tools-recent-files", JSON.stringify(next)); } catch { /* ignore */ }
-      setRecents(next);
+      setRecents(removeRecentFile(r.path)); // drop the stale entry
     }
   }
 
