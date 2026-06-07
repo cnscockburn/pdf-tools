@@ -7,6 +7,7 @@ import {
 import { cn, formatBytes } from "../lib/utils";
 import { useTabContext, type TabType } from "../lib/tabs";
 import { useFocusTrap } from "../lib/useFocusTrap";
+import KeyboardCheatSheet from "../components/KeyboardCheatSheet";
 import {
   isTauri, pickPdfFiles, openPathAsFile,
   loadRecentFiles, clearRecentFiles, removeRecentFile, type RecentFile,
@@ -25,6 +26,7 @@ type ToolDef = {
   toolHint?: string;
 };
 
+// Most-used operations first so the grid scans in frequency order.
 const TOOLS: ToolDef[] = [
   {
     id: "merge",
@@ -32,14 +34,6 @@ const TOOLS: ToolDef[] = [
     description: "Combine multiple PDFs into one",
     icon: <Layers className="h-[15px] w-[15px]" />,
     tabType: "merge",
-  },
-  {
-    id: "split",
-    title: "Split",
-    description: "Divide by page range",
-    icon: <Scissors className="h-[15px] w-[15px]" />,
-    needsFile: true,
-    toolHint: "split",
   },
   {
     id: "compress",
@@ -58,6 +52,14 @@ const TOOLS: ToolDef[] = [
     toolHint: "redact",
   },
   {
+    id: "split",
+    title: "Split",
+    description: "Divide by page range",
+    icon: <Scissors className="h-[15px] w-[15px]" />,
+    needsFile: true,
+    toolHint: "split",
+  },
+  {
     id: "organize",
     title: "Organize",
     description: "Reorder, rotate, delete pages",
@@ -74,14 +76,10 @@ const TOOLS: ToolDef[] = [
 ];
 
 // ── Capability hints shown beneath the drop zone ─────────────────────────────
-// Each is a shortcut chip that, when clicked, opens a file and drops you into
-// that capability (UX-24). `toolHint` (if set) pre-selects a viewer mode.
-
-const CAPABILITIES: { icon: React.ReactNode; text: string; kbd: string; toolHint?: string }[] = [
-  { icon: <MessageSquare className="h-3 w-3" />, text: "Annotate",       kbd: "A",      toolHint: "annotate" },
-  { icon: <Keyboard className="h-3 w-3" />,       text: "All shortcuts",  kbd: "?" },
-  { icon: <Columns className="h-3 w-3" />,         text: "Side by side",   kbd: "Ctrl+\\" },
-];
+// Each chip either opens a file (with an optional toolHint that pre-selects a
+// viewer mode) or triggers a standalone action. Defined inside the component
+// so chip handlers can close over state setters.
+type CapabilityDef = { icon: React.ReactNode; text: string; kbd: string; title: string; onClick: () => void };
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -91,6 +89,7 @@ export default function Home() {
   const privacyTrapRef = useFocusTrap<HTMLDivElement>(privacyOpen);
   const [recents, setRecents] = useState<RecentFile[]>(() => loadRecentFiles());
   const [recentError, setRecentError] = useState<string | null>(null);
+  const [cheatSheetOpen, setCheatSheetOpen] = useState(false);
 
   // Set window title; keep the recents list fresh when other surfaces change it.
   useEffect(() => {
@@ -123,6 +122,31 @@ export default function Home() {
   function openToolFilePicker(toolHint?: string) {
     void openViaPicker(toolHint);
   }
+
+  // Capability chips — each can either open a file or trigger a standalone action.
+  const capabilities: CapabilityDef[] = [
+    {
+      icon: <MessageSquare className="h-3 w-3" />,
+      text: "Annotate",
+      kbd: "A",
+      title: "Open a PDF and start annotating",
+      onClick: () => openToolFilePicker("annotate"),
+    },
+    {
+      icon: <Keyboard className="h-3 w-3" />,
+      text: "All shortcuts",
+      kbd: "?",
+      title: "Show keyboard shortcuts",
+      onClick: () => setCheatSheetOpen(true),
+    },
+    {
+      icon: <Columns className="h-3 w-3" />,
+      text: "Side by side",
+      kbd: "Ctrl+\\",
+      title: "Open a PDF and compare two documents side by side",
+      onClick: () => openToolFilePicker(undefined),
+    },
+  ];
 
   // Re-open a recent file by its stored OS path.
   async function openRecent(r: RecentFile) {
@@ -183,13 +207,13 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Capability shortcut chips — click to open a file and jump in */}
+            {/* Capability shortcut chips */}
             <div className="flex items-center justify-center gap-2 mt-4">
-              {CAPABILITIES.map((cap, i) => (
+              {capabilities.map((cap, i) => (
                 <button
                   key={i}
-                  onClick={() => openToolFilePicker(cap.toolHint)}
-                  title={`Open a PDF and ${cap.text.toLowerCase()}`}
+                  onClick={cap.onClick}
+                  title={cap.title}
                   className="group flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white app-dark:bg-stone-900 app-dark:border-stone-800 px-2.5 py-1.5 text-[11px] text-stone-500 app-dark:text-stone-400 hover:border-stone-300 hover:text-stone-700 app-dark:hover:text-stone-200 app-dark:hover:border-stone-700 hover:shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
                 >
                   <span className="text-stone-300 app-dark:text-stone-600 group-hover:text-amber-600 transition-colors">{cap.icon}</span>
@@ -295,6 +319,9 @@ export default function Home() {
           </button>
         </div>
       </div>
+
+      {/* ── Keyboard shortcut reference ───────────────────────────────────── */}
+      {cheatSheetOpen && <KeyboardCheatSheet onClose={() => setCheatSheetOpen(false)} />}
 
       {/* ── Privacy detail popup (UX-25) ──────────────────────────────────── */}
       {privacyOpen && (

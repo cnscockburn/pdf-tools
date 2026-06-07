@@ -1638,7 +1638,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                 className="flex items-center gap-1 text-[10px] text-stone-500 hover:text-stone-300 transition"
               >
                 <User className="h-3 w-3" />
-                <span className="hidden sm:inline">{settings.author || "Set name"}</span>
+                <span className="hidden sm:inline">{settings.author || "Add your name"}</span>
               </button>
             )
           )}
@@ -1689,15 +1689,15 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
 
           {/* First-run hint — dismissible, shows once */}
           {showFirstRunHint && !isSecondaryPane && (
-            <div className="shrink-0 flex items-center gap-3 px-4 py-1.5 bg-stone-900/80 border-b border-stone-700/50 text-[10px] text-stone-400">
-              <span className="flex items-center gap-4">
-                <span>Press <kbd className="rounded border border-stone-600 bg-stone-700 px-1 py-px font-mono text-stone-300">?</kbd> for all shortcuts</span>
-                <span className="w-px h-3 bg-stone-700" />
-                <span>Press <kbd className="rounded border border-stone-600 bg-stone-700 px-1 py-px font-mono text-stone-300">A</kbd> to annotate</span>
-                <span className="w-px h-3 bg-stone-700" />
-                <span><kbd className="rounded border border-stone-600 bg-stone-700 px-1 py-px font-mono text-stone-300">Ctrl+K</kbd> opens the command palette</span>
+            <div className="shrink-0 flex items-center gap-3 px-4 py-2 bg-stone-900 border-b border-stone-700 text-[11px] text-stone-300">
+              <span className="flex items-center gap-5 flex-wrap">
+                <span>Press <kbd className="rounded border border-stone-600 bg-stone-700 px-1.5 py-px font-mono text-stone-200">A</kbd> to annotate — or select text to get quick options</span>
+                <span className="w-px h-3 bg-stone-700 shrink-0" />
+                <span><kbd className="rounded border border-stone-600 bg-stone-700 px-1.5 py-px font-mono text-stone-200">Ctrl+K</kbd> command palette</span>
+                <span className="w-px h-3 bg-stone-700 shrink-0" />
+                <span><kbd className="rounded border border-stone-600 bg-stone-700 px-1.5 py-px font-mono text-stone-200">?</kbd> all shortcuts</span>
               </span>
-              <button onClick={dismissFirstRunHint} className="ml-auto text-stone-500 hover:text-stone-300 transition" aria-label="Dismiss tips">
+              <button onClick={dismissFirstRunHint} className="ml-auto shrink-0 text-stone-500 hover:text-stone-300 transition" aria-label="Dismiss tips">
                 <X className="h-3 w-3" />
               </button>
             </div>

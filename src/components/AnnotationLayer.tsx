@@ -809,6 +809,9 @@ export default function AnnotationLayer({
               placeholder="Reply… (Enter to send)"
               className="w-full rounded border border-stone-600 bg-stone-800 px-1.5 py-1 text-[10px] text-stone-100 resize-none focus:outline-none focus:ring-1 focus:ring-brand-500/50 placeholder:text-stone-500"
             />
+            <p className="text-[9px] text-stone-500 leading-snug">
+              Replies are this-session only — they are not saved to the PDF on download.
+            </p>
             <div className="flex gap-1">
               <button onClick={() => addReply(ann)}
                 className="flex-1 rounded bg-brand-500 hover:bg-brand-600 py-0.5 text-[10px] font-semibold text-white transition">Send</button>
