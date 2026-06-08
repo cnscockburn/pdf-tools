@@ -26,7 +26,7 @@ import CommandPalette, { type PaletteCommand } from "../components/CommandPalett
 // SettingsDialog is now rendered by TabShell; Viewer only calls openSettings() from context.
 import MiniMap from "../components/MiniMap";
 import MenuBar, { type MenuDef } from "../components/MenuBar";
-import { annotatePDF, redactPDF, cropPDF, decryptPDF, checkHealth, ocrPDF, type Annotation, type RedactRegion } from "../api/client";
+import { annotatePDF, redactPDF, cropPDF, decryptPDF, checkHealth, ocrPDF, comparePDFs, type Annotation, type RedactRegion } from "../api/client";
 import { useBookmarks } from "../lib/storage";
 import { useSettingsContext } from "../lib/settingsContext";
 import { downloadAnnotationReport, downloadAnnotationCsv, downloadAnnotationJson } from "../lib/annotationReport";
@@ -36,8 +36,10 @@ import { subscribe, publish } from "../lib/mirrorSync";
 import { pickPdfFiles } from "../lib/fileIntake";
 import { useHelpMode, helpForMode } from "../lib/helpMode";
 import { startAutoSave, deleteRecovery } from "../lib/autoSave";
-
-type CanvasMode = "view" | "annotate" | "redact" | "crop";
+import ContinuousCanvas from "../components/ContinuousCanvas";
+import { getDiff, setDiff, clearDiff } from "../lib/diffStore";
+import type { DiffEntry } from "../lib/diffStore";
+import type { CanvasMode, RedactBox, CropSel, DiffRegion } from "../lib/viewerTypes";
 
 const HIGHLIGHT_COLORS: HlColor[] = [
   { label: "Yellow", rgb: [1, 1, 0],     bg: "rgba(255,255,0,0.35)",   border: "rgba(200,160,0,0.8)" },
@@ -95,11 +97,8 @@ function toApiAnnotations(localAnns: LocalAnnot[]): Annotation[] {
   });
 }
 
-type RedactBox = { id: string; page: number; x0: number; y0: number; x1: number; y1: number };
 let _rid = 0;
 const newRid = () => `r${++_rid}_${Math.random().toString(36).slice(2, 6)}`;
-
-type CropSel = { x0: number; y0: number; x1: number; y1: number };
 
 /** Build a per-page string index from PDF.js for in-document search. */
 interface PageText {
@@ -202,6 +201,12 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   const [tocEditorOpen, setTocEditorOpen] = useState(false);
   // B3: OCR in-progress flag
   const [ocrLoading, setOcrLoading] = useState(false);
+  // B1: Continuous scroll mode
+  const [continuousScroll, setContinuousScroll] = useState(false);
+  // B6: Diff highlights — keyed by 1-indexed page number
+  const [diffHighlights, setDiffHighlights] = useState<Map<number, DiffRegion[]> | null>(null);
+  const [diffId, setDiffId] = useState<string | null>(null);
+  const [diffLoading, setDiffLoading] = useState(false);
 
   // ── Mirror sync (same-document side-by-side) ─────────────────────────────
   // Uses a monotonic version counter instead of a boolean flag to prevent echo.
@@ -432,7 +437,19 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
 
   // ── Load from tab props ───────────────────────────────────────────────────
   useEffect(() => {
-    if (toolHintProp) pendingToolRef.current = toolHintProp;
+    if (toolHintProp) {
+      if (toolHintProp.startsWith("diff:")) {
+        // B6: secondary pane — read diff highlights from the diff store.
+        const uuid = toolHintProp.slice(5);
+        const entry = getDiff(uuid);
+        if (entry) {
+          setDiffHighlights(entry.b);
+          setDiffId(uuid);
+        }
+      } else {
+        pendingToolRef.current = toolHintProp;
+      }
+    }
     if (initialFile) loadFile(initialFile);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -459,6 +476,8 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   // 0 ↔ non-zero boundary, not on every individual annotation change.
   const hasOverlayAnnots = bakedAnnotations.length > 0 || annotations.length > 0;
   useEffect(() => {
+    // B1: In continuous scroll mode ContinuousCanvas owns all canvas rendering.
+    if (continuousScroll) return;
     if (!pdf || !canvasRef.current) return;
     let cancelled = false;
 
@@ -510,7 +529,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
 
     return () => { cancelled = true; renderTaskRef.current?.cancel(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pdf, currentPage, scale, hasOverlayAnnots]);
+  }, [pdf, currentPage, scale, hasOverlayAnnots, continuousScroll]);
 
   // ── Build text search index when PDF loads ────────────────────────────────
   useEffect(() => {
@@ -729,12 +748,14 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     setTextSelectActive(canvasMode === "annotate" && textModes.includes(annotateSubMode));
   }, [annotateSubMode, canvasMode]);
 
-  // ── Continuous scroll — advance page at scroll boundary ────────────────────
+  // ── Single-page scroll boundary — advance page at edge ──────────────────────
   // When the canvas area is scrolled to its top or bottom edge and the user
   // keeps scrolling, advance to the previous / next page.
+  // Disabled in continuous scroll mode (ContinuousCanvas handles its own scroll).
   // passive:false is required so we can call preventDefault() at boundaries,
   // preventing parent-container scroll or Mac rubber-band while we accumulate.
   useEffect(() => {
+    if (continuousScroll) return; // B1: natural scroll handled by ContinuousCanvas
     const area = canvasAreaRef.current;
     if (!area) return;
 
@@ -794,11 +815,9 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
 
     area.addEventListener("wheel", onWheel, { passive: false });
     return () => area.removeEventListener("wheel", onWheel);
-  // Re-attach whenever `pdf` changes: the canvasAreaRef div only exists after
-  // a PDF is loaded (the empty-state early-return hides it at mount), so the
-  // initial [] run would find canvasAreaRef.current === null and bail out.
+  // Re-attach whenever `pdf` or `continuousScroll` changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pdf]);
+  }, [pdf, continuousScroll]);
 
   // ── Keyboard shortcuts (stable handler via ref) ────────────────────────────
   useEffect(() => {
@@ -1071,6 +1090,45 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     } finally {
       setOcrLoading(false);
     }
+  }
+
+  // ── B6: PDF comparison / diff ──────────────────────────────────────────────
+
+  async function handleComparePdfs() {
+    if (!workingFile) return;
+    const picked = await pickPdfFiles(false);
+    const opened2 = picked[0];
+    if (!opened2) return;
+    const file2 = opened2.file;
+    setDiffLoading(true);
+    try {
+      const result = await comparePDFs(workingFile, file2);
+      const uuid = crypto.randomUUID();
+      const entryA = new Map<number, DiffRegion[]>();
+      const entryB = new Map<number, DiffRegion[]>();
+      for (const pg of result.pages) {
+        if (pg.diffs_a.length > 0) entryA.set(pg.page, pg.diffs_a as DiffRegion[]);
+        if (pg.diffs_b.length > 0) entryB.set(pg.page, pg.diffs_b as DiffRegion[]);
+      }
+      const diffEntry: DiffEntry = { a: entryA, b: entryB };
+      setDiff(uuid, diffEntry);
+      setDiffHighlights(entryA);
+      setDiffId(uuid);
+      // Open the comparison file in the secondary pane. The toolHint "diff:UUID"
+      // tells it to load its highlights from the diff store.
+      openSideBySide("horizontal", "new", file2, `diff:${uuid}`);
+      showToast("Diff ready — red = removed, green = added.");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Comparison failed.");
+    } finally {
+      setDiffLoading(false);
+    }
+  }
+
+  function handleCloseDiff() {
+    setDiffHighlights(null);
+    if (diffId) { clearDiff(diffId); setDiffId(null); }
+    showToast("Diff view closed.");
   }
 
   function doSwitchMode(m: CanvasMode) {
@@ -1594,6 +1652,10 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           { label: "Edit Table of Contents",
             action: () => setTocEditorOpen(true),
             disabled: !hasDoc },
+          { type: "separator" },
+          { label: diffLoading ? "Comparing…" : diffHighlights ? "Close Diff View" : "Compare with PDF…",
+            action: () => diffHighlights ? handleCloseDiff() : handleComparePdfs(),
+            disabled: !hasDoc || diffLoading },
         ],
       },
       {
@@ -1602,10 +1664,18 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           { label: "Zoom In",          shortcut: "+",        action: () => zoomBy(1) },
           { label: "Zoom Out",         shortcut: "−",        action: () => zoomBy(-1) },
           { label: "Reset Zoom (100%)", shortcut: "Ctrl+0",  action: () => resetZoom() },
-          { label: "Fit Width",                             action: () => {
-              if (!canvasAreaRef.current || !canvasRef.current) return;
+          { label: "Fit Width",                             action: async () => {
+              if (!canvasAreaRef.current) return;
               const w = canvasAreaRef.current.clientWidth - 64;
-              const pw = canvasRef.current.width / scale;
+              let pw: number;
+              if (continuousScroll && pdf) {
+                // In continuous mode the canvasRef canvas may not exist; use page 1 viewport.
+                const pg = await pdf.getPage(1);
+                pw = pg.getViewport({ scale }).width / scale;
+              } else {
+                if (!canvasRef.current) return;
+                pw = canvasRef.current.width / scale;
+              }
               setScale(parseFloat(Math.max(0.5, Math.min(w / pw, 4)).toFixed(2)));
             }
           },
@@ -1622,6 +1692,9 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           { label: "Side by Side — New Document",   shortcut: "Ctrl+\\",  action: () => openSideBySide("horizontal", "new") },
           ...(isSideBySide ? [{ label: "Close Side by Side",  shortcut: "Ctrl+\\", action: () => closeSideBySide() }] : []),
           ...(isSideBySide ? [{ label: syncNavigation ? "Sync navigation: On" : "Sync navigation: Off", checked: syncNavigation, action: () => setSyncNavigation(v => !v) }] : []),
+          { type: "separator" },
+          { label: continuousScroll ? "Single-page view" : "Continuous Scroll", shortcut: "Ctrl+Alt+S",
+            checked: continuousScroll, action: () => setContinuousScroll(v => !v), disabled: !hasDoc },
         ],
       },
     ];
@@ -1820,7 +1893,51 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
             );
           })()}
 
-          {/* Canvas scroll area */}
+          {/* Canvas area — single-page or continuous (B1) */}
+          {continuousScroll && pdf ? (
+            <ContinuousCanvas
+              pdf={pdf}
+              scale={scale}
+              currentPage={currentPage}
+              onPageChange={p => { setCurrentPage(p); setPageInput(String(p)); }}
+              canvasWrapRef={canvasWrapRef as React.MutableRefObject<HTMLDivElement | null>}
+              canvasAreaRef={canvasAreaRef as React.MutableRefObject<HTMLDivElement | null>}
+              freeRectDragRef={freeRectDragRef}
+              annotations={annotations}
+              bakedAnnotations={bakedAnnotations}
+              onAnnotationsChange={changeAnnotations}
+              canvasMode={canvasMode}
+              annotateSubMode={annotateSubMode}
+              hlColorIdx={hlColor}
+              highlightColors={effectiveHlColors}
+              textSelectActive={textSelectActive}
+              author={settings.author}
+              shapeSubType={shapeSubType}
+              inkStrokeWidth={inkStrokeWidth}
+              inkColor={INK_COLORS[inkColorIdx].rgb}
+              stampLabel={stampLabel}
+              snippets={settings.snippets}
+              annotationsVisible={annotationsVisible}
+              focusAnnotId={focusAnnotId}
+              forceEditAnnotId={forceEditAnnotId}
+              onForceEditConsumed={() => setForceEditAnnotId(null)}
+              onNavigateAnnot={focusAnnotation}
+              hasOverlayAnnots={hasOverlayAnnots}
+              reduceMotion={settings.reduceMotion}
+              searchResults={searchResults}
+              searchIdx={searchIdx}
+              searchQuery={searchQuery}
+              redactBoxes={redactBoxes}
+              selectedRedact={selectedRedact}
+              onRedactBoxesChange={setRedactBoxes}
+              onSelectRedact={setSelectedRedact}
+              cropSelection={cropSelection}
+              cropLive={cropLive}
+              onCropSelChange={setCropSelection}
+              onCropLiveChange={setCropLive}
+              diffHighlights={diffHighlights ?? undefined}
+            />
+          ) : (
           <div ref={canvasAreaRef} className="flex-1 overflow-auto scrollbar-dark flex flex-col items-center py-8 px-4">
 
             <div
@@ -1920,6 +2037,25 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
                 </div>
               )}
 
+              {/* ── Diff highlights (B6) ───────────────────────────────────── */}
+              {diffHighlights && (() => {
+                const pageDiffs = diffHighlights.get(currentPage) ?? [];
+                return pageDiffs.length > 0 && (
+                  <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 6 }}>
+                    {pageDiffs.map((d, i) => (
+                      <div key={i} title={d.text} className="absolute" style={{
+                        left: `${d.x0 * 100}%`, top: `${d.y0 * 100}%`,
+                        width: `${(d.x1 - d.x0) * 100}%`,
+                        height: `${Math.max((d.y1 - d.y0) * 100, 1.2)}%`,
+                        backgroundColor: d.type === "remove" ? "rgba(220,38,38,0.35)" : "rgba(34,197,94,0.35)",
+                        outline: d.type === "remove" ? "1px solid rgba(220,38,38,0.6)" : "1px solid rgba(34,197,94,0.6)",
+                        borderRadius: 1,
+                      }} />
+                    ))}
+                  </div>
+                );
+              })()}
+
               {/* ── Redact overlay ─────────────────────────────────────────── */}
               {canvasMode === "redact" && (
                 <div className="absolute inset-0 cursor-crosshair" style={{ userSelect: "none" }}
@@ -1977,6 +2113,7 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
               )}
             </div>
           </div>
+          )} {/* end single-page / continuous ternary */}
 
           {/* ── Context toolbars ────────────────────────────────────────────── */}
 
@@ -2744,6 +2881,8 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
       { id: "settings",     label: "Preferences",       description: "Author name, colour labels",    category: "Tools",      action: () => { openSettings(); setPaletteOpen(false); } },
       { id: "ocr",          label: "Make Searchable (OCR)", description: "Run Tesseract OCR on scanned pages", category: "Tools", action: () => { setPaletteOpen(false); handleOcr(); } },
       { id: "toc-edit",     label: "Edit Table of Contents", description: "Add, rename or reorder TOC entries", category: "Tools", action: () => { setPaletteOpen(false); setTocEditorOpen(true); } },
+      { id: "continuous-scroll", label: continuousScroll ? "Switch to single-page view" : "Switch to continuous scroll", description: "Toggle virtualized multi-page scroll (B1)", category: "View", action: () => { setContinuousScroll(v => !v); setPaletteOpen(false); } },
+      { id: "compare-pdfs", label: diffHighlights ? "Close Diff View" : "Compare PDFs…", description: "Highlight differences between two documents (B6)", category: "Tools", action: () => { setPaletteOpen(false); diffHighlights ? handleCloseDiff() : handleComparePdfs(); } },
       { id: "export",       label: "Export report",     description: "Download annotations as .md",   category: "Export",     action: () => { downloadAnnotationReport([...bakedAnnotations, ...annotations], filename); setPaletteOpen(false); } },
       ...(workingBlob ? [{
         id: "download", label: "Download PDF", description: "Save modified PDF (Ctrl+S)", category: "Export",

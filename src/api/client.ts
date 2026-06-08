@@ -341,6 +341,40 @@ export async function setToc(file: File, entries: TocEntry[]): Promise<Blob> {
   return handleResponse(await apiFetch(await apiUrl("/toc/update"), { method: "POST", body: form }));
 }
 
+// ── PDF comparison / diff (B6) ────────────────────────────────────────────────
+
+export interface DiffRegionApi {
+  type: "add" | "remove";
+  x0: number; y0: number; x1: number; y1: number;
+  text?: string;
+}
+export interface DiffPageResult {
+  page: number;
+  /** Words in file1 but not file2 (removed), shown in the primary pane. */
+  diffs_a: DiffRegionApi[];
+  /** Words in file2 but not file1 (added), shown in the secondary pane. */
+  diffs_b: DiffRegionApi[];
+}
+export interface DiffResult {
+  pages: DiffPageResult[];
+}
+
+/**
+ * Compare two PDFs word-by-word and return per-page diff regions.
+ * The primary pane renders diffs_a (removals); secondary pane renders diffs_b (additions).
+ */
+export async function comparePDFs(file1: File, file2: File): Promise<DiffResult> {
+  const form = new FormData();
+  form.append("file1", file1);
+  form.append("file2", file2);
+  const res = await apiFetch(await apiUrl("/diff"), { method: "POST", body: form });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null) as { detail?: string } | null;
+    throw new Error(body?.detail ?? `Diff failed (HTTP ${res.status}).`);
+  }
+  return res.json() as Promise<DiffResult>;
+}
+
 /** Generate a formatted PDF annotation report for the given document + annotations. */
 export async function annotationReportPdf(
   file: File,

@@ -61,12 +61,8 @@ These are features not in the original plan. For each one I've given a brief rat
 
 ---
 
-### B1. Continuous scroll / multi-page view
-**What:** Currently the viewer renders one page at a time; you navigate between them. Continuous scroll renders all pages in a vertical column and scrolls through the whole document naturally (like a browser or Acrobat's default).  
-**Why:** The single-page model is a known friction point for reading-flow documents. Continuous scroll would eliminate the awkward page-advance gesture and make annotation positioning feel more natural.  
-**How:** A `ContinuousCanvas` component renders a virtualised list of pages (only the ±2 visible pages actually have active canvases; others are placeholder divs of the correct height). The scroll position determines the current page number for the minimap and thumbnail indicator.  
-**Effort:** High. This is the largest single structural change remaining — it touches the entire Viewer scroll model, the annotation coordinate system, and MiniMap.  
-**Decision needed:** Do you want this? If yes, should it be the default view, an optional toggle (View → Continuous Scroll), or replace the current model entirely?
+### B1. Continuous scroll / multi-page view ✅
+**Implemented:** `ContinuousCanvas.tsx` — virtualized scroll of all pages in one column (±2 RENDER_BUFFER). Only visible pages have live canvases; others render as correctly-sized placeholder divs. `programmaticScrollRef` prevents scroll→page echo loops. The view is toggled via View menu "Continuous Scroll" (Ctrl+Alt+S) or the command palette — it is not the default, so the single-page model remains unchanged. All overlays (annotations, search, diff, redact, crop) are supported in continuous mode. Viewer's `canvasWrapRef` and `canvasAreaRef` are updated on every scroll to the currently-active page so all existing coordinate calculations (QuickActionBar, free-rect drag, focus-annotation scroll) continue working.
 
 ---
 
@@ -95,12 +91,8 @@ These are features not in the original plan. For each one I've given a brief rat
 
 ---
 
-### B6. PDF comparison / diff view
-**What:** Open two PDFs side-by-side and visually highlight what changed between them — added/removed text, moved images, page insertions.  
-**Why:** Reviewers comparing document versions (contracts, proposals) currently have to do this manually or in Acrobat Pro.  
-**How:** Backend route using PyMuPDF's `page.get_text("dict")` to extract structured text from both documents, then diff the word stream. The diff is overlaid as highlights on the split-view panes (green = added, red = removed).  
-**Effort:** High. The diff algorithm, coordinate mapping, and overlay rendering are all non-trivial.  
-**Decision needed:** Yes/no. This is a significant, distinctive feature but genuinely hard to do well.
+### B6. PDF comparison / diff view ✅
+**Implemented:** Backend `POST /api/diff` uses PyMuPDF `page.get_text("words")` + Python `difflib.SequenceMatcher` to produce per-page word-level diff regions in fractional page coordinates. Frontend: Document menu "Compare with PDF…" — picks a second file, calls the API, stores results in `diffStore.ts` (module-level Map keyed by UUID), sets red ("remove") highlights on the primary pane, opens a side-by-side pane for the comparison file with `toolHint="diff:UUID"` so the secondary pane loads its green ("add") highlights on mount. "Close Diff View" clears both the highlights and the store entry. Works in both single-page and continuous scroll modes.
 
 ---
 

@@ -207,15 +207,18 @@ export default function TabShell() {
 
   // ── Side by side actions ───────────────────────────────────────────────────
 
-  const openSideBySide = useCallback((direction: SplitDirection, mode: "mirror" | "new", currentFile?: File | null) => {
+  const openSideBySide = useCallback((direction: SplitDirection, mode: "mirror" | "new", currentFile?: File | null, toolHint?: string) => {
     setSideBySideDirection(direction);
     const id = newTabId();
     const mirrorGroupId = mode === "mirror" ? `mirror_${Date.now()}` : undefined;
     const tab: Tab = {
       id,
       type: "viewer",
-      title: mode === "mirror" && currentFile ? currentFile.name : "Viewer",
-      initialFile: mode === "mirror" && currentFile ? currentFile : undefined,
+      // In mirror mode the secondary pane loads the same file; in new mode it
+      // optionally loads a specific file (e.g. the comparison file for B6 diff).
+      title: currentFile?.name ?? "Viewer",
+      initialFile: currentFile ?? undefined,
+      toolHint,
       mirrorGroupId,
     };
     // Tag the primary tab with the same mirrorGroupId so both panes sync

@@ -71,9 +71,10 @@ export interface TabContextValue {
   /**
    * Open a second pane alongside the active tab.
    * - mode "mirror": duplicates the current file into the second pane.
-   * - mode "new": opens an empty viewer in the second pane.
+   * - mode "new": opens an empty viewer (or pre-loads a specific file) in the second pane.
+   * - toolHint: passed to the secondary Viewer on mount (e.g. "diff:UUID" for B6).
    */
-  openSideBySide: (direction: SplitDirection, mode: "mirror" | "new", currentFile?: File | null) => void;
+  openSideBySide: (direction: SplitDirection, mode: "mirror" | "new", currentFile?: File | null, toolHint?: string) => void;
   /** Close the side-by-side pane, keeping the active tab. */
   closeSideBySide: () => void;
   /** Whether side-by-side is currently active. */

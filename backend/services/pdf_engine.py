@@ -847,3 +847,74 @@ def update_toc(file_bytes: bytes, entries: list[dict]) -> bytes:
         return _save(doc)
     finally:
         doc.close()
+
+
+# ---------------------------------------------------------------------------
+# PDF comparison / diff (B6)
+# ---------------------------------------------------------------------------
+
+def compare_pdfs(bytes1: bytes, bytes2: bytes) -> dict:
+    """Word-level diff between two PDFs.
+
+    For each page (up to max(len(doc1), len(doc2))) returns:
+      - ``diffs_a``: words in doc1 not in doc2 (removed), with fractional coords.
+      - ``diffs_b``: words in doc2 not in doc1 (added), with fractional coords.
+
+    Coordinates are fractional (0–1) relative to the page's own width/height so
+    they map directly to the overlay coordinate system used in the frontend.
+    """
+    import difflib
+
+    doc1 = _open(bytes1)
+    doc2 = _open(bytes2)
+
+    try:
+        n = max(len(doc1), len(doc2))
+        pages = []
+
+        for i in range(n):
+            page_num = i + 1
+
+            def _words(doc: fitz.Document, idx: int) -> list[dict]:
+                if idx >= len(doc):
+                    return []
+                pg = doc[idx]
+                pw, ph = pg.rect.width or 1, pg.rect.height or 1
+                # get_text("words") → (x0, y0, x1, y1, word, block_no, line_no, word_no)
+                raw = pg.get_text("words")
+                return [
+                    {
+                        "text": w[4],
+                        "x0": w[0] / pw, "y0": w[1] / ph,
+                        "x1": w[2] / pw, "y1": w[3] / ph,
+                    }
+                    for w in raw
+                    if str(w[4]).strip()  # skip blank tokens
+                ]
+
+            words1 = _words(doc1, i)
+            words2 = _words(doc2, i)
+
+            texts1 = [w["text"] for w in words1]
+            texts2 = [w["text"] for w in words2]
+
+            sm = difflib.SequenceMatcher(None, texts1, texts2, autojunk=False)
+
+            diffs_a: list[dict] = []
+            diffs_b: list[dict] = []
+
+            for tag, a1, a2, b1, b2 in sm.get_opcodes():
+                if tag in ("replace", "delete"):
+                    for w in words1[a1:a2]:
+                        diffs_a.append({**w, "type": "remove"})
+                if tag in ("replace", "insert"):
+                    for w in words2[b1:b2]:
+                        diffs_b.append({**w, "type": "add"})
+
+            pages.append({"page": page_num, "diffs_a": diffs_a, "diffs_b": diffs_b})
+
+        return {"pages": pages}
+
+    finally:
+        doc1.close()
+        doc2.close()
