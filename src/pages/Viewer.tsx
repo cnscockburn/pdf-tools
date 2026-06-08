@@ -26,11 +26,12 @@ import CommandPalette, { type PaletteCommand } from "../components/CommandPalett
 // SettingsDialog is now rendered by TabShell; Viewer only calls openSettings() from context.
 import MiniMap from "../components/MiniMap";
 import MenuBar, { type MenuDef } from "../components/MenuBar";
-import { annotatePDF, redactPDF, cropPDF, decryptPDF, checkHealth, type Annotation, type RedactRegion } from "../api/client";
+import { annotatePDF, redactPDF, cropPDF, decryptPDF, checkHealth, ocrPDF, type Annotation, type RedactRegion } from "../api/client";
 import { useBookmarks } from "../lib/storage";
 import { useSettingsContext } from "../lib/settingsContext";
 import { downloadAnnotationReport, downloadAnnotationCsv, downloadAnnotationJson } from "../lib/annotationReport";
 import { annotationReportPdf } from "../api/client";
+import TocEditorDialog from "../components/TocEditorDialog";
 import { subscribe, publish } from "../lib/mirrorSync";
 import { pickPdfFiles } from "../lib/fileIntake";
 import { useHelpMode, helpForMode } from "../lib/helpMode";
@@ -196,6 +197,11 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   const [annotateError, setAnnotateError]     = useState<string | null>(null);
   // A1: track whether the working blob was modified since the last download
   const [modifiedSinceDownload, setModifiedSinceDownload] = useState(false);
+
+  // B12: TOC editor dialog
+  const [tocEditorOpen, setTocEditorOpen] = useState(false);
+  // B3: OCR in-progress flag
+  const [ocrLoading, setOcrLoading] = useState(false);
 
   // ── Mirror sync (same-document side-by-side) ─────────────────────────────
   // Uses a monotonic version counter instead of a boolean flag to prevent echo.
@@ -1051,6 +1057,21 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     setPdf(doc);
   }
 
+  // B3: Make document searchable via Tesseract OCR
+  async function handleOcr() {
+    if (!workingFile || ocrLoading) return;
+    setOcrLoading(true);
+    try {
+      const blob = await ocrPDF(workingFile);
+      await applyBlob(blob);
+      showToast("OCR complete — document is now searchable.");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "OCR failed.");
+    } finally {
+      setOcrLoading(false);
+    }
+  }
+
   function doSwitchMode(m: CanvasMode) {
     setCanvasMode(m);
     setCropSelection(null); setCropLive(null);
@@ -1565,6 +1586,13 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           { type: "separator" },
           { label: "Fill Form",             action: () => togglePanel("form"),           disabled: !hasDoc },
           { label: "Export to Images",       action: () => togglePanel("pdf-to-images"), disabled: !hasDoc },
+          { type: "separator" },
+          { label: ocrLoading ? "Running OCR…" : "Make Searchable (OCR)",
+            action: () => handleOcr(),
+            disabled: !hasDoc || ocrLoading },
+          { label: "Edit Table of Contents",
+            action: () => setTocEditorOpen(true),
+            disabled: !hasDoc },
         ],
       },
       {
@@ -2490,6 +2518,19 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
         <KeyboardCheatSheet onClose={() => setCheatSheetOpen(false)} />
       )}
 
+      {/* ── TOC editor dialog (B12) ───────────────────────────────────────────── */}
+      {tocEditorOpen && workingFile && (
+        <TocEditorDialog
+          file={workingFile}
+          pageCount={pdf?.numPages ?? 0}
+          onSave={async (blob) => {
+            setTocEditorOpen(false);
+            await applyBlob(blob);
+          }}
+          onClose={() => setTocEditorOpen(false)}
+        />
+      )}
+
       {/* ── Command palette ───────────────────────────────────────────────────── */}
       {paletteOpen && pdf && (
         <CommandPalette
@@ -2700,6 +2741,8 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
       { id: "fill-form",    label: "Fill Form",         description: "Fill in PDF form fields",       category: "Tools",      action: () => { togglePanel("form"); setPaletteOpen(false); } },
       { id: "minimap",      label: "Toggle mini-map",   description: "Show/hide the page-position strip", category: "Navigation", action: () => { setMiniMapVisible(v => !v); setPaletteOpen(false); } },
       { id: "settings",     label: "Preferences",       description: "Author name, colour labels",    category: "Tools",      action: () => { openSettings(); setPaletteOpen(false); } },
+      { id: "ocr",          label: "Make Searchable (OCR)", description: "Run Tesseract OCR on scanned pages", category: "Tools", action: () => { setPaletteOpen(false); handleOcr(); } },
+      { id: "toc-edit",     label: "Edit Table of Contents", description: "Add, rename or reorder TOC entries", category: "Tools", action: () => { setPaletteOpen(false); setTocEditorOpen(true); } },
       { id: "export",       label: "Export report",     description: "Download annotations as .md",   category: "Export",     action: () => { downloadAnnotationReport([...bakedAnnotations, ...annotations], filename); setPaletteOpen(false); } },
       ...(workingBlob ? [{
         id: "download", label: "Download PDF", description: "Save modified PDF (Ctrl+S)", category: "Export",

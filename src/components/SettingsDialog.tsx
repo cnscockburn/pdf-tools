@@ -451,6 +451,66 @@ export default function SettingsDialog({ settings, onUpdate, onClose }: Props) {
               </div>
             </div>
           </section>
+
+          {/* ── Keyboard Shortcuts (B9) ─────────────────────────────────────── */}
+          <section>
+            <SectionLabel>Keyboard shortcuts</SectionLabel>
+            <p className="text-[11px] text-stone-500 mb-3 leading-relaxed">
+              All viewer shortcuts. Press <kbd className="bg-stone-800 border border-stone-600 rounded px-1 py-px text-[10px]">?</kbd> inside the viewer to open this reference as a floating cheat sheet.
+            </p>
+            {[
+              { group: "Navigation", rows: [
+                { key: "Arrow keys / Page Up/Down", desc: "Previous / next page" },
+                { key: "Home / End",                desc: "First / last page" },
+                { key: "+ / −",                     desc: "Zoom in / out" },
+                { key: "Ctrl+0",                    desc: "Reset zoom to 100%" },
+                { key: "Ctrl+F",                    desc: "Search text in document" },
+                { key: "Ctrl+G / Ctrl+Shift+G",     desc: "Jump to next / previous search result" },
+              ]},
+              { group: "Tools", rows: [
+                { key: "A",         desc: "Annotate mode" },
+                { key: "R",         desc: "Redact mode" },
+                { key: "C",         desc: "Crop mode" },
+                { key: "Escape",    desc: "Return to view mode" },
+                { key: "Ctrl+Z",    desc: "Undo last annotation" },
+                { key: "Ctrl+Y",    desc: "Redo annotation" },
+                { key: "Ctrl+S",    desc: "Save / download PDF" },
+                { key: "Ctrl+O",    desc: "Open another PDF" },
+                { key: "Ctrl+P",    desc: "Print" },
+              ]},
+              { group: "Annotations", rows: [
+                { key: "H",         desc: "Highlight sub-mode" },
+                { key: "N",         desc: "Note sub-mode" },
+                { key: "T",         desc: "Text box (freetext) sub-mode" },
+                { key: "D",         desc: "Drawing (ink) sub-mode" },
+                { key: "Shift+H",   desc: "Toggle annotation visibility" },
+                { key: "Delete",    desc: "Delete selected annotation" },
+              ]},
+              { group: "Interface", rows: [
+                { key: "Ctrl+Shift+P", desc: "Open command palette" },
+                { key: "?",            desc: "Show keyboard cheat sheet" },
+                { key: "Ctrl+T",       desc: "New tab" },
+                { key: "Ctrl+W",       desc: "Close active tab" },
+                { key: "Ctrl+Tab",     desc: "Switch to next tab" },
+                { key: "Ctrl+\\",      desc: "Toggle side-by-side view" },
+              ]},
+            ].map(({ group, rows }) => (
+              <div key={group} className="mb-4">
+                <p className="text-[10px] font-semibold text-stone-500 uppercase tracking-wider mb-1.5">{group}</p>
+                <div className="rounded-lg border border-stone-700 overflow-hidden">
+                  {rows.map(({ key, desc }, i) => (
+                    <div key={key} className={cn(
+                      "flex items-center justify-between gap-3 px-3 py-1.5 text-xs",
+                      i % 2 === 0 ? "bg-stone-800/50" : "bg-transparent",
+                    )}>
+                      <kbd className="font-mono text-[10px] text-stone-300 whitespace-nowrap">{key}</kbd>
+                      <span className="text-stone-400 text-right leading-snug">{desc}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </section>
         </div>
 
         {/* Footer */}

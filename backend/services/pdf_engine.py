@@ -789,3 +789,61 @@ def annotation_report(file_bytes: bytes, annotations: list[dict]) -> bytes:
     report.save(buf)
     report.close()
     return buf.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# OCR — make scanned PDFs searchable (B3)
+# ---------------------------------------------------------------------------
+
+def ocr_pdf(file_bytes: bytes) -> bytes:
+    """Run Tesseract OCR on unrecognised pages to produce a searchable PDF.
+
+    Only pages with no extractable text layer are processed, so already-digital
+    PDFs are returned unchanged. Caller must verify Tesseract is on PATH first.
+    """
+    doc = _open(file_bytes)
+    try:
+        for page in doc:
+            # Skip pages that already have text — only OCR blank/image pages.
+            if not page.get_text("text").strip():
+                try:
+                    page.apply_ocr(language="eng", dpi=300, full=False, colorize=False)
+                except Exception:
+                    pass  # Non-critical: skip pages where OCR fails
+        return _save(doc)
+    finally:
+        doc.close()
+
+
+# ---------------------------------------------------------------------------
+# TOC / Outline editor (B12)
+# ---------------------------------------------------------------------------
+
+def read_toc(file_bytes: bytes) -> list[dict]:
+    """Return the PDF table-of-contents as [{level, title, page}, …].
+
+    ``level`` is 1-indexed (1 = top-level chapter, 2 = section, …).
+    ``page`` is 1-indexed. Returns [] if the PDF has no outline.
+    """
+    doc = _open(file_bytes)
+    try:
+        toc = doc.get_toc()  # [[level, title, page], …]
+        return [{"level": lvl, "title": title, "page": page}
+                for lvl, title, page in toc]
+    finally:
+        doc.close()
+
+
+def update_toc(file_bytes: bytes, entries: list[dict]) -> bytes:
+    """Embed a new table-of-contents and return the updated PDF bytes.
+
+    Clears the existing outline and replaces it with ``entries``. Each entry
+    must have ``level`` (1-6), ``title`` (str), and ``page`` (int, 1-indexed).
+    """
+    doc = _open(file_bytes)
+    try:
+        toc = [[e["level"], e["title"], e["page"]] for e in entries]
+        doc.set_toc(toc)
+        return _save(doc)
+    finally:
+        doc.close()

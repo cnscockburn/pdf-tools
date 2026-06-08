@@ -298,6 +298,49 @@ export async function fillForm(file: File, values: Record<string, string>): Prom
   return handleResponse(await apiFetch(await apiUrl("/fill-form"), { method: "POST", body: form }));
 }
 
+// ── OCR (B3) ─────────────────────────────────────────────────────────────────
+
+/** Run Tesseract OCR on scanned pages; returns a searchable PDF blob.
+ *  Throws a human-readable error if Tesseract is not installed (503). */
+export async function ocrPDF(file: File): Promise<Blob> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await apiFetch(await apiUrl("/ocr"), { method: "POST", body: form });
+  if (res.status === 503) {
+    const body = await res.json().catch(() => null) as { detail?: string } | null;
+    throw new Error(body?.detail ?? "Tesseract OCR is not installed on this system.");
+  }
+  return handleResponse(res);
+}
+
+// ── TOC editor (B12) ─────────────────────────────────────────────────────────
+
+export interface TocEntry {
+  /** Nesting depth: 1 = chapter, 2 = section, … up to 6. */
+  level: number;
+  title: string;
+  /** 1-indexed page number. */
+  page: number;
+}
+
+/** Fetch the TOC / outline from a PDF. Returns [] if there is no outline. */
+export async function getToc(file: File): Promise<TocEntry[]> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await apiFetch(await apiUrl("/toc/read"), { method: "POST", body: form });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json() as { entries: TocEntry[] };
+  return json.entries ?? [];
+}
+
+/** Apply an updated TOC to a PDF and return the new PDF as a Blob. */
+export async function setToc(file: File, entries: TocEntry[]): Promise<Blob> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("entries", JSON.stringify(entries));
+  return handleResponse(await apiFetch(await apiUrl("/toc/update"), { method: "POST", body: form }));
+}
+
 /** Generate a formatted PDF annotation report for the given document + annotations. */
 export async function annotationReportPdf(
   file: File,
