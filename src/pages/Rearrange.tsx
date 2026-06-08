@@ -58,14 +58,15 @@ function SortablePage({
   let imgStyle: React.CSSProperties;
 
   if (isOdd && aspect !== null) {
-    // Rotated: visual footprint is (TILE_W * aspect) × TILE_W
-    const displayW = Math.round(TILE_W * aspect);
-    const imgH     = Math.round(TILE_W * aspect);
-    imgContainerStyle = { width: displayW, height: TILE_W, position: "relative", overflow: "hidden" };
+    // Rotated: visual footprint is (TILE_W * aspect) wide × TILE_W tall.
+    // The image itself is TILE_W × rotatedDim in its local (pre-rotation) space;
+    // after rotate(90/270), it becomes rotatedDim wide × TILE_W tall on screen.
+    const rotatedDim = Math.round(TILE_W * aspect);
+    imgContainerStyle = { width: rotatedDim, height: TILE_W, position: "relative", overflow: "hidden" };
     imgStyle = {
       position:  "absolute",
       width:     TILE_W,
-      height:    imgH,
+      height:    rotatedDim,
       top:       "50%",
       left:      "50%",
       transform: `translate(-50%, -50%) rotate(${item.rotate}deg)`,
@@ -160,7 +161,6 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
   // A3: set of positions (0-indexed "after page i") where split dividers are placed.
   // E.g. {1} means "split after the first page in the current plan" (plan[1] starts part 2).
   const [dividers, setDividers] = useState<Set<number>>(new Set());
-  const [hoveredGap, setHoveredGap] = useState<number | null>(null);
 
   const { thumbnails, pageCount } = usePdfThumbnails(file);
   const sensors = useSensors(
@@ -230,6 +230,8 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
         const newIdx = items.findIndex(t => t.id === String(over.id));
         return arrayMove(items, oldIdx, newIdx);
       });
+      // Split-line positions are plan indices; they become stale after a reorder.
+      setDividers(new Set());
     }
   }
 
@@ -390,27 +392,25 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
                       {/* Split divider zone after this page (not after the last) */}
                       {idx < plan.length - 1 && (
                         <div
-                          className="relative w-8 flex-shrink-0 flex items-center justify-center cursor-pointer select-none"
-                          onMouseEnter={() => setHoveredGap(idx)}
-                          onMouseLeave={() => setHoveredGap(null)}
+                          className="group/gap relative w-8 flex-shrink-0 flex items-center justify-center cursor-pointer select-none"
                           onClick={() => toggleDivider(idx)}
                           title={dividers.has(idx) ? "Remove split here" : "Add split here"}
                         >
-                          {/* Vertical line */}
+                          {/* Vertical line — always visible when a divider is set; fades in on hover */}
                           <div className={cn(
                             "absolute left-1/2 -translate-x-1/2 w-0.5 rounded-full transition-all duration-150 pointer-events-none",
-                            hoveredGap === idx || dividers.has(idx) ? "opacity-100" : "opacity-0",
-                            dividers.has(idx) ? "inset-y-0 bg-amber-500" : "inset-y-3 bg-stone-400",
+                            dividers.has(idx)
+                              ? "inset-y-0 bg-amber-500 opacity-100"
+                              : "inset-y-3 bg-stone-400 opacity-0 group-hover/gap:opacity-100",
                           )} />
                           {/* Circle button */}
                           <div className={cn(
                             "relative z-10 w-5 h-5 rounded-full flex items-center justify-center",
                             "text-[11px] font-bold leading-none shadow-md",
                             "transition-all duration-150 pointer-events-none",
-                            hoveredGap === idx || dividers.has(idx) ? "opacity-100 scale-100" : "opacity-0 scale-75",
                             dividers.has(idx)
-                              ? "bg-amber-500 text-white"
-                              : "bg-stone-700 border border-stone-500 text-stone-200",
+                              ? "opacity-100 scale-100 bg-amber-500 text-white"
+                              : "opacity-0 scale-75 group-hover/gap:opacity-100 group-hover/gap:scale-100 bg-stone-700 border border-stone-500 text-stone-200",
                           )}>
                             {dividers.has(idx) ? "×" : "+"}
                           </div>

@@ -39,8 +39,8 @@ const STEP_PX     = 10;   // ideal pixels per page (for width sizing)
 const MIN_STRIP_W = 440;  // minimum strip width ≈ floating toolbar width
 
 const ACCENTS = {
-  amber: { strong: "#d97706", soft: "rgba(217,119,6,0.55)", pip: "#fbbf24" },
-  cyan:  { strong: "#06b6d4", soft: "rgba(6,182,212,0.55)", pip: "#22d3ee" },
+  amber: { strong: "#d97706", pip: "#fbbf24" },
+  cyan:  { strong: "#06b6d4", pip: "#22d3ee" },
 };
 
 export default function MiniMap({
@@ -58,6 +58,10 @@ export default function MiniMap({
   const draggingRef      = useRef(false);
   const animRunningRef   = useRef(false);
   const lastNavPageRef   = useRef<number | null>(null); // last page navigated during drag
+  // Keep reduceMotion in a ref so the RAF loop always reads the current value
+  // without needing to be recreated when the prop changes.
+  const reduceMotionRef  = useRef(!!reduceMotion);
+  useEffect(() => { reduceMotionRef.current = !!reduceMotion; }, [reduceMotion]);
 
   const [, force]         = useState(0);
   const rafRef            = useRef(0);
@@ -156,8 +160,8 @@ export default function MiniMap({
     animRunningRef.current = true;
 
     function loop() {
-      const targetHover   = hoverFracRef.current;
-      const targetAmpl    = (targetHover !== null && !reduceMotion) ? 1 : 0;
+      const targetHover = hoverFracRef.current;
+      const targetAmpl  = (targetHover !== null && !reduceMotionRef.current) ? 1 : 0;
 
       // Lerp wave amplitude.
       const amplSpeed = targetAmpl > waveAmplRef.current ? 0.14 : 0.10;
@@ -179,15 +183,15 @@ export default function MiniMap({
 
       drawRef.current();
 
-      // Continue while amplitude hasn't settled OR cursor is actively present
-      // (so the wave stays fully deployed while hovering, not just on entry).
-      const amplUnsettled   = Math.abs(waveAmplRef.current - targetAmpl) > 0.004;
-      const posUnsettled    = targetHover !== null &&
-                              renderedHoverRef.current !== null &&
-                              Math.abs(renderedHoverRef.current - targetHover) > 0.0005;
-      const hoverActive     = targetHover !== null; // keep loop alive while hovering
+      // Stop once amplitude and position have both settled.
+      // onPointerMove re-calls startAnim() for each cursor movement, so the
+      // wave position stays current without a perpetual 60fps idle loop.
+      const amplUnsettled = Math.abs(waveAmplRef.current - targetAmpl) > 0.004;
+      const posUnsettled  = targetHover !== null &&
+                            renderedHoverRef.current !== null &&
+                            Math.abs(renderedHoverRef.current - targetHover) > 0.0005;
 
-      if (amplUnsettled || posUnsettled || hoverActive) {
+      if (amplUnsettled || posUnsettled) {
         rafRef.current = requestAnimationFrame(loop);
       } else {
         animRunningRef.current = false;
@@ -196,7 +200,7 @@ export default function MiniMap({
     }
 
     rafRef.current = requestAnimationFrame(loop);
-  }, [reduceMotion]); // no draw dep needed — we use drawRef
+  }, []); // stable — all values read via refs (drawRef, reduceMotionRef, hoverFracRef, etc.)
 
   // ── Thumbnail on settle ────────────────────────────────────────────────────
   const requestThumb = useCallback(async (page: number) => {
@@ -276,12 +280,16 @@ export default function MiniMap({
   }
 
   function onPointerUp(e: React.PointerEvent) {
-    const wasDragging = draggingRef.current;
-    draggingRef.current  = false;
+    const wasDragging  = draggingRef.current;
+    const didLiveScrub = lastNavPageRef.current !== null;
+    draggingRef.current    = false;
     lastNavPageRef.current = null;
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
-    // If the user only clicked (no drag movement), navigate on release.
-    if (wasDragging && hoverFracRef.current !== null) {
+    // Navigate on release only when no live scrub happened (i.e. the user
+    // clicked without dragging). If they dragged, the scrub already called
+    // onGoTo for every page crossing — firing it again on release is a no-op
+    // at best and double-navigation at worst.
+    if (wasDragging && !didLiveScrub && hoverFracRef.current !== null) {
       onGoTo(pageFromFrac(hoverFracRef.current));
     }
   }

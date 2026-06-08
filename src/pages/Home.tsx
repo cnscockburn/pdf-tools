@@ -188,8 +188,9 @@ export default function Home() {
       <div className="flex-1 flex flex-col items-center justify-center overflow-auto px-6 py-10">
         <div className="w-full max-w-2xl flex flex-col items-center gap-8">
 
-          {/* ── Primary: two-column intake ────────────────────────────────── */}
-          <div className="w-full flex flex-col sm:flex-row gap-3">
+          {/* ── Primary: intake block (two columns + chips) ──────────────── */}
+          <div className="w-full flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row gap-3">
 
             {/* Left — viewer drop zone */}
             <div className="flex-[3] min-w-0">
@@ -242,7 +243,7 @@ export default function Home() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-stone-700 app-dark:text-stone-200 group-hover:text-stone-900 app-dark:group-hover:text-white transition-colors">
-                    Organise &amp; Split
+                    Organise & Split
                   </p>
                   <p className="mt-1 text-xs text-stone-400 app-dark:text-stone-500 leading-snug">
                     Reorder, rotate, delete, or split pages
@@ -253,7 +254,7 @@ export default function Home() {
           </div>
 
           {/* Capability shortcut chips */}
-          <div className="flex items-center justify-center gap-2 -mt-4">
+          <div className="flex items-center justify-center gap-2">
             {capabilities.map((cap, i) => (
               <button
                 key={i}
@@ -267,6 +268,7 @@ export default function Home() {
               </button>
             ))}
           </div>
+          </div>{/* end intake block */}
 
           {/* ── Recent files (Tauri — reopened by stored path) ─────────────── */}
           {recents.length > 0 && (

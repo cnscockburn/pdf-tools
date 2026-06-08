@@ -5,4 +5,5 @@ title = "Stria gitleaks config"
 
 [[allowlists]]
 description = "Keyboard shortcut strings in cheat sheet — high-entropy shortcut keys (e.g. Ctrl+Shift+Tab) trigger the generic-api-key rule as false positives"
-paths = ["src/components/KeyboardCheatSheet.tsx"]
+paths        = ["src/components/KeyboardCheatSheet.tsx"]
+stopwords    = ["Ctrl+Shift", "Ctrl+Alt", "Shift+Tab"]
