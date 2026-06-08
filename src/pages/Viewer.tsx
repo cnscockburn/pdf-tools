@@ -1061,10 +1061,11 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
   async function handleOcr() {
     if (!workingFile || ocrLoading) return;
     setOcrLoading(true);
+    showToast("Running OCR; this may take a moment...");
     try {
       const blob = await ocrPDF(workingFile);
       await applyBlob(blob);
-      showToast("OCR complete — document is now searchable.");
+      showToast("OCR complete. Document is now searchable.");
     } catch (e) {
       showToast(e instanceof Error ? e.message : "OCR failed.");
     } finally {

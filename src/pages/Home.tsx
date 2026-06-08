@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import {
-  Layers, Scissors, Minimize2, EyeOff, LayoutGrid, FileImage,
+  Layers, Minimize2, EyeOff, LayoutGrid, FileImage,
   Keyboard, Columns, MessageSquare, ShieldCheck, X, FileText, Clock, Package,
 } from "lucide-react";
 import { cn, formatBytes } from "../lib/utils";
@@ -16,23 +16,42 @@ import striaLogo from "../assets/stria-logo.png";
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
 
+// Badge color per tool — amber for primary document ops, slate for conversion,
+// teal for security/redact, indigo for organisation.
+type BadgeColor = "amber" | "rose" | "teal" | "indigo" | "slate" | "violet";
+
 type ToolDef = {
   id: string;
   title: string;
   description: string;
   icon: React.ReactNode;
+  badge: BadgeColor;
   tabType?: TabType;
   needsFile?: true;
   toolHint?: string;
 };
 
+// Badge color classes at rest (bg + text) — spec calls for colored at rest.
+const BADGE_CLASSES: Record<BadgeColor, string> = {
+  amber:  "bg-amber-100 text-amber-600 app-dark:bg-amber-900/40 app-dark:text-amber-400",
+  rose:   "bg-rose-100 text-rose-600 app-dark:bg-rose-900/40 app-dark:text-rose-400",
+  teal:   "bg-teal-100 text-teal-600 app-dark:bg-teal-900/40 app-dark:text-teal-400",
+  indigo: "bg-indigo-100 text-indigo-600 app-dark:bg-indigo-900/40 app-dark:text-indigo-400",
+  slate:  "bg-slate-100 text-slate-500 app-dark:bg-slate-800/60 app-dark:text-slate-400",
+  violet: "bg-violet-100 text-violet-600 app-dark:bg-violet-900/40 app-dark:text-violet-400",
+};
+
 // Most-used operations first so the grid scans in frequency order.
+// "Split" is removed — it opened the same Rearrange tab as "Organize" with no
+// explanation, creating a false-promise duplicate. The split-divider feature
+// is discoverable inside the Organize page.
 const TOOLS: ToolDef[] = [
   {
     id: "merge",
     title: "Merge",
     description: "Combine multiple PDFs into one",
     icon: <Layers className="h-[15px] w-[15px]" />,
+    badge: "amber",
     tabType: "merge",
   },
   {
@@ -40,6 +59,7 @@ const TOOLS: ToolDef[] = [
     title: "Compress",
     description: "Reduce file size",
     icon: <Minimize2 className="h-[15px] w-[15px]" />,
+    badge: "slate",
     needsFile: true,
     toolHint: "compress",
   },
@@ -48,21 +68,16 @@ const TOOLS: ToolDef[] = [
     title: "Redact",
     description: "Remove sensitive content",
     icon: <EyeOff className="h-[15px] w-[15px]" />,
+    badge: "rose",
     needsFile: true,
     toolHint: "redact",
   },
   {
-    id: "split",
-    title: "Split",
-    description: "Divide into parts",
-    icon: <Scissors className="h-[15px] w-[15px]" />,
-    tabType: "rearrange",  // Opens Organise — click gaps between pages to place split lines
-  },
-  {
     id: "organize",
-    title: "Organize",
-    description: "Reorder, rotate, delete pages",
+    title: "Organize & Split",
+    description: "Reorder, rotate, delete, or split pages",
     icon: <LayoutGrid className="h-[15px] w-[15px]" />,
+    badge: "indigo",
     tabType: "rearrange",
   },
   {
@@ -70,6 +85,7 @@ const TOOLS: ToolDef[] = [
     title: "Images to PDF",
     description: "Turn images into a PDF",
     icon: <FileImage className="h-[15px] w-[15px]" />,
+    badge: "teal",
     tabType: "images-to-pdf",
   },
   {
@@ -77,6 +93,7 @@ const TOOLS: ToolDef[] = [
     title: "Batch",
     description: "Process many PDFs at once",
     icon: <Package className="h-[15px] w-[15px]" />,
+    badge: "violet",
     tabType: "batch",
   },
 ];
@@ -295,9 +312,8 @@ export default function Home() {
                 >
                   <div className={cn(
                     "shrink-0 w-8 h-8 rounded-lg flex items-center justify-center",
-                    "bg-stone-100 text-stone-400 transition-colors duration-150",
-                    "app-dark:bg-stone-800 app-dark:text-stone-500",
-                    "group-hover:bg-amber-50 group-hover:text-amber-600 app-dark:group-hover:bg-brand-950/50",
+                    "transition-[background-color,color] duration-150",
+                    BADGE_CLASSES[tool.badge],
                   )}>
                     {tool.icon}
                   </div>
@@ -320,7 +336,7 @@ export default function Home() {
             className="group flex items-center gap-1.5 text-[10px] text-stone-400 hover:text-stone-600 app-dark:hover:text-stone-200 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded px-2 py-1"
           >
             <ShieldCheck className="h-3 w-3 text-stone-300 app-dark:text-stone-600 group-hover:text-green-600 transition-colors" />
-            Everything runs on your machine — nothing is uploaded.
+            Everything runs on your machine; nothing is uploaded.
             <span className="underline decoration-dotted underline-offset-2">How it works</span>
           </button>
         </div>

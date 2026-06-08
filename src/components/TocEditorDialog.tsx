@@ -150,7 +150,7 @@ export default function TocEditorDialog({ file, pageCount, onSave, onClose }: Pr
           <div>
             <h2 className="text-sm font-semibold text-white">Edit Table of Contents</h2>
             <p className="text-[11px] text-stone-500 mt-0.5">
-              {entries.length} entr{entries.length !== 1 ? "ies" : "y"} · saving will replace the current outline
+              {entries.length} entr{entries.length !== 1 ? "ies" : "y"} · Saving will replace the current outline
             </p>
           </div>
           <button
@@ -186,11 +186,27 @@ export default function TocEditorDialog({ file, pageCount, onSave, onClose }: Pr
           {!loading && entries.map((entry, idx) => (
             <div
               key={entry.id}
-              className="group flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-stone-800/60 transition"
-              style={{ paddingLeft: `${8 + (entry.level - 1) * 16}px` }}
+              className="group flex items-center gap-2 rounded-lg py-1 hover:bg-stone-800/60 transition"
+              // Left padding creates visual indentation; the amber guide line reinforces depth
+              style={{ paddingLeft: `${8 + (entry.level - 1) * 18}px`, paddingRight: "8px" }}
             >
-              {/* Level indicator */}
-              <span className="shrink-0 text-[9px] font-mono text-stone-600 w-5 text-center">
+              {/* Depth guide line — amber, fades with depth */}
+              {entry.level > 1 && (
+                <span
+                  className="shrink-0 self-stretch w-0.5 rounded-full mr-1"
+                  style={{ background: `rgba(217,119,6,${Math.max(0.15, 0.7 - (entry.level - 2) * 0.15)})` }}
+                  aria-hidden="true"
+                />
+              )}
+
+              {/* Level pill — always visible, readable contrast */}
+              <span
+                className="shrink-0 text-[9px] font-semibold rounded px-1 py-px leading-none tabular-nums"
+                style={{
+                  background: entry.level === 1 ? "rgba(217,119,6,0.2)" : "rgba(87,83,78,0.5)",
+                  color: entry.level === 1 ? "#fbbf24" : "#a8a29e",
+                }}
+              >
                 L{entry.level}
               </span>
 
@@ -217,29 +233,14 @@ export default function TocEditorDialog({ file, pageCount, onSave, onClose }: Pr
                 />
               </div>
 
-              {/* Controls — shown on hover */}
-              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                <button
-                  onClick={() => changeLevel(entry.id, -1)}
-                  disabled={entry.level <= 1}
-                  title="Decrease indent (promote)"
-                  className="rounded p-1 text-stone-500 hover:text-stone-200 hover:bg-stone-700 disabled:opacity-30 transition"
-                >
-                  <ChevronRight className="h-3 w-3 rotate-180" />
-                </button>
-                <button
-                  onClick={() => changeLevel(entry.id, 1)}
-                  disabled={entry.level >= 6}
-                  title="Increase indent (demote)"
-                  className="rounded p-1 text-stone-500 hover:text-stone-200 hover:bg-stone-700 disabled:opacity-30 transition"
-                >
-                  <ChevronRight className="h-3 w-3" />
-                </button>
+              {/* Controls — reorder always visible; indent/delete show on hover */}
+              <div className="flex items-center gap-0.5 shrink-0">
+                {/* Move up/down — always shown so keyboard users can navigate */}
                 <button
                   onClick={() => moveEntry(entry.id, -1)}
                   disabled={idx === 0}
                   title="Move up"
-                  className="rounded p-1 text-stone-500 hover:text-stone-200 hover:bg-stone-700 disabled:opacity-30 transition"
+                  className="rounded p-1 text-stone-500 hover:text-stone-200 hover:bg-stone-700 disabled:opacity-20 transition"
                 >
                   <ArrowUp className="h-3 w-3" />
                 </button>
@@ -247,9 +248,27 @@ export default function TocEditorDialog({ file, pageCount, onSave, onClose }: Pr
                   onClick={() => moveEntry(entry.id, 1)}
                   disabled={idx === entries.length - 1}
                   title="Move down"
-                  className="rounded p-1 text-stone-500 hover:text-stone-200 hover:bg-stone-700 disabled:opacity-30 transition"
+                  className="rounded p-1 text-stone-500 hover:text-stone-200 hover:bg-stone-700 disabled:opacity-20 transition"
                 >
                   <ArrowDown className="h-3 w-3" />
+                </button>
+                {/* Indent/promote + insert + delete — appear on hover */}
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={() => changeLevel(entry.id, -1)}
+                  disabled={entry.level <= 1}
+                  title="Promote (decrease indent)"
+                  className="rounded p-1 text-stone-500 hover:text-stone-200 hover:bg-stone-700 disabled:opacity-20 transition"
+                >
+                  <ChevronRight className="h-3 w-3 rotate-180" />
+                </button>
+                <button
+                  onClick={() => changeLevel(entry.id, 1)}
+                  disabled={entry.level >= 6}
+                  title="Demote (increase indent)"
+                  className="rounded p-1 text-stone-500 hover:text-stone-200 hover:bg-stone-700 disabled:opacity-20 transition"
+                >
+                  <ChevronRight className="h-3 w-3" />
                 </button>
                 <button
                   onClick={() => addEntry(entry.id)}
@@ -265,6 +284,7 @@ export default function TocEditorDialog({ file, pageCount, onSave, onClose }: Pr
                 >
                   <Trash2 className="h-3 w-3" />
                 </button>
+                </div>
               </div>
             </div>
           ))}

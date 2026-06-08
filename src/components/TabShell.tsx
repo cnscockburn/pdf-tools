@@ -20,6 +20,7 @@ import { onWindowFileDrop, openPathAsFile } from "../lib/fileIntake";
 import { listRecovery, deleteRecovery } from "../lib/autoSave";
 import TabBar from "./TabBar";
 import SettingsDialog from "./SettingsDialog";
+import KeyboardCheatSheet from "./KeyboardCheatSheet";
 import Home from "../pages/Home";
 import Viewer from "../pages/Viewer";
 import Merge from "../pages/Merge";
@@ -60,6 +61,8 @@ export default function TabShell() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const openSettings  = useCallback(() => setSettingsOpen(true),  []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  // Shell-level cheat sheet so it's reachable from Settings (and Home tab) too.
+  const [shellCheatSheetOpen, setShellCheatSheetOpen] = useState(false);
 
   // Apply reduce-motion class to <html> globally
   useEffect(() => {
@@ -360,7 +363,13 @@ export default function TabShell() {
           settings={settings}
           onUpdate={updateSettings}
           onClose={closeSettings}
+          onOpenCheatSheet={() => { closeSettings(); setShellCheatSheetOpen(true); }}
         />
+      )}
+
+      {/* Shell-level cheat sheet — reachable from Settings and Home */}
+      {shellCheatSheetOpen && (
+        <KeyboardCheatSheet onClose={() => setShellCheatSheetOpen(false)} />
       )}
 
       {/* ── B10: Recovery restore prompt ────────────────────────────────────── */}

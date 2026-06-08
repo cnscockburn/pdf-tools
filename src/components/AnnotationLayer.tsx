@@ -872,7 +872,7 @@ export default function AnnotationLayer({
               className="w-full rounded border border-stone-600 bg-stone-800 px-1.5 py-1 text-[10px] text-stone-100 resize-none focus:outline-none focus:ring-1 focus:ring-brand-500/50 placeholder:text-stone-500"
             />
             <p className="text-[9px] text-stone-500 leading-snug">
-              Replies are this-session only — they are not saved to the PDF on download.
+              Replies are this-session only; they are not saved to the PDF on download.
             </p>
             <div className="flex gap-1">
               <button onClick={() => addReply(ann)}
@@ -1245,7 +1245,7 @@ export default function AnnotationLayer({
                     <div className="px-2.5 py-2 text-xs leading-snug max-h-28 overflow-y-auto">
                       {ann.text
                         ? <span className="text-stone-200 whitespace-pre-wrap"><MathText text={ann.text} /></span>
-                        : <span className="italic text-stone-600">Empty — double-click to edit</span>
+                        : <span className="italic text-stone-600">Empty. Double-click to edit.</span>
                       }
                     </div>
 

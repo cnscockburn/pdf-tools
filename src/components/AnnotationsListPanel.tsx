@@ -404,7 +404,7 @@ export default function AnnotationsListPanel({
             className="w-full flex items-center gap-2 px-3 py-1.5 text-[10px] text-stone-500 hover:text-stone-300 hover:bg-stone-800/50 transition"
           >
             <span className="font-medium text-stone-400">{annotations.length} annotation{annotations.length !== 1 ? "s" : ""}</span>
-            <span className="text-stone-600">—</span>
+            <span className="text-stone-700">·</span>
             <span>{stats.byStatus.open ?? 0} open</span>
             {(stats.byStatus.resolved ?? 0) > 0 && <span className="text-green-600">{stats.byStatus.resolved} resolved</span>}
             <ChevronDown className={cn("h-3 w-3 ml-auto transition-transform", statsOpen && "rotate-180")} />
@@ -413,7 +413,7 @@ export default function AnnotationsListPanel({
             <div className="px-3 pb-2 space-y-2 text-[10px] text-stone-400">
               {/* By type */}
               <div>
-                <p className="text-stone-600 uppercase tracking-wider mb-1 font-medium">By type</p>
+                <p className="text-stone-400 uppercase tracking-wider mb-1 font-medium">By type</p>
                 <div className="flex flex-wrap gap-1.5">
                   {Object.entries(stats.byType).sort((a,b)=>b[1]-a[1]).map(([t,n]) => (
                     <span key={t} className="flex items-center gap-1 bg-stone-800 rounded px-1.5 py-0.5">
@@ -425,7 +425,7 @@ export default function AnnotationsListPanel({
               {/* By author */}
               {Object.keys(stats.byAuthor).length > 0 && (
                 <div>
-                  <p className="text-stone-600 uppercase tracking-wider mb-1 font-medium">By author</p>
+                  <p className="text-stone-400 uppercase tracking-wider mb-1 font-medium">By author</p>
                   <div className="flex flex-wrap gap-1.5">
                     {Object.entries(stats.byAuthor).sort((a,b)=>b[1]-a[1]).map(([auth,n]) => (
                       <span key={auth} className="bg-stone-800 rounded px-1.5 py-0.5 text-stone-300">
@@ -543,45 +543,44 @@ export default function AnnotationsListPanel({
       </div>
 
       {/* ── Footer — export buttons ──────────────────────────────────────── */}
-      <div className="px-3 py-2.5 border-t border-stone-700 shrink-0 flex flex-col gap-1.5">
-        <div className="flex gap-1.5">
-          <button
-            onClick={onExportReport}
-            className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 px-2 py-1.5 text-xs text-stone-300 hover:text-white transition"
-            title="Export as Markdown document"
-          >
-            <FileText className="h-3.5 w-3.5" />
-            Report (.md)
-          </button>
-          {onExportReportPdf && (
-            <button
-              onClick={onExportReportPdf}
-              className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 px-2 py-1.5 text-xs text-stone-300 hover:text-white transition"
-              title="Export as formatted PDF with thumbnails"
-            >
-              <FileText className="h-3.5 w-3.5" />
-              Report (.pdf)
-            </button>
-          )}
-        </div>
-        {(onExportCsv || onExportJson) && (
+      <div className="px-3 py-2.5 border-t border-stone-700 shrink-0 space-y-1.5">
+        {/* Primary action — Markdown report */}
+        <button
+          onClick={onExportReport}
+          className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 px-2 py-1.5 text-xs font-semibold text-white transition"
+          title="Export review report as Markdown"
+        >
+          <FileText className="h-3.5 w-3.5" />
+          Export Report (.md)
+        </button>
+        {/* Secondary formats — smaller, neutral */}
+        {(onExportReportPdf || onExportCsv || onExportJson) && (
           <div className="flex gap-1.5">
+            {onExportReportPdf && (
+              <button
+                onClick={onExportReportPdf}
+                className="flex-1 rounded-lg bg-stone-800 hover:bg-stone-700 px-2 py-1.5 text-[11px] text-stone-400 hover:text-stone-100 transition"
+                title="Export as formatted PDF with thumbnails"
+              >
+                Report (.pdf)
+              </button>
+            )}
             {onExportCsv && (
               <button
                 onClick={onExportCsv}
-                className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-stone-800 hover:bg-stone-700 px-2 py-1.5 text-[11px] text-stone-400 hover:text-white transition"
-                title="Export as CSV spreadsheet"
+                className="flex-1 rounded-lg bg-stone-800 hover:bg-stone-700 px-2 py-1.5 text-[11px] text-stone-400 hover:text-stone-100 transition"
+                title="Export annotation data as CSV spreadsheet"
               >
-                .csv
+                Data (.csv)
               </button>
             )}
             {onExportJson && (
               <button
                 onClick={onExportJson}
-                className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-stone-800 hover:bg-stone-700 px-2 py-1.5 text-[11px] text-stone-400 hover:text-white transition"
-                title="Export as JSON"
+                className="flex-1 rounded-lg bg-stone-800 hover:bg-stone-700 px-2 py-1.5 text-[11px] text-stone-400 hover:text-stone-100 transition"
+                title="Export annotation data as JSON"
               >
-                .json
+                Data (.json)
               </button>
             )}
           </div>
