@@ -93,9 +93,10 @@ interface Props {
   onGoTo:           (page: number) => void;
   onDelete:         (id: AnnotId) => void;
   onStatusChange:   (id: AnnotId, status: AnnotStatus) => void;
-  onExportReport:   () => void;
-  onExportCsv?:     () => void;
-  onExportJson?:    () => void;
+  onExportReport:      () => void;
+  onExportReportPdf?:  () => void;
+  onExportCsv?:        () => void;
+  onExportJson?:       () => void;
   onFocusAnnot?:    (id: AnnotId) => void;
   onEditAnnot?:     (id: AnnotId) => void;
   /** Active annotation id — highlighted in the list (P1-11 / UX-11) */
@@ -108,7 +109,7 @@ interface Props {
 
 export default function AnnotationsListPanel({
   annotations, currentPage, onGoTo, onFocusAnnot, onEditAnnot, onDelete, onStatusChange,
-  onExportReport, onExportCsv, onExportJson,
+  onExportReport, onExportReportPdf, onExportCsv, onExportJson,
   focusAnnotId, colorLabels,
 }: Props) {
   const [filterStatus,  setFilterStatus]  = useState<FilterStatus>("all");
@@ -543,14 +544,26 @@ export default function AnnotationsListPanel({
 
       {/* ── Footer — export buttons ──────────────────────────────────────── */}
       <div className="px-3 py-2.5 border-t border-stone-700 shrink-0 flex flex-col gap-1.5">
-        <button
-          onClick={onExportReport}
-          className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 px-3 py-1.5 text-xs text-stone-300 hover:text-white transition"
-          title="Export as Markdown document"
-        >
-          <FileText className="h-3.5 w-3.5" />
-          Export report (.md)
-        </button>
+        <div className="flex gap-1.5">
+          <button
+            onClick={onExportReport}
+            className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 px-2 py-1.5 text-xs text-stone-300 hover:text-white transition"
+            title="Export as Markdown document"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            Report (.md)
+          </button>
+          {onExportReportPdf && (
+            <button
+              onClick={onExportReportPdf}
+              className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 px-2 py-1.5 text-xs text-stone-300 hover:text-white transition"
+              title="Export as formatted PDF with thumbnails"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              Report (.pdf)
+            </button>
+          )}
+        </div>
         {(onExportCsv || onExportJson) && (
           <div className="flex gap-1.5">
             {onExportCsv && (

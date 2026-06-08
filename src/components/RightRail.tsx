@@ -34,9 +34,10 @@ interface Props {
   onEditAnnot?:    (id: AnnotId) => void;
   onDeleteAnnot:   (id: AnnotId) => void;
   onStatusChange:  (id: AnnotId, status: AnnotStatus) => void;
-  onExportReport:  () => void;
-  onExportCsv?:    () => void;
-  onExportJson?:   () => void;
+  onExportReport:     () => void;
+  onExportReportPdf?: () => void;
+  onExportCsv?:       () => void;
+  onExportJson?:      () => void;
   focusAnnotId?:   AnnotId | null;
   colorLabels?: string[];
   // Outline
@@ -58,7 +59,7 @@ const TABS: { id: RailTab; label: string; Icon: React.ComponentType<{ className?
 
 export default function RightRail({
   annotations, currentPage, onGoToPage, onFocusAnnot, onEditAnnot, onDeleteAnnot, onStatusChange,
-  onExportReport, onExportCsv, onExportJson,
+  onExportReport, onExportReportPdf, onExportCsv, onExportJson,
   focusAnnotId, colorLabels,
   pdf, bookmarks, onAddBookmark, onDeleteBookmark, onRenameBookmark,
   activeTab: controlledTab, onTabChange,
@@ -123,6 +124,7 @@ export default function RightRail({
             onDelete={onDeleteAnnot}
             onStatusChange={onStatusChange}
             onExportReport={onExportReport}
+            onExportReportPdf={onExportReportPdf}
             onExportCsv={onExportCsv}
             onExportJson={onExportJson}
             focusAnnotId={focusAnnotId}

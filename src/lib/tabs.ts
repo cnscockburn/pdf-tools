@@ -8,7 +8,7 @@ import { createContext, useContext } from "react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export type TabType = "home" | "viewer" | "merge" | "rearrange" | "images-to-pdf";
+export type TabType = "home" | "viewer" | "merge" | "rearrange" | "images-to-pdf" | "batch";
 
 export interface Tab {
   id: string;
@@ -94,6 +94,7 @@ const TAB_TYPE_TITLES: Record<TabType, string> = {
   merge: "Merge",
   rearrange: "Rearrange",
   "images-to-pdf": "Images to PDF",
+  "batch": "Batch",
 };
 
 export function defaultTabTitle(type: TabType): string {

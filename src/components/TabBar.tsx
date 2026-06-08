@@ -8,7 +8,7 @@
  */
 import { useEffect } from "react";
 import {
-  Home, FileText, Layers, LayoutGrid, FileImage, Plus, X, Settings,
+  Home, FileText, Layers, LayoutGrid, FileImage, Plus, X, Settings, Package,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import type { Tab, TabType } from "../lib/tabs";
@@ -21,6 +21,7 @@ const TAB_ICONS: Record<TabType, React.ReactNode> = {
   merge:           <Layers    className="h-3 w-3" />,
   rearrange:       <LayoutGrid className="h-3 w-3" />,
   "images-to-pdf": <FileImage className="h-3 w-3" />,
+  "batch":         <Package   className="h-3 w-3" />,
 };
 
 // ── Component ────────────────────────────────────────────────────────────────

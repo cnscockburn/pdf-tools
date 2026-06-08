@@ -78,4 +78,26 @@ describe("mirrorSync", () => {
     expect(listenerB).toHaveBeenCalledWith("for-b", "s2");
     expect(listenerB).not.toHaveBeenCalledWith("for-a", "s1");
   });
+
+  // A2: page navigation events are published through the same channel
+  it("delivers page-navigation events typed with { page }", () => {
+    const listener = vi.fn();
+    subscribe<{ page?: number; annotations?: unknown[]; baked?: unknown[] }>("nav-group", listener);
+    publish("nav-group", "pane-1", { page: 5 });
+    expect(listener).toHaveBeenCalledWith({ page: 5 }, "pane-1");
+  });
+
+  it("listener can distinguish annotation-only vs page-only events", () => {
+    const received: Array<{ page?: number; annotations?: unknown[] }> = [];
+    subscribe<{ page?: number; annotations?: unknown[] }>("g2", (data) => {
+      received.push(data);
+    });
+    publish("g2", "s", { page: 3 });
+    publish("g2", "s", { annotations: [], baked: [] });
+    expect(received).toHaveLength(2);
+    expect(received[0]).toHaveProperty("page", 3);
+    expect(received[0]).not.toHaveProperty("annotations");
+    expect(received[1]).toHaveProperty("annotations");
+    expect(received[1]).not.toHaveProperty("page");
+  });
 });

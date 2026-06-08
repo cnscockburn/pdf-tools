@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { generateMarkdownReport, downloadAnnotationReport } from "./annotationReport";
+import { generateMarkdownReport, downloadAnnotationReport, generateCsvReport, generateJsonReport } from "./annotationReport";
 import type { LocalAnnot } from "../components/AnnotationLayer";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -160,9 +160,90 @@ describe("downloadAnnotationReport", () => {
   it("triggers a download with _review.md suffix", () => {
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     downloadAnnotationReport([noteAnnot()], "my-document.pdf");
-    // The download attr should be set to stem + _review.md
     clickSpy.mockRestore();
-    // Primary assertion: URL.createObjectURL was called (the blob was created)
     expect(URL.createObjectURL).toHaveBeenCalled();
+  });
+});
+
+// ── generateCsvReport ─────────────────────────────────────────────────────────
+
+describe("generateCsvReport", () => {
+  it("includes header row with all columns", () => {
+    const csv = generateCsvReport([]);
+    const header = csv.split("\r\n")[0];
+    expect(header).toBe("page,type,text,author,status,tags");
+  });
+
+  it("produces one data row per annotation", () => {
+    const rows = generateCsvReport([noteAnnot(), highlightAnnot()]).split("\r\n").filter(Boolean);
+    expect(rows).toHaveLength(3); // header + 2
+  });
+
+  it("sorts rows by page number", () => {
+    const csv = generateCsvReport([noteAnnot({ page: 5 }), noteAnnot({ id: "n2", page: 1 })]);
+    const rows = csv.split("\r\n").slice(1).filter(Boolean);
+    expect(rows[0]).toMatch(/^1,/);
+    expect(rows[1]).toMatch(/^5,/);
+  });
+
+  it("quotes text containing commas", () => {
+    const csv = generateCsvReport([noteAnnot({ text: "hello, world" })]);
+    expect(csv).toContain('"hello, world"');
+  });
+
+  it("double-escapes quotes inside text (RFC 4180)", () => {
+    const csv = generateCsvReport([noteAnnot({ text: 'say "hi"' })]);
+    expect(csv).toContain('"say ""hi"""');
+  });
+
+  it("uses readable type labels (not raw type strings)", () => {
+    const csv = generateCsvReport([noteAnnot()]);
+    expect(csv).toContain("Note");
+    expect(csv).not.toContain(",note,");
+  });
+});
+
+// ── generateJsonReport ────────────────────────────────────────────────────────
+
+describe("generateJsonReport", () => {
+  it("produces valid JSON", () => {
+    const json = generateJsonReport([noteAnnot()], "doc.pdf");
+    expect(() => JSON.parse(json)).not.toThrow();
+  });
+
+  it("includes filename in output", () => {
+    const parsed = JSON.parse(generateJsonReport([], "test.pdf"));
+    expect(parsed.filename).toBe("test.pdf");
+  });
+
+  it("includes correct count", () => {
+    const parsed = JSON.parse(generateJsonReport([noteAnnot(), highlightAnnot()], "doc.pdf"));
+    expect(parsed.count).toBe(2);
+  });
+
+  it("includes a generated ISO timestamp", () => {
+    const parsed = JSON.parse(generateJsonReport([], "doc.pdf"));
+    expect(parsed.generated).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it("maps annotation fields to flat row shape", () => {
+    const parsed = JSON.parse(generateJsonReport([noteAnnot()], "doc.pdf"));
+    const row = parsed.annotations[0];
+    expect(row).toMatchObject({
+      page: 1,
+      type: "Note",
+      text: "A note comment",
+      author: "Alice",
+      status: "open",
+    });
+  });
+
+  it("sorts by page number", () => {
+    const parsed = JSON.parse(generateJsonReport(
+      [noteAnnot({ page: 4 }), noteAnnot({ id: "n2", page: 1 })],
+      "doc.pdf"
+    ));
+    expect(parsed.annotations[0].page).toBe(1);
+    expect(parsed.annotations[1].page).toBe(4);
   });
 });

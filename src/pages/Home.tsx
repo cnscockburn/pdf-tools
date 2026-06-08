@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import {
   Layers, Scissors, Minimize2, EyeOff, LayoutGrid, FileImage,
-  Keyboard, Columns, MessageSquare, ShieldCheck, X, FileText, Clock,
+  Keyboard, Columns, MessageSquare, ShieldCheck, X, FileText, Clock, Package,
 } from "lucide-react";
 import { cn, formatBytes } from "../lib/utils";
 import { useTabContext, type TabType } from "../lib/tabs";
@@ -54,10 +54,9 @@ const TOOLS: ToolDef[] = [
   {
     id: "split",
     title: "Split",
-    description: "Divide by page range",
+    description: "Divide into parts",
     icon: <Scissors className="h-[15px] w-[15px]" />,
-    needsFile: true,
-    toolHint: "split",
+    tabType: "rearrange",  // Opens Organise — click gaps between pages to place split lines
   },
   {
     id: "organize",
@@ -72,6 +71,13 @@ const TOOLS: ToolDef[] = [
     description: "Turn images into a PDF",
     icon: <FileImage className="h-[15px] w-[15px]" />,
     tabType: "images-to-pdf",
+  },
+  {
+    id: "batch",
+    title: "Batch",
+    description: "Process many PDFs at once",
+    icon: <Package className="h-[15px] w-[15px]" />,
+    tabType: "batch",
   },
 ];
 

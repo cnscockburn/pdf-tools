@@ -30,6 +30,7 @@ import { annotatePDF, redactPDF, cropPDF, decryptPDF, checkHealth, type Annotati
 import { useBookmarks } from "../lib/storage";
 import { useSettingsContext } from "../lib/settingsContext";
 import { downloadAnnotationReport, downloadAnnotationCsv, downloadAnnotationJson } from "../lib/annotationReport";
+import { annotationReportPdf } from "../api/client";
 import { subscribe, publish } from "../lib/mirrorSync";
 import { pickPdfFiles } from "../lib/fileIntake";
 import { useHelpMode, helpForMode } from "../lib/helpMode";
@@ -1531,7 +1532,15 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
           { label: "Open…",               shortcut: "Ctrl+O",       action: () => openFilePicker() },
           { label: "Save / Download",      shortcut: "Ctrl+S",       action: () => requestDownload() },
           { type: "separator" },
-          { label: "Export Review Report", action: () => downloadAnnotationReport([...bakedAnnotations, ...annotations], filename), disabled: bakedAnnotations.length === 0 && annotations.length === 0 },
+          { label: "Export Review Report (.md)",   action: () => downloadAnnotationReport([...bakedAnnotations, ...annotations], filename), disabled: bakedAnnotations.length === 0 && annotations.length === 0 },
+          { label: "Export Review Report (.pdf)", action: async () => {
+              const allAnns = [...bakedAnnotations, ...annotations];
+              if (!workingFile || allAnns.length === 0) { showToast("No annotations to export."); return; }
+              try {
+                const blob = await annotationReportPdf(workingFile, toApiAnnotations(allAnns) as Annotation[]);
+                downloadBlob(blob, filename.replace(/\.pdf$/i, "") + "_review_report.pdf");
+              } catch (e) { showToast(e instanceof Error ? e.message : "Export failed."); }
+            }, disabled: bakedAnnotations.length === 0 && annotations.length === 0 },
           { label: "Print…",               shortcut: "Ctrl+P", action: () => printDocument(), disabled: !hasDoc },
           { type: "separator" },
           { label: "Settings…",            shortcut: "Ctrl+,", action: () => openSettings() },
@@ -2435,6 +2444,14 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
               onDeleteAnnot={deleteAnnot}
               onStatusChange={changeAnnotStatus}
               onExportReport={() => downloadAnnotationReport([...bakedAnnotations, ...annotations], filename)}
+              onExportReportPdf={async () => {
+                const allAnns = [...bakedAnnotations, ...annotations];
+                if (!workingFile || allAnns.length === 0) { showToast("No annotations to export."); return; }
+                try {
+                  const blob = await annotationReportPdf(workingFile, toApiAnnotations(allAnns) as Annotation[]);
+                  downloadBlob(blob, filename.replace(/\.pdf$/i, "") + "_review_report.pdf");
+                } catch (e) { showToast(e instanceof Error ? e.message : "Export failed."); }
+              }}
               onExportCsv={() => downloadAnnotationCsv([...bakedAnnotations, ...annotations], filename)}
               onExportJson={() => downloadAnnotationJson([...bakedAnnotations, ...annotations], filename)}
               focusAnnotId={focusAnnotId}

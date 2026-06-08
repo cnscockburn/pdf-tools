@@ -25,6 +25,7 @@ import Viewer from "../pages/Viewer";
 import Merge from "../pages/Merge";
 import Rearrange from "../pages/Rearrange";
 import ImagesToPDF from "../pages/ImagesToPDF";
+import Batch from "../pages/Batch";
 
 // ── Tab content renderer ─────────────────────────────────────────────────────
 
@@ -40,6 +41,8 @@ function TabContent({ tab, isSecondaryPane }: { tab: Tab; isSecondaryPane?: bool
       return <Rearrange initialFile={tab.initialFile} />;
     case "images-to-pdf":
       return <ImagesToPDF />;
+    case "batch":
+      return <Batch />;
     default:
       return null;
   }

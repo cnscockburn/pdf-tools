@@ -16,12 +16,12 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, RotateCw, RotateCcw, Trash2, FileOutput, Eye, Check } from "lucide-react";
+import { GripVertical, RotateCw, RotateCcw, Trash2, FileOutput, Eye, Check, Scissors } from "lucide-react";
 import { usePdfThumbnails } from "../components/PageThumbnailGrid";
 import Layout from "../components/Layout";
 import FileDropZone from "../components/FileDropZone";
 import ProcessButton from "../components/ProcessButton";
-import { organisePdf } from "../api/client";
+import { organisePdf, splitPDF } from "../api/client";
 import { downloadBlob } from "../lib/utils";
 import { cn } from "../lib/utils";
 import { useTabContext } from "../lib/tabs";
@@ -99,6 +99,9 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
   const [loading, setLoading] = useState(false);
   const [openingViewer, setOpeningViewer] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A3: set of positions (0-indexed "after page i") where split dividers are placed.
+  // E.g. {1} means "split after the first page in the current plan" (plan[1] starts part 2).
+  const [dividers, setDividers] = useState<Set<number>>(new Set());
 
   const { thumbnails, pageCount } = usePdfThumbnails(file);
   const sensors = useSensors(
@@ -113,11 +116,35 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
       setPlan(Array.from({ length: pageCount }, (_, i) => ({ id: `p${i + 1}`, src: i + 1, rotate: 0 })));
       setSelected(new Set());
       setLastClicked(null);
+      setDividers(new Set());
     }
   }, [pageCount]);
 
-  const dirty = plan.length !== pageCount || plan.some((it, i) => it.src !== i + 1 || it.rotate !== 0);
+  const dirty = plan.length !== pageCount || plan.some((it, i) => it.src !== i + 1 || it.rotate !== 0) || dividers.size > 0;
   const planPayload = plan.map(({ src, rotate }) => ({ src, rotate }));
+  const hasDividers = dividers.size > 0;
+
+  function toggleDivider(afterIdx: number) {
+    setDividers(prev => {
+      const next = new Set(prev);
+      next.has(afterIdx) ? next.delete(afterIdx) : next.add(afterIdx);
+      return next;
+    });
+  }
+
+  /** Split plan into sections at divider positions, returning page ranges [start,end] (1-indexed). */
+  function buildSplitRanges(): Array<[number, number]> {
+    const sorted = Array.from(dividers).sort((a, b) => a - b);
+    const ranges: Array<[number, number]> = [];
+    let start = 1;
+    for (const div of sorted) {
+      const end = div + 1; // divider is "after plan[div]", so this section is pages start..div+1
+      if (end >= start) ranges.push([start, end]);
+      start = end + 1;
+    }
+    if (start <= plan.length) ranges.push([start, plan.length]);
+    return ranges;
+  }
 
   function selectPage(id: string, shift: boolean) {
     setSelected(prev => {
@@ -174,8 +201,23 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
     if (!file) return;
     setLoading(true); setError(null);
     try {
-      const blob = await runOrganise();
-      if (blob) downloadBlob(blob, `organised_${file.name}`);
+      if (hasDividers) {
+        // First organise the plan, then split at divider positions.
+        const organised = await runOrganise();
+        if (!organised) return;
+        const ranges = buildSplitRanges();
+        if (ranges.length <= 1) {
+          // Only one section — download as a single organised PDF.
+          downloadBlob(organised, `organised_${file.name}`);
+        } else {
+          const orgFile = new File([organised], `organised_${file.name}`, { type: "application/pdf" });
+          const zip = await splitPDF(orgFile, ranges);
+          downloadBlob(zip, `split_${file.name.replace(/\.pdf$/i, "")}.zip`);
+        }
+      } else {
+        const blob = await runOrganise();
+        if (blob) downloadBlob(blob, `organised_${file.name}`);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Operation failed. Check that the PDF is valid.");
     } finally { setLoading(false); }
@@ -262,18 +304,45 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
               Click a page to select · Shift-click for a range · drag the grip to reorder · keyboard: Tab, Space to lift, arrows, Space to drop.
             </p>
 
+            {hasDividers && (
+              <p className="text-[10px] text-amber-600 -mt-3 flex items-center gap-1">
+                <Scissors className="h-3 w-3" />
+                {dividers.size} split line{dividers.size !== 1 ? "s" : ""} placed — Save will produce {dividers.size + 1} PDF{dividers.size !== 0 ? "s" : ""} as a ZIP.
+              </p>
+            )}
+
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={plan.map(p => p.id)} strategy={rectSortingStrategy}>
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-3">
+                {/* Render pages and inter-page divider zones in a flat flex-wrap layout */}
+                <div className="flex flex-wrap gap-2 items-start">
                   {plan.map((item, idx) => (
-                    <SortablePage
-                      key={item.id}
-                      item={item}
-                      index={idx}
-                      thumb={thumbnails[item.src - 1]}
-                      selected={selected.has(item.id)}
-                      onSelect={selectPage}
-                    />
+                    <div key={item.id} className="flex items-stretch gap-1">
+                      {/* Page card */}
+                      <div style={{ width: 100 }}>
+                        <SortablePage
+                          item={item}
+                          index={idx}
+                          thumb={thumbnails[item.src - 1]}
+                          selected={selected.has(item.id)}
+                          onSelect={selectPage}
+                        />
+                      </div>
+                      {/* Split divider zone after this page (not after the last page) */}
+                      {idx < plan.length - 1 && (
+                        <button
+                          onClick={() => toggleDivider(idx)}
+                          title={dividers.has(idx) ? "Remove split here" : "Split here"}
+                          className={cn(
+                            "w-5 flex-shrink-0 flex items-center justify-center rounded transition-colors group",
+                            dividers.has(idx)
+                              ? "bg-amber-500/20 hover:bg-amber-500/30 text-amber-500"
+                              : "bg-transparent hover:bg-stone-100 app-dark:hover:bg-stone-800 text-stone-300 hover:text-amber-500",
+                          )}
+                        >
+                          <Scissors className={cn("h-3 w-3", dividers.has(idx) ? "opacity-100" : "opacity-0 group-hover:opacity-100")} />
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
               </SortableContext>

@@ -297,3 +297,14 @@ export async function fillForm(file: File, values: Record<string, string>): Prom
   form.append("values", JSON.stringify(values));
   return handleResponse(await apiFetch(await apiUrl("/fill-form"), { method: "POST", body: form }));
 }
+
+/** Generate a formatted PDF annotation report for the given document + annotations. */
+export async function annotationReportPdf(
+  file: File,
+  annotations: Annotation[],
+): Promise<Blob> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("annotations", JSON.stringify(annotations));
+  return handleResponse(await apiFetch(await apiUrl("/annotation-report"), { method: "POST", body: form }));
+}

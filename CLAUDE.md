@@ -18,6 +18,8 @@ After fixing CI/security findings, always run the full test suite and re-run sem
 - Run `cargo audit` inside `src-tauri/` for Rust dependency audits.
 - Run `bandit -r backend --exclude backend/.venv` for Python SAST.
 - The full automated suite is at `.github/workflows/security.yml` and locally via `scripts/security-audit.ps1`.
+- To install missing tools: `pip install bandit pip-audit semgrep` in the backend venv; `cargo install cargo-audit` for Rust.
+- `scripts/security-audit.ps1` auto-installs `bandit` and `pip-audit` if absent unless `-SkipInstall` is passed. Run with `-CI` flag in CI to fail on any finding.
 
 ## Python / PDF Tooling
 

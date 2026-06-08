@@ -5,7 +5,9 @@ Most functions accept/return raw bytes. The archive-producing operations
 (a SpooledTemporaryFile) instead, so large archives spill to disk rather than
 being held entirely in memory; routers stream them to the response.
 """
+import datetime
 import io
+import math
 import tempfile
 import zipfile
 from typing import IO
@@ -650,3 +652,140 @@ def pdf_to_images(file_bytes: bytes, dpi: int = 150, fmt: str = "png") -> IO[byt
     doc.close()
     out.seek(0)
     return out
+
+
+# ---------------------------------------------------------------------------
+# Annotation report PDF (B11)
+# ---------------------------------------------------------------------------
+
+_ANNOT_TYPE_LABEL = {
+    "note": "Note", "highlight": "Highlight", "freetext": "Text Box",
+    "underline": "Underline", "strikethrough": "Strikethrough",
+    "ink": "Drawing", "shape": "Shape", "stamp": "Stamp",
+}
+
+def annotation_report(file_bytes: bytes, annotations: list[dict]) -> bytes:
+    """
+    Generate a formatted PDF report of annotations.
+
+    Layout per annotation entry:
+      * Type badge  |  Page number  |  Author (if set)  |  Status (if not open)
+      * Annotation text (if any)
+      * A small thumbnail crop of the annotated area from the source document
+
+    Returns the report as raw PDF bytes.
+    """
+    src = _open(file_bytes)
+    report = fitz.open()
+    PAGE_W, PAGE_H = 595, 842          # A4 portrait (points)
+    MARGIN = 40
+    COL_W = PAGE_W - 2 * MARGIN
+    THUMB_H = 100                       # max thumbnail height in points
+    LINE_H = 14
+    SECTION_GAP = 10
+    BADGE_H = 16
+
+    def new_page():
+        p = report.new_page(width=PAGE_W, height=PAGE_H)
+        return p, MARGIN
+
+    def add_text(page, x, y, text, fontsize=10, color=(0.2, 0.2, 0.2), bold=False):
+        """Insert text, return new y."""
+        fname = "helv" if not bold else "hebo"
+        page.insert_text((x, y), text, fontsize=fontsize, fontname=fname, color=color)
+        return y + LINE_H
+
+    # ── Cover / header ─────────────────────────────────────────────────────────
+    page, y = new_page()
+    y = add_text(page, MARGIN, y + 20, "Annotation Report", fontsize=18, bold=True, color=(0.1, 0.1, 0.1))
+    y = add_text(page, MARGIN, y + 4, f"Generated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}", fontsize=9, color=(0.5, 0.5, 0.5))
+    y = add_text(page, MARGIN, y, f"Total annotations: {len(annotations)}", fontsize=9, color=(0.5, 0.5, 0.5))
+    y += SECTION_GAP * 2
+
+    # ── One entry per annotation ───────────────────────────────────────────────
+    for ann in annotations:
+        ann_type  = ann.get("type", "note")
+        ann_page  = ann.get("page", 1)
+        ann_text  = ann.get("text") or ann.get("label") or ""
+        ann_auth  = ann.get("author", "")
+        ann_stat  = ann.get("status", "open")
+        label     = _ANNOT_TYPE_LABEL.get(ann_type, ann_type.title())
+
+        # Estimate height needed for this entry
+        text_lines = math.ceil(len(ann_text) / 80) if ann_text else 0
+        entry_h = BADGE_H + (text_lines * LINE_H) + THUMB_H + SECTION_GAP * 2 + 10
+
+        # New page if not enough room
+        if y + entry_h > PAGE_H - MARGIN:
+            page, y = new_page()
+
+        # Type badge (filled rectangle + label)
+        badge_color = (0.85, 0.47, 0.02)   # amber-500 ≈ brand color
+        page.draw_rect(fitz.Rect(MARGIN, y, MARGIN + 70, y + BADGE_H), color=badge_color, fill=badge_color, radius=3)
+        page.insert_text((MARGIN + 4, y + 11), label, fontsize=8, fontname="hebo", color=(1, 1, 1))
+
+        # Page + author + status on same row
+        meta_parts = [f"Page {ann_page}"]
+        if ann_auth: meta_parts.append(ann_auth)
+        if ann_stat and ann_stat != "open": meta_parts.append(ann_stat.replace("wontfix", "Won't fix").title())
+        page.insert_text((MARGIN + 76, y + 11), "  ·  ".join(meta_parts), fontsize=9, fontname="helv", color=(0.4, 0.4, 0.4))
+        y += BADGE_H + 4
+
+        # Annotation text
+        if ann_text:
+            # Wrap text manually at ~80 chars
+            words = ann_text.split()
+            line, lines = [], []
+            for w in words:
+                if sum(len(x) + 1 for x in line) + len(w) > 82:
+                    lines.append(" ".join(line)); line = [w]
+                else:
+                    line.append(w)
+            if line: lines.append(" ".join(line))
+            for ln in lines[:6]:  # cap at 6 lines to keep layout predictable
+                y = add_text(page, MARGIN + 4, y, ln, fontsize=9, color=(0.2, 0.2, 0.2))
+            y += 2
+
+        # Thumbnail crop from the source page
+        if 1 <= ann_page <= src.page_count:
+            sp = src[ann_page - 1]
+            pb = sp.rect
+            # Determine crop rect from annotation coordinates (fractional → points)
+            x0f = ann.get("x0", ann.get("x", 0.05))
+            y0f = ann.get("y0", ann.get("y", 0.05))
+            x1f = ann.get("x1", x0f + 0.1)
+            y1f = ann.get("y1", y0f + 0.1)
+            # Expand by 10% for context, clamp to page bounds
+            cx = (x1f + x0f) / 2; cy = (y1f + y0f) / 2
+            hw = max((x1f - x0f) * 0.6, 0.15); hh = max((y1f - y0f) * 0.6, 0.1)
+            crop = fitz.Rect(
+                pb.x0 + max(0, cx - hw) * pb.width,
+                pb.y0 + max(0, cy - hh) * pb.height,
+                pb.x0 + min(1, cx + hw) * pb.width,
+                pb.y0 + min(1, cy + hh) * pb.height,
+            )
+            try:
+                mat = fitz.Matrix(1.5, 1.5)
+                pix = sp.get_pixmap(matrix=mat, clip=crop, alpha=False)
+                # Scale thumbnail to fit within COL_W × THUMB_H
+                tw_pts = COL_W
+                th_pts = pix.height / pix.width * tw_pts if pix.width > 0 else THUMB_H
+                if th_pts > THUMB_H:
+                    tw_pts = tw_pts * THUMB_H / th_pts
+                    th_pts = THUMB_H
+                dest = fitz.Rect(MARGIN, y, MARGIN + tw_pts, y + th_pts)
+                page.insert_image(dest, stream=pix.tobytes("png"))
+                page.draw_rect(dest, color=(0.8, 0.8, 0.8), width=0.5)
+                y += th_pts + 4
+            except Exception:
+                pass  # skip thumbnail on error
+
+        # Separator line
+        page.draw_line(fitz.Point(MARGIN, y + 3), fitz.Point(MARGIN + COL_W, y + 3), color=(0.9, 0.9, 0.9), width=0.5)
+        y += SECTION_GAP
+
+    src.close()
+    buf = io.BytesIO()
+    report.save(buf)
+    report.close()
+    return buf.getvalue()
