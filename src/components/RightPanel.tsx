@@ -30,9 +30,9 @@ interface Props {
 
 function PanelHeader({ title, onClose }: { title: string; onClose: () => void }) {
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-b border-stone-700 shrink-0">
-      <span className="text-sm font-semibold text-white">{title}</span>
-      <button onClick={onClose} className="text-stone-400 hover:text-white transition">
+    <div className="flex items-center justify-between px-4 py-3 border-b border-stone-700 viewer-light:border-stone-200 shrink-0">
+      <span className="text-sm font-semibold text-white viewer-light:text-stone-800">{title}</span>
+      <button onClick={onClose} className="text-stone-400 hover:text-white viewer-light:text-stone-500 viewer-light:hover:text-stone-800 transition">
         <X className="h-4 w-4" />
       </button>
     </div>
@@ -641,12 +641,12 @@ export default function RightPanel({
   const title = PANEL_TITLES[tool];
 
   return (
-    <div className="w-72 flex-shrink-0 flex flex-col bg-stone-900 border-l border-stone-700 overflow-hidden">
+    <div className="w-72 flex-shrink-0 flex flex-col bg-stone-900 viewer-light:bg-stone-50 border-l border-stone-700 viewer-light:border-stone-200 overflow-hidden">
       {/* Generic header for snippets panel */}
       {title && (
-        <div className="flex items-center justify-between px-4 py-3 border-b border-stone-700 shrink-0">
-          <span className="text-sm font-semibold text-white">{title}</span>
-          <button onClick={onClose} className="text-stone-400 hover:text-white transition">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-stone-700 viewer-light:border-stone-200 shrink-0">
+          <span className="text-sm font-semibold text-white viewer-light:text-stone-800">{title}</span>
+          <button onClick={onClose} className="text-stone-400 hover:text-white viewer-light:text-stone-500 viewer-light:hover:text-stone-800 transition">
             <X className="h-4 w-4" />
           </button>
         </div>

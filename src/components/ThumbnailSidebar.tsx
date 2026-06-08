@@ -32,7 +32,7 @@ export default function ThumbnailSidebar({ file, currentPage, onSelect, collapse
         // z-20 keeps the floating collapse toggle (which sits -right-3, outside
         // the box) above the canvas sibling. No overflow-hidden here, or the
         // toggle gets clipped — the inner scroll area handles its own overflow.
-        "relative z-20 flex-shrink-0 flex flex-col bg-stone-900 border-r border-stone-700 transition-[width] duration-200",
+        "relative z-20 flex-shrink-0 flex flex-col bg-stone-900 viewer-light:bg-stone-50 border-r border-stone-700 viewer-light:border-stone-300 transition-[width] duration-200",
         collapsed ? "w-8" : "w-40"
       )}
     >
@@ -40,7 +40,7 @@ export default function ThumbnailSidebar({ file, currentPage, onSelect, collapse
       <button
         onClick={onToggle}
         title={collapsed ? "Show thumbnails" : "Hide thumbnails"}
-        className="absolute -right-3 top-3 z-30 flex h-6 w-6 items-center justify-center rounded-full bg-stone-700 border border-stone-600 text-stone-300 hover:bg-stone-600 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/50"
+        className="absolute -right-3 top-3 z-30 flex h-6 w-6 items-center justify-center rounded-full bg-stone-700 viewer-light:bg-stone-200 border border-stone-600 viewer-light:border-stone-300 text-stone-300 viewer-light:text-stone-600 hover:bg-stone-600 viewer-light:hover:bg-stone-300 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/50"
       >
         {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
       </button>
@@ -56,8 +56,8 @@ export default function ThumbnailSidebar({ file, currentPage, onSelect, collapse
                 className={cn(
                   "w-full flex flex-col items-center gap-0.5 rounded p-1 transition relative",
                   p === currentPage
-                    ? cn("ring-2 bg-stone-800", accent === "cyan" ? "ring-cyan-500" : "ring-brand-500")
-                    : "hover:bg-stone-800"
+                    ? cn("ring-2 bg-stone-800 viewer-light:bg-stone-200", accent === "cyan" ? "ring-cyan-500" : "ring-brand-500")
+                    : "hover:bg-stone-800 viewer-light:hover:bg-stone-200"
                 )}
               >
                 <div className="relative w-full">
@@ -68,7 +68,7 @@ export default function ThumbnailSidebar({ file, currentPage, onSelect, collapse
                       className="w-full rounded shadow"
                     />
                   ) : (
-                    <div className="w-full aspect-[3/4] bg-stone-700 rounded animate-pulse" />
+                    <div className="w-full aspect-[3/4] bg-stone-700 viewer-light:bg-stone-300 rounded animate-pulse" />
                   )}
                   {/* Annotation count badge */}
                   {count > 0 && (
@@ -83,7 +83,7 @@ export default function ThumbnailSidebar({ file, currentPage, onSelect, collapse
                     </div>
                   )}
                 </div>
-                <span className="text-[9px] text-stone-400">{p}</span>
+                <span className="text-[9px] text-stone-400 viewer-light:text-stone-600">{p}</span>
               </button>
             );
           })}

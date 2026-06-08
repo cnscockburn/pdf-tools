@@ -383,9 +383,9 @@ export default function AnnotationsListPanel({
   if (annotations.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center">
-        <MessageSquare className="h-8 w-8 text-stone-600" />
-        <p className="text-sm text-stone-500">No annotations yet.</p>
-        <p className="text-xs text-stone-600">Switch to Annotate mode and mark up the document.</p>
+        <MessageSquare className="h-8 w-8 text-stone-600 viewer-light:text-stone-400" />
+        <p className="text-sm text-stone-500 viewer-light:text-stone-600">No annotations yet.</p>
+        <p className="text-xs text-stone-600 viewer-light:text-stone-500">Switch to Annotate mode and mark up the document.</p>
       </div>
     );
   }

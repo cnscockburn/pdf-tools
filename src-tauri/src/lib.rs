@@ -179,6 +179,69 @@ fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
     std::fs::read(&canonical).map_err(|_| "Failed to read file.".to_string())
 }
 
+/// Write an auto-save recovery snapshot for a document.
+///
+/// `slot` is a simple filename key (e.g. the tab ID). The file is written
+/// atomically via a temp file to avoid partial writes. Reading back is done
+/// via `read_file_bytes` once the recovery path is known. The recovery
+/// directory sits in the OS app-data folder and is created if absent.
+#[tauri::command]
+fn write_recovery_file(app: tauri::AppHandle, slot: String, data: Vec<u8>) -> Result<String, String> {
+    // Basic slot validation — must be a safe filename: alphanumeric + _ - .
+    if !slot.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.') || slot.len() > 64 {
+        return Err("Invalid recovery slot name.".to_string());
+    }
+    let dir = app.path().app_data_dir()
+        .map_err(|_| "Could not resolve app data dir.".to_string())?
+        .join("recovery");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("{slot}.pdf"));
+    // Write via a temp file then rename — atomic on Windows for same-directory moves.
+    let tmp = dir.join(format!("{slot}.tmp"));
+    std::fs::write(&tmp, &data).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
+/// Delete a recovery snapshot once the document has been cleanly saved/closed.
+#[tauri::command]
+fn delete_recovery_file(app: tauri::AppHandle, slot: String) -> Result<(), String> {
+    if !slot.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.') || slot.len() > 64 {
+        return Err("Invalid recovery slot name.".to_string());
+    }
+    let path = app.path().app_data_dir()
+        .map_err(|_| "Could not resolve app data dir.".to_string())?
+        .join("recovery")
+        .join(format!("{slot}.pdf"));
+    if path.exists() {
+        std::fs::remove_file(&path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// List recovery snapshots present in the recovery directory.
+/// Returns a list of `{ slot, path }` objects.
+#[tauri::command]
+fn list_recovery_files(app: tauri::AppHandle) -> Result<Vec<std::collections::HashMap<String, String>>, String> {
+    let dir = app.path().app_data_dir()
+        .map_err(|_| "Could not resolve app data dir.".to_string())?
+        .join("recovery");
+    if !dir.exists() { return Ok(vec![]); }
+    let mut out = vec![];
+    let entries = std::fs::read_dir(&dir).map_err(|e| e.to_string())?;
+    for entry in entries.flatten() {
+        let p = entry.path();
+        if p.extension().and_then(|e| e.to_str()) == Some("pdf") {
+            let mut map = std::collections::HashMap::new();
+            let slot = p.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
+            map.insert("slot".to_string(), slot);
+            map.insert("path".to_string(), p.to_string_lossy().into_owned());
+            out.push(map);
+        }
+    }
+    Ok(out)
+}
+
 /// Get the file path passed as a CLI argument (e.g. "Open with" from Explorer).
 /// Returns None if no file argument was provided or if the path is invalid.
 #[tauri::command]
@@ -230,7 +293,10 @@ pub fn run() {
                 let _ = w.set_focus();
             }
         }))
-        .invoke_handler(tauri::generate_handler![read_file_bytes, get_cli_file_path, api_token, api_port])
+        .invoke_handler(tauri::generate_handler![
+            read_file_bytes, get_cli_file_path, api_token, api_port,
+            write_recovery_file, delete_recovery_file, list_recovery_files,
+        ])
         .manage(ApiToken(token.clone()))
         .manage(ApiPort(port))
         .manage(BackendServer(Mutex::new(None)))

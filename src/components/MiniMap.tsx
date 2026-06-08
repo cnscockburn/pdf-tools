@@ -237,7 +237,7 @@ export default function MiniMap({ totalPages, currentPage, annotations, onGoTo, 
             <img
               src={thumb.url}
               alt={`Page ${hoverPage}`}
-              className="rounded shadow-2xl border border-stone-600 bg-white"
+              className="rounded shadow-2xl border border-stone-600 viewer-light:border-stone-300 bg-white"
               style={{ maxHeight: 140 }}
             />
           )}

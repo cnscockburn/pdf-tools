@@ -34,7 +34,7 @@ export default function SearchBar({ query, onChange, results, focusIdx, loading,
   const current = total > 0 ? focusIdx + 1 : 0;
 
   return (
-    <div role="search" aria-label="Search in document" className="flex items-center gap-1.5 bg-stone-900 border border-stone-600 rounded-xl px-2 py-1.5 shadow-xl w-full max-w-sm">
+    <div role="search" aria-label="Search in document" className="flex items-center gap-1.5 bg-stone-900 viewer-light:bg-white border border-stone-600 viewer-light:border-stone-300 rounded-xl px-2 py-1.5 shadow-xl viewer-light:shadow-md w-full max-w-sm">
       <input
         ref={inputRef}
         type="text"
@@ -45,12 +45,12 @@ export default function SearchBar({ query, onChange, results, focusIdx, loading,
           if (e.key === "Escape") { e.preventDefault(); onClose(); }
         }}
         placeholder="Search in document…"
-        className="flex-1 min-w-0 bg-transparent border-none text-xs text-white placeholder-stone-500 focus:outline-none"
+        className="flex-1 min-w-0 bg-transparent border-none text-xs text-white viewer-light:text-stone-800 placeholder-stone-500 viewer-light:placeholder-stone-400 focus:outline-none"
         spellCheck={false}
       />
 
       {/* Match count */}
-      <span className="shrink-0 text-[10px] tabular-nums text-stone-500 min-w-[3.5rem] text-right" aria-live="polite">
+      <span className="shrink-0 text-[10px] tabular-nums text-stone-500 viewer-light:text-stone-500 min-w-[3.5rem] text-right" aria-live="polite">
         {loading
           ? <Loader2 className="h-3 w-3 animate-spin inline" />
           : query
@@ -67,7 +67,7 @@ export default function SearchBar({ query, onChange, results, focusIdx, loading,
           disabled={total === 0}
           title="Previous match (Shift+Enter)"
           aria-label="Previous match"
-          className="p-1 rounded hover:bg-stone-700 disabled:opacity-30 text-stone-400 hover:text-white transition"
+          className="p-1 rounded hover:bg-stone-700 viewer-light:hover:bg-stone-100 disabled:opacity-30 text-stone-400 viewer-light:text-stone-500 hover:text-white viewer-light:hover:text-stone-800 transition"
         >
           <ChevronUp className="h-3.5 w-3.5" />
         </button>
@@ -76,7 +76,7 @@ export default function SearchBar({ query, onChange, results, focusIdx, loading,
           disabled={total === 0}
           title="Next match (Enter)"
           aria-label="Next match"
-          className="p-1 rounded hover:bg-stone-700 disabled:opacity-30 text-stone-400 hover:text-white transition"
+          className="p-1 rounded hover:bg-stone-700 viewer-light:hover:bg-stone-100 disabled:opacity-30 text-stone-400 viewer-light:text-stone-500 hover:text-white viewer-light:hover:text-stone-800 transition"
         >
           <ChevronDown className="h-3.5 w-3.5" />
         </button>
@@ -84,7 +84,7 @@ export default function SearchBar({ query, onChange, results, focusIdx, loading,
           onClick={onClose}
           title="Close search (Esc)"
           aria-label="Close search"
-          className="p-1 rounded hover:bg-stone-700 text-stone-500 hover:text-white transition"
+          className="p-1 rounded hover:bg-stone-700 viewer-light:hover:bg-stone-100 text-stone-500 hover:text-white viewer-light:hover:text-stone-800 transition"
         >
           <X className="h-3.5 w-3.5" />
         </button>

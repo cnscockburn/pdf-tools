@@ -63,7 +63,7 @@ function OutlineNode({ node, pdf, depth, onGoTo, currentPage }: NodeProps) {
   return (
     <div>
       <div
-        className="w-full flex items-center gap-1.5 pr-3 hover:bg-stone-800 transition group"
+        className="w-full flex items-center gap-1.5 pr-3 hover:bg-stone-800 viewer-light:hover:bg-stone-100 transition group"
         style={{ paddingLeft: `${12 + depth * 12}px` }}
       >
         {hasChildren ? (

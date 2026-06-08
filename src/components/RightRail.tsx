@@ -73,11 +73,11 @@ export default function RightRail({
 
   return (
     <div
-      className="w-64 flex-shrink-0 flex flex-col overflow-hidden bg-stone-800 border-l border-stone-600"
+      className="w-64 flex-shrink-0 flex flex-col overflow-hidden bg-stone-800 viewer-light:bg-white border-l border-stone-600 viewer-light:border-stone-300"
     >
       {/* ── Tab bar ─────────────────────────────────────────────────────── */}
       <div
-        className="flex shrink-0 border-b border-stone-600"
+        className="flex shrink-0 border-b border-stone-600 viewer-light:border-stone-300"
       >
         {TABS.map(({ id, label, Icon }) => {
           const active = activeTab === id;
@@ -89,7 +89,7 @@ export default function RightRail({
                 "flex-1 flex flex-col items-center gap-0.5 px-2 py-2.5 transition-colors",
                 active
                   ? "text-brand-500 border-b-2 border-brand-500 -mb-px"
-                  : "text-stone-500 hover:text-stone-300"
+                  : "text-stone-500 viewer-light:text-stone-500 hover:text-stone-300 viewer-light:hover:text-stone-700"
               )}
             >
               <Icon className="h-3.5 w-3.5" />
@@ -101,11 +101,11 @@ export default function RightRail({
 
       {/* ── Panel header ────────────────────────────────────────────────── */}
       <div
-        className="shrink-0 px-3 py-2 border-b border-stone-600"
+        className="shrink-0 px-3 py-2 border-b border-stone-600 viewer-light:border-stone-300"
       >
-        <span className="text-[12px] font-semibold text-stone-300 tracking-tight">
+        <span className="text-[12px] font-semibold text-stone-300 viewer-light:text-stone-700 tracking-tight">
           {activeTab === "annotations" && (
-            <>Annotations {annotations.length > 0 && <span className="text-stone-600 font-normal">· {annotations.length}</span>}</>
+            <>Annotations {annotations.length > 0 && <span className="text-stone-600 viewer-light:text-stone-500 font-normal">· {annotations.length}</span>}</>
           )}
           {activeTab === "document"    && "Outline & Bookmarks"}
         </span>

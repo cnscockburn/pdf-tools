@@ -38,8 +38,8 @@ export default function DocumentPanel({
     <div className="flex flex-col h-full overflow-hidden">
       {/* Outline section — only when the document actually has one */}
       {pdf && hasOutline && (
-        <div className="shrink-0 max-h-[45%] overflow-y-auto scrollbar-dark border-b border-stone-700">
-          <p className="px-3 pt-2 pb-1 text-[10px] font-semibold text-stone-500 uppercase tracking-wider sticky top-0 bg-stone-800">
+        <div className="shrink-0 max-h-[45%] overflow-y-auto scrollbar-dark border-b border-stone-700 viewer-light:border-stone-200">
+          <p className="px-3 pt-2 pb-1 text-[10px] font-semibold text-stone-500 viewer-light:text-stone-500 uppercase tracking-wider sticky top-0 bg-stone-800 viewer-light:bg-stone-50">
             Outline
           </p>
           <OutlinePanel pdf={pdf} currentPage={currentPage} onGoTo={onGoTo} embedded />
@@ -49,7 +49,7 @@ export default function DocumentPanel({
       {/* Bookmarks section — takes the remaining height */}
       <div className="flex-1 min-h-0 flex flex-col">
         {hasOutline && (
-          <p className="shrink-0 px-3 pt-2 pb-1 text-[10px] font-semibold text-stone-500 uppercase tracking-wider">
+          <p className="shrink-0 px-3 pt-2 pb-1 text-[10px] font-semibold text-stone-500 viewer-light:text-stone-500 uppercase tracking-wider">
             Bookmarks
           </p>
         )}

@@ -16,7 +16,8 @@ import { TabContext, newTabId, defaultTabTitle, type Tab, type TabType, type Tab
 import { SettingsContext, type SettingsContextValue } from "../lib/settingsContext";
 import { useSettings } from "../lib/storage";
 import { getCliFile, listenForFileOpen } from "../lib/tauriFileOpen";
-import { onWindowFileDrop } from "../lib/fileIntake";
+import { onWindowFileDrop, openPathAsFile } from "../lib/fileIntake";
+import { listRecovery, deleteRecovery } from "../lib/autoSave";
 import TabBar from "./TabBar";
 import SettingsDialog from "./SettingsDialog";
 import Home from "../pages/Home";
@@ -83,6 +84,31 @@ export default function TabShell() {
   // Ref to current activeTabId + tabs for use inside callbacks
   const stateRef = useRef({ activeTabId, tabs });
   stateRef.current = { activeTabId, tabs };
+
+  // ── B10: Recovery prompt ───────────────────────────────────────────────────
+  // On startup check for leftover recovery snapshots (= documents that were open
+  // when the app last crashed or was force-quit). Offer to restore each one.
+  const [recoveryFiles, setRecoveryFiles] = useState<Array<{ slot: string; path: string }>>([]);
+  const [recoveryDismissed, setRecoveryDismissed] = useState(false);
+  useEffect(() => {
+    listRecovery().then(files => {
+      if (files.length > 0) setRecoveryFiles(files);
+    });
+  }, []); // eslint-disable-line
+
+  async function restoreRecovery(r: { slot: string; path: string }) {
+    try {
+      const file = await openPathAsFile(r.path);
+      openTab("viewer", { file, title: `Recovered — ${file.name}` });
+      await deleteRecovery(r.slot);
+    } catch { /* ignore */ }
+    setRecoveryFiles(prev => prev.filter(x => x.slot !== r.slot));
+  }
+
+  async function discardRecovery(r: { slot: string }) {
+    await deleteRecovery(r.slot);
+    setRecoveryFiles(prev => prev.filter(x => x.slot !== r.slot));
+  }
 
   // ── Close guards ───────────────────────────────────────────────────────────
   // Tabs (Viewer) register a guard consulted before close. A blocked close
@@ -332,6 +358,35 @@ export default function TabShell() {
           onUpdate={updateSettings}
           onClose={closeSettings}
         />
+      )}
+
+      {/* ── B10: Recovery restore prompt ────────────────────────────────────── */}
+      {recoveryFiles.length > 0 && !recoveryDismissed && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Restore recovered documents"
+          className="fixed inset-0 z-[350] flex items-center justify-center bg-black/70"
+        >
+          <div className="bg-stone-900 border border-stone-700 rounded-2xl shadow-2xl w-[420px] max-w-[90vw] p-6 flex flex-col gap-4">
+            <div>
+              <h2 className="text-sm font-semibold text-white">Recover unsaved documents?</h2>
+              <p className="mt-1.5 text-xs text-stone-400 leading-relaxed">
+                Stria found {recoveryFiles.length} auto-saved snapshot{recoveryFiles.length !== 1 ? "s" : ""} from the previous session.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              {recoveryFiles.map(r => (
+                <div key={r.slot} className="flex items-center gap-2">
+                  <span className="flex-1 text-xs text-stone-300 truncate">{r.path.split(/[/\\]/).pop()}</span>
+                  <button onClick={() => restoreRecovery(r)} className="shrink-0 rounded-lg bg-brand-500 hover:bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition">Restore</button>
+                  <button onClick={() => discardRecovery(r)} className="shrink-0 rounded-lg bg-stone-700 hover:bg-stone-600 px-3 py-1.5 text-xs text-stone-300 transition">Discard</button>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setRecoveryDismissed(true)} className="text-[11px] text-stone-500 hover:text-stone-300 transition self-end">Dismiss all</button>
+          </div>
+        </div>
       )}
 
       {/* ── Close-guard confirmation (uncommitted annotations, P1-03/P1-24) ──── */}

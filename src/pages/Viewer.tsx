@@ -33,6 +33,7 @@ import { downloadAnnotationReport, downloadAnnotationCsv, downloadAnnotationJson
 import { subscribe, publish } from "../lib/mirrorSync";
 import { pickPdfFiles } from "../lib/fileIntake";
 import { useHelpMode, helpForMode } from "../lib/helpMode";
+import { startAutoSave, deleteRecovery } from "../lib/autoSave";
 
 type CanvasMode = "view" | "annotate" | "redact" | "crop";
 
@@ -945,6 +946,22 @@ export default function Viewer({ initialFile, tabId, toolHint: toolHintProp, isS
     });
     return () => unregisterCloseGuard(tabId);
   }, [tabId, registerCloseGuard, unregisterCloseGuard]);
+
+  // ── Auto-save / crash recovery (B10) ─────────────────────────────────────────
+  // In packaged builds, checkpoint the working blob every 2 minutes.
+  // Use the live ref so the interval always gets the most-recent blob without
+  // needing to re-register. Clear the snapshot on clean download or tab close.
+  const workingBlobForAutoSave = useRef<Blob | null>(null);
+  workingBlobForAutoSave.current = workingBlob;
+  useEffect(() => {
+    if (!tabId) return;
+    const cancel = startAutoSave(tabId, () => workingBlobForAutoSave.current);
+    return () => {
+      cancel();
+      // Clean up the recovery file when the Viewer unmounts (tab closed cleanly).
+      if (tabId) deleteRecovery(tabId).catch(() => {});
+    };
+  }, [tabId]); // eslint-disable-line
 
   // ── UI-scale ↔ PDF-zoom compensation (UX-04) ───────────────────────────────
   // The whole content area is CSS-zoomed by uiScale, so raising the UI scale

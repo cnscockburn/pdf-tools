@@ -34,7 +34,7 @@ export default function BookmarksPanel({ bookmarks, currentPage, onGoTo, onDelet
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Add bookmark button */}
-      <div className="px-3 py-2 border-b border-stone-700 shrink-0">
+      <div className="px-3 py-2 border-b border-stone-700 viewer-light:border-stone-200 shrink-0">
         <button
           onClick={onAddBookmark}
           disabled={isCurrentPageBookmarked}
