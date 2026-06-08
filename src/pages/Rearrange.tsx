@@ -26,6 +26,8 @@ import { downloadBlob } from "../lib/utils";
 import { cn } from "../lib/utils";
 import { useTabContext } from "../lib/tabs";
 
+const TILE_W = 100; // base tile width in px (un-rotated)
+
 /** A page in the working plan: original (1-indexed) source page + added rotation. */
 interface PageItem { id: string; src: number; rotate: number }
 
@@ -39,13 +41,30 @@ function SortablePage({
   onSelect: (id: string, shift: boolean) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+
+  // Track natural image dimensions so we can resize the tile to match rotated footprint.
+  const [natural, setNatural] = useState<[number, number] | null>(null);
+
+  // Aspect ratio: height / width. Default to 1.414 (A4 portrait) until image loads.
+  const aspect = natural ? natural[1] / natural[0] : 1.414;
+  const isOdd = item.rotate === 90 || item.rotate === 270;
+
+  // Container size that shows the full rotated image without clipping.
+  const wrapW = isOdd ? Math.round(TILE_W * aspect) : TILE_W;
+  const wrapH = isOdd ? TILE_W : Math.round(TILE_W * aspect);
+
+  // The <img> in its un-rotated coordinate space always fits TILE_W × (TILE_W * aspect).
+  const imgNatW = TILE_W;
+  const imgNatH = Math.round(TILE_W * aspect);
+
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       onClick={(e) => onSelect(item.id, e.shiftKey)}
       className={cn(
-        "relative flex flex-col items-center gap-1 rounded-lg p-1 bg-white app-dark:bg-stone-900 cursor-pointer select-none transition",
+        "relative flex flex-col items-center gap-1 rounded-lg p-1 bg-white app-dark:bg-stone-900 cursor-pointer select-none",
+        "transition-[box-shadow,opacity,transform]",
         isDragging ? "opacity-50 scale-105 shadow-lg z-10" : "",
         selected ? "ring-2 ring-brand-500 bg-amber-50/40 app-dark:bg-brand-950/40" : "border border-stone-200 hover:border-stone-300 app-dark:border-stone-800 app-dark:hover:border-stone-700",
       )}
@@ -66,16 +85,39 @@ function SortablePage({
         <span className="absolute top-1 right-1 z-10 h-4 w-4 rounded-full bg-brand-500 text-white flex items-center justify-center shadow"><Check className="h-2.5 w-2.5" strokeWidth={3} /></span>
       )}
 
-      {thumb ? (
-        <img
-          src={thumb}
-          alt={`Page ${item.src}`}
-          style={{ transform: item.rotate ? `rotate(${item.rotate}deg)` : undefined }}
-          className="w-full rounded shadow-sm transition-transform"
-        />
-      ) : (
-        <div className="w-full aspect-[3/4] bg-stone-100 rounded animate-pulse" />
-      )}
+      {/* Image container — sized to the rotated visual footprint */}
+      <div
+        className="relative overflow-hidden rounded shadow-sm"
+        style={{ width: wrapW, height: thumb ? wrapH : undefined }}
+      >
+        {thumb ? (
+          <img
+            src={thumb}
+            alt={`Page ${item.src}`}
+            onLoad={(e) => {
+              const img = e.currentTarget;
+              setNatural([img.naturalWidth, img.naturalHeight]);
+            }}
+            style={isOdd ? {
+              position: "absolute",
+              width: imgNatW,
+              height: imgNatH,
+              top: "50%",
+              left: "50%",
+              transform: `translate(-50%, -50%) rotate(${item.rotate}deg)`,
+            } : {
+              display: "block",
+              width: "100%",
+              transform: item.rotate ? `rotate(${item.rotate}deg)` : undefined,
+            }}
+          />
+        ) : (
+          <div
+            className="bg-stone-100 app-dark:bg-stone-800 rounded animate-pulse"
+            style={{ width: TILE_W, height: imgNatH }}
+          />
+        )}
+      </div>
 
       <span className="text-[10px] text-stone-500 app-dark:text-stone-400">
         {index + 1}
@@ -102,6 +144,7 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
   // A3: set of positions (0-indexed "after page i") where split dividers are placed.
   // E.g. {1} means "split after the first page in the current plan" (plan[1] starts part 2).
   const [dividers, setDividers] = useState<Set<number>>(new Set());
+  const [hoveredGap, setHoveredGap] = useState<number | null>(null);
 
   const { thumbnails, pageCount } = usePdfThumbnails(file);
   const sensors = useSensors(
@@ -313,12 +356,12 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
 
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={plan.map(p => p.id)} strategy={rectSortingStrategy}>
-                {/* Render pages and inter-page divider zones in a flat flex-wrap layout */}
-                <div className="flex flex-wrap gap-2 items-start">
+                {/* Pages with inter-page hover split zones */}
+                <div className="flex flex-wrap items-start" style={{ gap: "8px 0" }}>
                   {plan.map((item, idx) => (
-                    <div key={item.id} className="flex items-stretch gap-1">
+                    <div key={item.id} className="flex items-stretch">
                       {/* Page card */}
-                      <div style={{ width: 100 }}>
+                      <div className="mx-1">
                         <SortablePage
                           item={item}
                           index={idx}
@@ -327,20 +370,35 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
                           onSelect={selectPage}
                         />
                       </div>
-                      {/* Split divider zone after this page (not after the last page) */}
+
+                      {/* Split divider zone after this page (not after the last) */}
                       {idx < plan.length - 1 && (
-                        <button
+                        <div
+                          className="relative w-8 flex-shrink-0 flex items-center justify-center cursor-pointer select-none"
+                          onMouseEnter={() => setHoveredGap(idx)}
+                          onMouseLeave={() => setHoveredGap(null)}
                           onClick={() => toggleDivider(idx)}
-                          title={dividers.has(idx) ? "Remove split here" : "Split here"}
-                          className={cn(
-                            "w-5 flex-shrink-0 flex items-center justify-center rounded transition-colors group",
-                            dividers.has(idx)
-                              ? "bg-amber-500/20 hover:bg-amber-500/30 text-amber-500"
-                              : "bg-transparent hover:bg-stone-100 app-dark:hover:bg-stone-800 text-stone-300 hover:text-amber-500",
-                          )}
+                          title={dividers.has(idx) ? "Remove split here" : "Add split here"}
                         >
-                          <Scissors className={cn("h-3 w-3", dividers.has(idx) ? "opacity-100" : "opacity-0 group-hover:opacity-100")} />
-                        </button>
+                          {/* Vertical line */}
+                          <div className={cn(
+                            "absolute left-1/2 -translate-x-1/2 w-0.5 rounded-full transition-all duration-150 pointer-events-none",
+                            hoveredGap === idx || dividers.has(idx) ? "opacity-100" : "opacity-0",
+                            dividers.has(idx) ? "inset-y-0 bg-amber-500" : "inset-y-3 bg-stone-400",
+                          )} />
+                          {/* Circle button */}
+                          <div className={cn(
+                            "relative z-10 w-5 h-5 rounded-full flex items-center justify-center",
+                            "text-[11px] font-bold leading-none shadow-md",
+                            "transition-all duration-150 pointer-events-none",
+                            hoveredGap === idx || dividers.has(idx) ? "opacity-100 scale-100" : "opacity-0 scale-75",
+                            dividers.has(idx)
+                              ? "bg-amber-500 text-white"
+                              : "bg-stone-700 border border-stone-500 text-stone-200",
+                          )}>
+                            {dividers.has(idx) ? "×" : "+"}
+                          </div>
+                        </div>
                       )}
                     </div>
                   ))}

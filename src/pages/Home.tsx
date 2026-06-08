@@ -41,10 +41,8 @@ const BADGE_CLASSES: Record<BadgeColor, string> = {
   violet: "bg-violet-100 text-violet-600 app-dark:bg-violet-900/40 app-dark:text-violet-400",
 };
 
-// Most-used operations first so the grid scans in frequency order.
-// "Split" is removed — it opened the same Rearrange tab as "Organize" with no
-// explanation, creating a false-promise duplicate. The split-divider feature
-// is discoverable inside the Organize page.
+// Tool grid — Organise is promoted to a top-level CTA, so it's excluded here.
+// These are tools not covered by the Organise screen.
 const TOOLS: ToolDef[] = [
   {
     id: "merge",
@@ -71,14 +69,6 @@ const TOOLS: ToolDef[] = [
     badge: "rose",
     needsFile: true,
     toolHint: "redact",
-  },
-  {
-    id: "organize",
-    title: "Organize & Split",
-    description: "Reorder, rotate, delete, or split pages",
-    icon: <LayoutGrid className="h-[15px] w-[15px]" />,
-    badge: "indigo",
-    tabType: "rearrange",
   },
   {
     id: "convert",
@@ -198,53 +188,84 @@ export default function Home() {
       <div className="flex-1 flex flex-col items-center justify-center overflow-auto px-6 py-10">
         <div className="w-full max-w-2xl flex flex-col items-center gap-8">
 
-          {/* ── Primary: file intake ──────────────────────────────────────── */}
-          <div className="w-full">
-            <div
-              {...getRootProps(isTauri ? { onClick: () => openViaPicker() } : {})}
-              className={cn(
-                "w-full flex flex-col items-center justify-center gap-5 rounded-2xl",
-                "border-2 border-dashed transition-colors duration-200 cursor-pointer",
-                "py-14 px-8",
-                isDragActive
-                  ? "border-brand-500 bg-[#fffbeb] app-dark:bg-brand-950/40 scale-[1.005]"
-                  : "border-stone-300 bg-white hover:border-[#d4c5a0] hover:shadow-sm app-dark:border-stone-700 app-dark:bg-stone-900 app-dark:hover:border-brand-500/60"
-              )}
-            >
-              <input {...getInputProps()} />
-              <svg
-                className={cn("h-11 w-11 transition-colors duration-200", isDragActive ? "text-brand-500" : "text-stone-300 app-dark:text-stone-600")}
-                viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5"
-                aria-hidden="true"
+          {/* ── Primary: two-column intake ────────────────────────────────── */}
+          <div className="w-full flex flex-col sm:flex-row gap-3">
+
+            {/* Left — viewer drop zone */}
+            <div className="flex-[3] min-w-0">
+              <div
+                {...getRootProps(isTauri ? { onClick: () => openViaPicker() } : {})}
+                className={cn(
+                  "w-full h-full flex flex-col items-center justify-center gap-4 rounded-2xl",
+                  "border-2 border-dashed transition-colors duration-200 cursor-pointer",
+                  "py-12 px-6",
+                  isDragActive
+                    ? "border-brand-500 bg-[#fffbeb] app-dark:bg-brand-950/40 scale-[1.005]"
+                    : "border-stone-300 bg-white hover:border-[#d4c5a0] hover:shadow-sm app-dark:border-stone-700 app-dark:bg-stone-900 app-dark:hover:border-brand-500/60"
+                )}
               >
-                <path d="M10 38V18l10-12h18v32H10z" strokeLinejoin="round"/>
-                <path d="M20 6v12h18M22 28l6-6 6 6M28 22v10" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <div className="text-center">
-                <p className="text-sm font-semibold text-stone-700 app-dark:text-stone-200">
-                  {isDragActive ? "Drop the PDF here" : "Open a PDF to start reviewing"}
-                </p>
-                <p className="mt-1.5 text-xs text-stone-400 app-dark:text-stone-500">
-                  Drop a file, or click to browse
-                </p>
+                <input {...getInputProps()} />
+                <svg
+                  className={cn("h-10 w-10 transition-colors duration-200", isDragActive ? "text-brand-500" : "text-stone-300 app-dark:text-stone-600")}
+                  viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5"
+                  aria-hidden="true"
+                >
+                  <path d="M10 38V18l10-12h18v32H10z" strokeLinejoin="round"/>
+                  <path d="M20 6v12h18M22 28l6-6 6 6M28 22v10" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <div className="text-center">
+                  <p className="text-sm font-semibold text-stone-700 app-dark:text-stone-200">
+                    {isDragActive ? "Drop the PDF here" : "Open a PDF to review"}
+                  </p>
+                  <p className="mt-1 text-xs text-stone-400 app-dark:text-stone-500">
+                    Drop a file, or click to browse
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Capability shortcut chips */}
-            <div className="flex items-center justify-center gap-2 mt-4">
-              {capabilities.map((cap, i) => (
-                <button
-                  key={i}
-                  onClick={cap.onClick}
-                  title={cap.title}
-                  className="group flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white app-dark:bg-stone-900 app-dark:border-stone-800 px-2.5 py-1.5 text-[11px] text-stone-500 app-dark:text-stone-400 hover:border-stone-300 hover:text-stone-700 app-dark:hover:text-stone-200 app-dark:hover:border-stone-700 hover:shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
-                >
-                  <span className="text-stone-300 app-dark:text-stone-600 group-hover:text-amber-600 transition-colors">{cap.icon}</span>
-                  {cap.text}
-                  <kbd className="rounded border border-stone-200 bg-stone-50 app-dark:bg-stone-800 app-dark:border-stone-700 px-1 text-[9px] font-mono text-stone-400 app-dark:text-stone-500">{cap.kbd}</kbd>
-                </button>
-              ))}
+            {/* Right — Organise & Split secondary CTA */}
+            <div className="flex-[2] min-w-0">
+              <button
+                onClick={() => openTab("rearrange")}
+                className={cn(
+                  "group w-full h-full flex flex-col items-center justify-center gap-4 rounded-2xl",
+                  "border-2 border-dashed transition-colors duration-200 cursor-pointer",
+                  "py-12 px-6 text-center",
+                  "border-stone-200 bg-white hover:border-indigo-300 hover:bg-indigo-50/40 hover:shadow-sm",
+                  "app-dark:border-stone-700 app-dark:bg-stone-900 app-dark:hover:border-indigo-500/60 app-dark:hover:bg-indigo-950/20",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50",
+                )}
+              >
+                <div className="h-10 w-10 rounded-xl flex items-center justify-center bg-indigo-100 text-indigo-600 app-dark:bg-indigo-900/40 app-dark:text-indigo-400 group-hover:bg-indigo-200 app-dark:group-hover:bg-indigo-900/60 transition-colors">
+                  <LayoutGrid className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-stone-700 app-dark:text-stone-200 group-hover:text-stone-900 app-dark:group-hover:text-white transition-colors">
+                    Organise &amp; Split
+                  </p>
+                  <p className="mt-1 text-xs text-stone-400 app-dark:text-stone-500 leading-snug">
+                    Reorder, rotate, delete, or split pages
+                  </p>
+                </div>
+              </button>
             </div>
+          </div>
+
+          {/* Capability shortcut chips */}
+          <div className="flex items-center justify-center gap-2 -mt-4">
+            {capabilities.map((cap, i) => (
+              <button
+                key={i}
+                onClick={cap.onClick}
+                title={cap.title}
+                className="group flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white app-dark:bg-stone-900 app-dark:border-stone-800 px-2.5 py-1.5 text-[11px] text-stone-500 app-dark:text-stone-400 hover:border-stone-300 hover:text-stone-700 app-dark:hover:text-stone-200 app-dark:hover:border-stone-700 hover:shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
+              >
+                <span className="text-stone-300 app-dark:text-stone-600 group-hover:text-amber-600 transition-colors">{cap.icon}</span>
+                {cap.text}
+                <kbd className="rounded border border-stone-200 bg-stone-50 app-dark:bg-stone-800 app-dark:border-stone-700 px-1 text-[9px] font-mono text-stone-400 app-dark:text-stone-500">{cap.kbd}</kbd>
+              </button>
+            ))}
           </div>
 
           {/* ── Recent files (Tauri — reopened by stored path) ─────────────── */}
@@ -286,12 +307,12 @@ export default function Home() {
           {/* ── Divider ──────────────────────────────────────────────────── */}
           <div className="w-full flex items-center gap-3">
             <div className="flex-1 h-px bg-stone-200 app-dark:bg-stone-800" />
-            <span className="text-[10px] font-medium text-stone-400 uppercase tracking-[0.1em]">or use a tool directly</span>
+            <span className="text-[10px] font-medium text-stone-400 uppercase tracking-[0.1em]">more tools</span>
             <div className="flex-1 h-px bg-stone-200 app-dark:bg-stone-800" />
           </div>
 
           {/* ── Secondary: tool grid ─────────────────────────────────────── */}
-          <div className="w-full grid grid-cols-3 gap-2">
+          <div className="w-full grid grid-cols-3 sm:grid-cols-5 gap-2">
             {TOOLS.map(tool => {
               const handleClick = tool.tabType
                 ? () => openTab(tool.tabType!)
