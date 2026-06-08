@@ -1,18 +1,17 @@
 /**
- * MiniMap — a thin page-navigator strip with a dock-magnification "wave".
+ * MiniMap — page-navigator strip with a dock-magnification "wave".
  *
- * At rest it's a slim bar: one tick per page, an accent marker at the current
- * page, and pips for pages that carry annotations. On hover the ticks near the
- * cursor swell (Gaussian falloff) so you can target a page precisely; the page
- * number floats above the cursor. Pause and a thumbnail preview of that page
- * appears. Click jumps immediately; click-and-drag scrubs and only navigates on
- * release (so a fast drag across a long document doesn't thrash the renderer).
+ * At rest: one tick per page, accent marker at the current page, pips for
+ * annotated pages. On hover: ticks near the cursor swell (Gaussian falloff);
+ * a page-number badge floats above; pausing shows a thumbnail preview.
+ * Click or click-and-drag scrubs live (updates page on every page crossing).
  *
- * Width: clamps between MIN_STRIP_W (≈floating toolbar) and the full container
- * width, proportional to page count so sparse PDFs don't get absurdly wide ticks.
+ * Width: clamps between MIN_STRIP_W (≈ the floating toolbar) and the container
+ * width, proportional to page count so sparse PDFs don't fill the whole bar.
  *
- * Animation: the wave swell position and amplitude both lerp smoothly toward
- * their targets via a continuous RAF loop, giving a natural "docking" feel.
+ * Animation: waveAmplRef lerps 0→1 on hover entry and 1→0 on leave, giving a
+ * smooth "dock" swell. renderedHoverRef follows the cursor with slight lag.
+ * The RAF loop uses a drawRef (always the latest draw fn) to avoid stale closures.
  */
 import { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
@@ -30,33 +29,35 @@ interface Props {
   reduceMotion?: boolean;
 }
 
-const STRIP_H     = 34;   // canvas height in CSS px (room for the swell)
+const STRIP_H     = 34;   // canvas height in CSS px
 const BASE_TICK   = 5;    // resting tick height
-const MAX_TICK    = 30;   // peak tick height under the cursor
-const SIGMA       = 4;    // wave spread, in pages
-const SETTLE_MS   = 350;  // stillness before the thumbnail appears
+const MAX_TICK    = 30;   // peak tick height under cursor
+const SIGMA       = 4;    // wave spread in pages
+const SETTLE_MS   = 350;  // stillness before thumbnail appears
 
-// Proportional width: each page gets ~STEP_PX at minimum.
-// Strip never goes below MIN_STRIP_W (≈ floating toolbar) or above the container.
-const STEP_PX     = 10;
-const MIN_STRIP_W = 440;
+const STEP_PX     = 10;   // ideal pixels per page (for width sizing)
+const MIN_STRIP_W = 440;  // minimum strip width ≈ floating toolbar width
 
 const ACCENTS = {
   amber: { strong: "#d97706", soft: "rgba(217,119,6,0.55)", pip: "#fbbf24" },
   cyan:  { strong: "#06b6d4", soft: "rgba(6,182,212,0.55)", pip: "#22d3ee" },
 };
 
-export default function MiniMap({ totalPages, currentPage, annotations, onGoTo, accent = "amber", pdf, reduceMotion }: Props) {
+export default function MiniMap({
+  totalPages, currentPage, annotations, onGoTo,
+  accent = "amber", pdf, reduceMotion,
+}: Props) {
   const wrapRef   = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
-  // Live interaction state — mutated in event handlers, read in RAF loop.
-  const hoverFracRef    = useRef<number | null>(null); // actual cursor fraction
-  const renderedHoverRef = useRef<number | null>(null); // lerped cursor fraction (canvas)
-  const waveAmplRef     = useRef(0);                   // lerped 0→1 amplitude
-  const draggingRef     = useRef(false);
-  const animRunningRef  = useRef(false);
+  // ── Animation state in refs (no re-render per frame) ─────────────────────
+  const hoverFracRef     = useRef<number | null>(null); // actual cursor position (0-1)
+  const renderedHoverRef = useRef<number | null>(null); // lerped cursor position
+  const waveAmplRef      = useRef(0);                  // lerped wave amplitude 0→1
+  const draggingRef      = useRef(false);
+  const animRunningRef   = useRef(false);
+  const lastNavPageRef   = useRef<number | null>(null); // last page navigated during drag
 
   const [, force]         = useState(0);
   const rafRef            = useRef(0);
@@ -72,7 +73,7 @@ export default function MiniMap({ totalPages, currentPage, annotations, onGoTo, 
     return s;
   }, [annotations]);
 
-  // Measure the outer container; strip width is derived from this.
+  // Measure container width so we can compute the proportional strip width.
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -82,7 +83,7 @@ export default function MiniMap({ totalPages, currentPage, annotations, onGoTo, 
     return () => ro.disconnect();
   }, []);
 
-  // Derived strip width — proportional to page count, clamped.
+  // Proportional strip width — grows with page count, min = toolbar width.
   const stripWidth = containerWidth > 0
     ? Math.min(containerWidth, Math.max(MIN_STRIP_W, totalPages * STEP_PX))
     : 0;
@@ -91,8 +92,6 @@ export default function MiniMap({ totalPages, currentPage, annotations, onGoTo, 
     Math.max(1, Math.min(totalPages, Math.floor(frac * totalPages) + 1)), [totalPages]);
 
   // ── Canvas draw ────────────────────────────────────────────────────────────
-  // Reads from renderedHoverRef + waveAmplRef (not raw hoverFracRef) so the
-  // wave is always at the lerped position, not the snapped cursor position.
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     const w = stripWidth;
@@ -100,7 +99,7 @@ export default function MiniMap({ totalPages, currentPage, annotations, onGoTo, 
     const dpr = window.devicePixelRatio || 1;
     const cw = Math.floor(w * dpr);
     const ch = Math.floor(STRIP_H * dpr);
-    if (canvas.width !== cw) canvas.width = cw;
+    if (canvas.width !== cw)  canvas.width = cw;
     if (canvas.height !== ch) canvas.height = ch;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -116,14 +115,13 @@ export default function MiniMap({ totalPages, currentPage, annotations, onGoTo, 
 
     for (let i = 0; i < totalPages; i++) {
       const page = i + 1;
-      const cx = (i + 0.5) * stepX;
-      const fracCenter = cx / w;
+      const cx   = (i + 0.5) * stepX;
       let mag = 0;
       if (hover !== null && ampl > 0.005 && !reduceMotion) {
-        const d = (fracCenter - hover) * totalPages; // distance in pages
+        const d = ((cx / w) - hover) * totalPages;  // distance in pages
         mag = Math.exp(-(d * d) / (2 * SIGMA * SIGMA)) * ampl;
       }
-      const h = BASE_TICK + mag * (MAX_TICK - BASE_TICK);
+      const th = BASE_TICK + mag * (MAX_TICK - BASE_TICK);
       const isCurrent = page === currentPage;
       const hasAnnot  = annotPages.has(page);
 
@@ -134,56 +132,62 @@ export default function MiniMap({ totalPages, currentPage, annotations, onGoTo, 
           : mag > 0.15
             ? "#a8a29e"   // stone-400 — lit near cursor
             : "#57534e";  // stone-600 — resting
-      ctx.fillRect(cx - tickW / 2, baseY - h, tickW, h);
+      ctx.fillRect(cx - tickW / 2, baseY - th, tickW, th);
     }
 
-    // Current-page marker (full-height, always visible).
+    // Current-page marker — full height.
     const markerX = (currentPage - 0.5) * stepX;
     ctx.fillStyle = acc.strong;
     ctx.fillRect(markerX - 0.75, 0, 1.5, STRIP_H);
   }, [stripWidth, totalPages, currentPage, annotPages, accent, reduceMotion]);
 
+  // Always keep drawRef pointed at the latest draw so the RAF loop avoids stale closures.
+  const drawRef = useRef(draw);
+  drawRef.current = draw;
+
   useEffect(() => { draw(); }, [draw]);
 
   // ── Animation loop ─────────────────────────────────────────────────────────
-  // Lerps renderedHoverRef toward hoverFracRef, and waveAmplRef toward 0 or 1.
-  // Runs until both have settled; re-triggers itself via RAF.
+  // Runs until both waveAmplRef and renderedHoverRef have fully settled.
+  // Uses drawRef.current() so it always calls the latest draw, even if draw
+  // was recreated while the loop was running (e.g. currentPage changed).
   const startAnim = useCallback(() => {
     if (animRunningRef.current) return;
     animRunningRef.current = true;
 
     function loop() {
-      const targetHover = hoverFracRef.current;
-      const currentHover = renderedHoverRef.current;
-      const targetAmpl = (targetHover !== null && !reduceMotion) ? 1 : 0;
-      const curAmpl = waveAmplRef.current;
+      const targetHover   = hoverFracRef.current;
+      const targetAmpl    = (targetHover !== null && !reduceMotion) ? 1 : 0;
 
-      // Lerp wave amplitude (ease-in on enter, ease-out on leave).
-      const amplSpeed = targetAmpl > curAmpl ? 0.14 : 0.10;
-      const nextAmpl = curAmpl + (targetAmpl - curAmpl) * amplSpeed;
+      // Lerp wave amplitude.
+      const amplSpeed = targetAmpl > waveAmplRef.current ? 0.14 : 0.10;
+      const nextAmpl  = waveAmplRef.current + (targetAmpl - waveAmplRef.current) * amplSpeed;
       waveAmplRef.current = Math.abs(nextAmpl - targetAmpl) < 0.004 ? targetAmpl : nextAmpl;
 
-      // Lerp hover position (only when a cursor position is active).
+      // Lerp cursor position.
       if (targetHover !== null) {
-        if (currentHover === null) {
-          renderedHoverRef.current = targetHover;
+        if (renderedHoverRef.current === null) {
+          renderedHoverRef.current = targetHover; // snap on first entry
         } else {
-          const next = currentHover + (targetHover - currentHover) * 0.22;
-          renderedHoverRef.current = Math.abs(next - targetHover) < 0.0005 ? targetHover : next;
+          const next = renderedHoverRef.current + (targetHover - renderedHoverRef.current) * 0.22;
+          renderedHoverRef.current =
+            Math.abs(next - targetHover) < 0.0005 ? targetHover : next;
         }
       } else if (waveAmplRef.current < 0.004) {
-        // Wave fully gone — clear rendered position too.
         renderedHoverRef.current = null;
       }
 
-      draw();
+      drawRef.current();
 
-      const stillMoving =
-        Math.abs(waveAmplRef.current - targetAmpl) > 0.004 ||
-        (targetHover !== null && currentHover !== null &&
-          Math.abs((renderedHoverRef.current ?? targetHover) - targetHover) > 0.0005);
+      // Continue while amplitude hasn't settled OR cursor is actively present
+      // (so the wave stays fully deployed while hovering, not just on entry).
+      const amplUnsettled   = Math.abs(waveAmplRef.current - targetAmpl) > 0.004;
+      const posUnsettled    = targetHover !== null &&
+                              renderedHoverRef.current !== null &&
+                              Math.abs(renderedHoverRef.current - targetHover) > 0.0005;
+      const hoverActive     = targetHover !== null; // keep loop alive while hovering
 
-      if (stillMoving) {
+      if (amplUnsettled || posUnsettled || hoverActive) {
         rafRef.current = requestAnimationFrame(loop);
       } else {
         animRunningRef.current = false;
@@ -192,7 +196,7 @@ export default function MiniMap({ totalPages, currentPage, annotations, onGoTo, 
     }
 
     rafRef.current = requestAnimationFrame(loop);
-  }, [draw, reduceMotion]);
+  }, [reduceMotion]); // no draw dep needed — we use drawRef
 
   // ── Thumbnail on settle ────────────────────────────────────────────────────
   const requestThumb = useCallback(async (page: number) => {
@@ -226,15 +230,14 @@ export default function MiniMap({ totalPages, currentPage, annotations, onGoTo, 
   }, [requestThumb]);
 
   // ── Pointer handlers ───────────────────────────────────────────────────────
-  // fracFromEvent maps clientX to the strip fraction (0–1), accounting for the
-  // fact that the strip may be narrower than the container (centered).
+  // Maps clientX to a 0-1 fraction within the strip (which may be narrower than
+  // the full container when there are few pages).
   function fracFromEvent(e: React.PointerEvent | PointerEvent): number {
     const el = wrapRef.current!;
-    const r = el.getBoundingClientRect();
-    // Strip is centered; offset within the strip.
-    const containerW = r.width;
-    const sw = Math.min(containerW, Math.max(MIN_STRIP_W, totalPages * STEP_PX));
-    const stripLeft = r.left + (containerW - sw) / 2;
+    const r  = el.getBoundingClientRect();
+    const cW = r.width;
+    const sw = Math.min(cW, Math.max(MIN_STRIP_W, totalPages * STEP_PX));
+    const stripLeft = r.left + (cW - sw) / 2;
     return Math.max(0, Math.min(1, (e.clientX - stripLeft) / sw));
   }
 
@@ -242,8 +245,16 @@ export default function MiniMap({ totalPages, currentPage, annotations, onGoTo, 
     const frac = fracFromEvent(e);
     hoverFracRef.current = frac;
     startAnim();
-    force(v => v + 1); // update badge position
-    armSettle(pageFromFrac(frac));
+    force(v => v + 1); // update badge/thumb overlay position
+
+    const page = pageFromFrac(frac);
+    armSettle(page);
+
+    // Live scrub: navigate to the page under the cursor while dragging.
+    if (draggingRef.current && page !== lastNavPageRef.current) {
+      lastNavPageRef.current = page;
+      onGoTo(page);
+    }
   }
 
   function onPointerLeave() {
@@ -251,12 +262,13 @@ export default function MiniMap({ totalPages, currentPage, annotations, onGoTo, 
     hoverFracRef.current = null;
     if (settleTimer.current) clearTimeout(settleTimer.current);
     setThumb(null);
-    startAnim(); // let the wave retract smoothly
+    startAnim(); // retract wave smoothly
     force(v => v + 1);
   }
 
   function onPointerDown(e: React.PointerEvent) {
-    draggingRef.current = true;
+    draggingRef.current  = true;
+    lastNavPageRef.current = null;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     hoverFracRef.current = fracFromEvent(e);
     startAnim();
@@ -265,8 +277,10 @@ export default function MiniMap({ totalPages, currentPage, annotations, onGoTo, 
 
   function onPointerUp(e: React.PointerEvent) {
     const wasDragging = draggingRef.current;
-    draggingRef.current = false;
+    draggingRef.current  = false;
+    lastNavPageRef.current = null;
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    // If the user only clicked (no drag movement), navigate on release.
     if (wasDragging && hoverFracRef.current !== null) {
       onGoTo(pageFromFrac(hoverFracRef.current));
     }
@@ -279,11 +293,9 @@ export default function MiniMap({ totalPages, currentPage, annotations, onGoTo, 
 
   if (totalPages <= 1) return null;
 
-  const hover = hoverFracRef.current;
+  const hover     = hoverFracRef.current;
   const hoverPage = hover !== null ? pageFromFrac(hover) : null;
-  const acc = ACCENTS[accent];
-
-  // Badge left position: relative to the container, accounting for strip centering.
+  const acc       = ACCENTS[accent];
   const badgeLeft = hover !== null && containerWidth > 0
     ? (containerWidth - stripWidth) / 2 + hover * stripWidth
     : null;
@@ -294,7 +306,7 @@ export default function MiniMap({ totalPages, currentPage, annotations, onGoTo, 
       className="relative w-full select-none"
       style={{ height: STRIP_H }}
     >
-      {/* Centered strip — narrows for small PDFs */}
+      {/* Centered strip — narrower than container for small PDFs */}
       <div
         aria-label="Page navigator"
         className="absolute top-0 bottom-0 cursor-pointer"
@@ -310,11 +322,11 @@ export default function MiniMap({ totalPages, currentPage, annotations, onGoTo, 
         <canvas
           ref={canvasRef}
           className="block"
-          style={{ width: stripWidth, height: STRIP_H }}
+          style={{ width: stripWidth || "100%", height: STRIP_H }}
         />
       </div>
 
-      {/* Floating page number + thumbnail near the cursor */}
+      {/* Floating page number + thumbnail */}
       {hover !== null && hoverPage !== null && badgeLeft !== null && stripWidth > 0 && (
         <div
           className="pointer-events-none absolute bottom-full mb-1 -translate-x-1/2 flex flex-col items-center gap-1 z-50"
@@ -326,10 +338,7 @@ export default function MiniMap({ totalPages, currentPage, annotations, onGoTo, 
               src={thumb.url}
               alt={`Page ${hoverPage}`}
               className="rounded shadow-2xl border border-stone-600 viewer-light:border-stone-300 bg-white"
-              style={{
-                maxHeight: 140,
-                animation: "minimap-thumb-in 160ms ease-out both",
-              }}
+              style={{ maxHeight: 140, animation: "minimap-thumb-in 160ms ease-out both" }}
             />
           )}
           <span

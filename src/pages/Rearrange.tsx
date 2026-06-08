@@ -42,20 +42,48 @@ function SortablePage({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
 
-  // Track natural image dimensions so we can resize the tile to match rotated footprint.
+  // Natural image dimensions — set once on first load.
   const [natural, setNatural] = useState<[number, number] | null>(null);
 
-  // Aspect ratio: height / width. Default to 1.414 (A4 portrait) until image loads.
-  const aspect = natural ? natural[1] / natural[0] : 1.414;
-  const isOdd = item.rotate === 90 || item.rotate === 270;
+  const isOdd  = item.rotate === 90 || item.rotate === 270;
+  // aspect = h/w of the actual image; null until the image has loaded.
+  const aspect = natural ? natural[1] / natural[0] : null;
 
-  // Container size that shows the full rotated image without clipping.
-  const wrapW = isOdd ? Math.round(TILE_W * aspect) : TILE_W;
-  const wrapH = isOdd ? TILE_W : Math.round(TILE_W * aspect);
+  // For odd rotations (90°/270°) we need explicit container dimensions so the
+  // rotated image fits without clipping. We only apply these once the natural
+  // dimensions are known — before that we show a proportional placeholder.
+  // For even rotations (0°/180°) the container is TILE_W wide and auto-height
+  // so the tile never shrinks when the real page aspect differs from A4.
+  let imgContainerStyle: React.CSSProperties;
+  let imgStyle: React.CSSProperties;
 
-  // The <img> in its un-rotated coordinate space always fits TILE_W × (TILE_W * aspect).
-  const imgNatW = TILE_W;
-  const imgNatH = Math.round(TILE_W * aspect);
+  if (isOdd && aspect !== null) {
+    // Rotated: visual footprint is (TILE_W * aspect) × TILE_W
+    const displayW = Math.round(TILE_W * aspect);
+    const imgH     = Math.round(TILE_W * aspect);
+    imgContainerStyle = { width: displayW, height: TILE_W, position: "relative", overflow: "hidden" };
+    imgStyle = {
+      position:  "absolute",
+      width:     TILE_W,
+      height:    imgH,
+      top:       "50%",
+      left:      "50%",
+      transform: `translate(-50%, -50%) rotate(${item.rotate}deg)`,
+    };
+  } else if (isOdd) {
+    // Odd rotation but natural not yet known: square placeholder, no rotation applied yet
+    imgContainerStyle = { width: TILE_W, height: TILE_W, overflow: "hidden" };
+    imgStyle = { display: "block", width: "100%", height: "auto" };
+  } else {
+    // Even rotation (0° or 180°): auto height so the tile grows/shrinks naturally
+    imgContainerStyle = { width: TILE_W, overflow: "hidden" };
+    imgStyle = {
+      display:   "block",
+      width:     "100%",
+      height:    "auto",
+      transform: item.rotate === 180 ? "rotate(180deg)" : undefined,
+    };
+  }
 
   return (
     <div
@@ -82,14 +110,13 @@ function SortablePage({
 
       {/* Selection tick */}
       {selected && (
-        <span className="absolute top-1 right-1 z-10 h-4 w-4 rounded-full bg-brand-500 text-white flex items-center justify-center shadow"><Check className="h-2.5 w-2.5" strokeWidth={3} /></span>
+        <span className="absolute top-1 right-1 z-10 h-4 w-4 rounded-full bg-brand-500 text-white flex items-center justify-center shadow">
+          <Check className="h-2.5 w-2.5" strokeWidth={3} />
+        </span>
       )}
 
       {/* Image container — sized to the rotated visual footprint */}
-      <div
-        className="relative overflow-hidden rounded shadow-sm"
-        style={{ width: wrapW, height: thumb ? wrapH : undefined }}
-      >
+      <div className="rounded shadow-sm" style={imgContainerStyle}>
         {thumb ? (
           <img
             src={thumb}
@@ -98,23 +125,12 @@ function SortablePage({
               const img = e.currentTarget;
               setNatural([img.naturalWidth, img.naturalHeight]);
             }}
-            style={isOdd ? {
-              position: "absolute",
-              width: imgNatW,
-              height: imgNatH,
-              top: "50%",
-              left: "50%",
-              transform: `translate(-50%, -50%) rotate(${item.rotate}deg)`,
-            } : {
-              display: "block",
-              width: "100%",
-              transform: item.rotate ? `rotate(${item.rotate}deg)` : undefined,
-            }}
+            style={imgStyle}
           />
         ) : (
           <div
             className="bg-stone-100 app-dark:bg-stone-800 rounded animate-pulse"
-            style={{ width: TILE_W, height: imgNatH }}
+            style={{ width: TILE_W, aspectRatio: "3/4" }}
           />
         )}
       </div>

@@ -1,0 +1,8 @@
+# Gitleaks configuration for Stria PDF Toolkit
+# See: https://github.com/gitleaks/gitleaks?tab=readme-ov-file#configuration
+
+title = "Stria gitleaks config"
+
+[[allowlists]]
+description = "Keyboard shortcut strings in cheat sheet — high-entropy shortcut keys (e.g. Ctrl+Shift+Tab) trigger the generic-api-key rule as false positives"
+paths = ["src/components/KeyboardCheatSheet.tsx"]
