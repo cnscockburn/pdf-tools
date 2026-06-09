@@ -376,7 +376,7 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
             {hasDividers && (
               <p className="text-[10px] text-amber-600 -mt-3 flex items-center gap-1">
                 <Scissors className="h-3 w-3" />
-                {dividers.size} split line{dividers.size !== 1 ? "s" : ""} placed — Save will produce {dividers.size + 1} PDFs as a ZIP.
+                {dividers.size} split line{dividers.size !== 1 ? "s" : ""} placed. Save will produce {dividers.size + 1} PDFs as a ZIP.
               </p>
             )}
 

@@ -10,7 +10,7 @@ interface Props {
 export default function Layout({ title, description, children }: Props) {
   const { openTab } = useTabContext();
   return (
-    <div className="min-h-screen bg-stone-50 app-dark:bg-stone-950">
+    <div className="h-full overflow-y-auto bg-stone-50 app-dark:bg-stone-950">
       <header className="bg-white border-b border-stone-200 app-dark:bg-stone-900 app-dark:border-stone-800 px-6 py-4 flex items-center gap-4">
         <button
           onClick={() => openTab("home")}

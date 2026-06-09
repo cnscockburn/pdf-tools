@@ -124,7 +124,7 @@ export default function ImagesToPDF() {
   }
 
   return (
-    <Layout title="Images to PDF" description="Convert images into a PDF — one image per page">
+    <Layout title="Images to PDF" description="Convert images into a PDF, one image per page">
       <div className="space-y-6">
         <FileDropZone
           files={[]}
@@ -138,7 +138,7 @@ export default function ImagesToPDF() {
             "image/bmp":  [".bmp"],
             "image/webp": [".webp"],
           }}
-          label="Drop images here — each image becomes one page"
+          label="Drop images here, one image per page"
           hint="JPEG, PNG, TIFF, GIF, BMP or WebP"
         />
 
@@ -148,7 +148,7 @@ export default function ImagesToPDF() {
               <div className="rounded-xl border border-stone-200 bg-white divide-y divide-stone-100 app-dark:border-stone-800 app-dark:bg-stone-900 app-dark:divide-stone-800 overflow-hidden">
                 <div className="px-4 py-2.5 flex items-center justify-between bg-stone-50/50 app-dark:bg-stone-800/50">
                   <span className="text-[10px] font-medium text-stone-400 uppercase tracking-wide">
-                    {tagged.length} image{tagged.length !== 1 ? "s" : ""} — {tagged.length} page{tagged.length !== 1 ? "s" : ""} in output
+                    {tagged.length} image{tagged.length !== 1 ? "s" : ""}, {tagged.length} page{tagged.length !== 1 ? "s" : ""} in output
                   </span>
                   <span className="text-[10px] text-stone-400">Drag to reorder · top to bottom = page order</span>
                 </div>
@@ -170,7 +170,7 @@ export default function ImagesToPDF() {
           onClick={handleConvert}
           loading={loading}
           disabled={files.length === 0}
-          label={files.length === 0 ? "Add images first" : `Convert ${files.length} image(s) to PDF`}
+          label={files.length === 0 ? "Add images first" : `Convert ${files.length} image${files.length !== 1 ? "s" : ""} to PDF`}
         />
       </div>
     </Layout>

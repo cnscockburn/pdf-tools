@@ -167,7 +167,7 @@ export default function Home() {
       const file = await openPathAsFile(r.path);
       openTab("viewer", { file, title: file.name });
     } catch {
-      setRecentError(`Couldn't open ${r.name} — it may have been moved or deleted.`);
+      setRecentError(`Couldn't open ${r.name}: it may have been moved or deleted.`);
       setRecents(removeRecentFile(r.path)); // drop the stale entry
     }
   }
@@ -390,7 +390,7 @@ export default function Home() {
             <ul className="space-y-2.5 text-xs text-stone-600 app-dark:text-stone-300 leading-relaxed">
               <li className="flex gap-2"><span className="text-green-600">•</span> Your PDFs never leave your computer. There is no cloud, no account, and no upload.</li>
               <li className="flex gap-2"><span className="text-green-600">•</span> All processing (annotate, redact, compress, crop, merge) runs in a local background service bundled with the app.</li>
-              <li className="flex gap-2"><span className="text-green-600">•</span> Files are not cached or retained — close a tab and the document is gone from memory.</li>
+              <li className="flex gap-2"><span className="text-green-600">•</span> Files are not cached or retained. Close a tab and the document is gone from memory.</li>
               <li className="flex gap-2"><span className="text-green-600">•</span> Only small preferences (your name, colour labels, bookmarks) are saved locally between sessions.</li>
               <li className="flex gap-2"><span className="text-green-600">•</span> No telemetry, no analytics, no network calls to anyone.</li>
             </ul>

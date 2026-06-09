@@ -156,7 +156,7 @@ export default function Batch() {
             <p className="text-sm font-semibold text-stone-700 app-dark:text-stone-200">
               {isDragActive ? "Drop PDFs here" : "Drop multiple PDFs here"}
             </p>
-            <p className="text-xs text-stone-400 mt-1">Or click to browse — select as many PDFs as you like</p>
+            <p className="text-xs text-stone-400 mt-1">Or click to browse. Select as many PDFs as you like.</p>
           </div>
         </div>
 
@@ -194,7 +194,7 @@ export default function Batch() {
         {files.length > 0 && (
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-stone-600 app-dark:text-stone-400 mb-2 uppercase tracking-wide">Operation</label>
+              <p className="block text-xs font-semibold text-stone-600 app-dark:text-stone-400 mb-2 uppercase tracking-wide">Operation</p>
               <div className="flex gap-2">
                 {(["compress", "watermark", "to-images"] as Operation[]).map(o => (
                   <button
@@ -202,7 +202,7 @@ export default function Batch() {
                     onClick={() => setOp(o)}
                     disabled={running}
                     className={cn(
-                      "px-3 py-1.5 rounded-lg text-xs font-medium transition border",
+                      "px-3 py-1.5 rounded-lg text-xs font-medium transition border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50",
                       op === o
                         ? "bg-brand-500 text-white border-brand-500"
                         : "bg-white text-stone-600 border-stone-200 hover:border-stone-300 app-dark:bg-stone-900 app-dark:text-stone-300 app-dark:border-stone-700",
@@ -217,10 +217,10 @@ export default function Batch() {
             {/* Per-operation settings */}
             {op === "compress" && (
               <div className="flex items-center gap-3 flex-wrap">
-                <label className="text-xs text-stone-600 app-dark:text-stone-400">Quality:</label>
+                <span className="text-xs text-stone-600 app-dark:text-stone-400">Quality:</span>
                 {(["screen", "ebook", "printer", "lossless"] as const).map(q => (
                   <button key={q} onClick={() => setCompressQuality(q)} disabled={running}
-                    className={cn("px-2.5 py-1 rounded-lg text-xs transition border",
+                    className={cn("px-2.5 py-1 rounded-lg text-xs transition border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50",
                       compressQuality === q ? "bg-brand-500 text-white border-brand-500" : "text-stone-500 border-stone-200 hover:border-stone-300 app-dark:border-stone-700")}>
                     {q.charAt(0).toUpperCase() + q.slice(1)}
                   </button>
@@ -231,19 +231,19 @@ export default function Batch() {
             {op === "watermark" && (
               <div className="flex items-center gap-4 flex-wrap">
                 <div>
-                  <label className="block text-[10px] text-stone-500 mb-1">Text</label>
-                  <input value={wmText} onChange={e => setWmText(e.target.value)} maxLength={200} disabled={running}
+                  <label htmlFor="wm-text" className="block text-[10px] text-stone-500 mb-1">Text</label>
+                  <input id="wm-text" value={wmText} onChange={e => setWmText(e.target.value)} maxLength={200} disabled={running}
                     className="rounded-lg border border-stone-200 app-dark:border-stone-700 bg-white app-dark:bg-stone-900 px-2.5 py-1.5 text-xs text-stone-700 app-dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-brand-500 w-32" />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-stone-500 mb-1">Opacity {Math.round(wmOpacity * 100)}%</label>
-                  <input type="range" min={5} max={100} value={Math.round(wmOpacity * 100)}
+                  <label htmlFor="wm-opacity" className="block text-[10px] text-stone-500 mb-1">Opacity {Math.round(wmOpacity * 100)}%</label>
+                  <input id="wm-opacity" type="range" min={5} max={100} value={Math.round(wmOpacity * 100)}
                     onChange={e => setWmOpacity(parseInt(e.target.value) / 100)} disabled={running}
                     className="w-24 accent-brand-500" />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-stone-500 mb-1">Angle {wmAngle}°</label>
-                  <input type="range" min={0} max={359} value={wmAngle}
+                  <label htmlFor="wm-angle" className="block text-[10px] text-stone-500 mb-1">Angle {wmAngle}°</label>
+                  <input id="wm-angle" type="range" min={0} max={359} value={wmAngle}
                     onChange={e => setWmAngle(parseInt(e.target.value))} disabled={running}
                     className="w-24 accent-brand-500" />
                 </div>
@@ -253,18 +253,18 @@ export default function Batch() {
             {op === "to-images" && (
               <div className="flex items-center gap-4 flex-wrap">
                 <div>
-                  <label className="block text-[10px] text-stone-500 mb-1">DPI</label>
-                  <input type="number" min={36} max={600} value={imgDpi}
+                  <label htmlFor="img-dpi" className="block text-[10px] text-stone-500 mb-1">DPI</label>
+                  <input id="img-dpi" type="number" min={36} max={600} value={imgDpi}
                     onChange={e => setImgDpi(Math.max(36, Math.min(600, parseInt(e.target.value) || 150)))}
                     disabled={running}
                     className="rounded-lg border border-stone-200 app-dark:border-stone-700 bg-white app-dark:bg-stone-900 px-2.5 py-1.5 text-xs text-stone-700 app-dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-brand-500 w-20 no-spinner" />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-stone-500 mb-1">Format</label>
+                  <p className="block text-[10px] text-stone-500 mb-1">Format</p>
                   <div className="flex gap-1.5">
                     {(["png", "jpg"] as const).map(f => (
                       <button key={f} onClick={() => setImgFmt(f)} disabled={running}
-                        className={cn("px-2.5 py-1 rounded-lg text-xs transition border",
+                        className={cn("px-2.5 py-1 rounded-lg text-xs transition border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50",
                           imgFmt === f ? "bg-brand-500 text-white border-brand-500" : "text-stone-500 border-stone-200 hover:border-stone-300 app-dark:border-stone-700 uppercase")}>
                         {f.toUpperCase()}
                       </button>
@@ -279,7 +279,7 @@ export default function Batch() {
               <button
                 onClick={runBatch}
                 disabled={running || files.length === 0 || pendingCount === 0}
-                className="flex items-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 disabled:opacity-50 px-5 py-2.5 text-sm font-semibold text-white transition shadow-sm"
+                className="flex items-center gap-2 rounded-lg bg-brand-500 hover:bg-brand-600 disabled:opacity-50 px-5 py-2.5 text-sm font-semibold text-white transition shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
               >
                 {running ? <><Loader2 className="h-4 w-4 animate-spin" /> Processing…</> : `Run on ${pendingCount} file${pendingCount !== 1 ? "s" : ""}`}
               </button>
@@ -287,7 +287,7 @@ export default function Batch() {
               {done && doneCount > 0 && (
                 <button
                   onClick={downloadAll}
-                  className="flex items-center gap-2 rounded-xl bg-stone-800 hover:bg-stone-700 app-dark:bg-stone-700 app-dark:hover:bg-stone-600 px-5 py-2.5 text-sm font-semibold text-white transition"
+                  className="flex items-center gap-2 rounded-lg bg-stone-800 hover:bg-stone-700 app-dark:bg-stone-700 app-dark:hover:bg-stone-600 px-5 py-2.5 text-sm font-semibold text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
                 >
                   Download {doneCount} result{doneCount !== 1 ? "s" : ""}
                   {errorCount > 0 && <span className="text-red-400">({errorCount} error{errorCount !== 1 ? "s" : ""})</span>}

@@ -203,7 +203,7 @@ export default function Merge({ initialFile }: MergeProps = {}) {
               <div className="rounded-xl border border-stone-200 bg-white divide-y divide-stone-100 app-dark:border-stone-800 app-dark:bg-stone-900 app-dark:divide-stone-800 overflow-hidden">
                 <div className="px-4 py-2.5 flex items-center justify-between bg-stone-50/50 app-dark:bg-stone-800/50">
                   <span className="text-[10px] font-medium text-stone-400 uppercase tracking-wide">
-                    {tagged.length} file{tagged.length !== 1 ? "s" : ""} — drag to reorder
+                    {tagged.length} file{tagged.length !== 1 ? "s" : ""}, drag to reorder
                   </span>
                   {tagged.length > 1 && (
                     <span className="text-[10px] text-stone-400">
