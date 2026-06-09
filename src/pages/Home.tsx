@@ -199,7 +199,7 @@ export default function Home() {
                 className={cn(
                   "w-full h-full flex flex-col items-center justify-center gap-4 rounded-2xl",
                   "border-2 border-dashed transition-colors duration-200 cursor-pointer",
-                  "py-12 px-6",
+                  "py-8 sm:py-12 px-6",
                   isDragActive
                     ? "border-brand-500 bg-[#fffbeb] app-dark:bg-brand-950/40 scale-[1.005]"
                     : "border-stone-300 bg-white hover:border-[#d4c5a0] hover:shadow-sm app-dark:border-stone-700 app-dark:bg-stone-900 app-dark:hover:border-brand-500/60"
@@ -232,7 +232,7 @@ export default function Home() {
                 className={cn(
                   "group w-full h-full flex flex-col items-center justify-center gap-4 rounded-2xl",
                   "border-2 border-dashed transition-colors duration-200 cursor-pointer",
-                  "py-12 px-6 text-center",
+                  "py-8 sm:py-12 px-6 text-center",
                   "border-stone-200 bg-white hover:border-indigo-300 hover:bg-indigo-50/40 hover:shadow-sm",
                   "app-dark:border-stone-700 app-dark:bg-stone-900 app-dark:hover:border-indigo-500/60 app-dark:hover:bg-indigo-950/20",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50",
@@ -255,9 +255,9 @@ export default function Home() {
 
           {/* Capability shortcut chips */}
           <div className="flex items-center justify-center gap-2">
-            {capabilities.map((cap, i) => (
+            {capabilities.map((cap) => (
               <button
-                key={i}
+                key={cap.text}
                 onClick={cap.onClick}
                 title={cap.title}
                 className="group flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white app-dark:bg-stone-900 app-dark:border-stone-800 px-2.5 py-1.5 text-[11px] text-stone-500 app-dark:text-stone-400 hover:border-stone-300 hover:text-stone-700 app-dark:hover:text-stone-200 app-dark:hover:border-stone-700 hover:shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"

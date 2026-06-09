@@ -89,11 +89,19 @@ function SortablePage({
   return (
     <div
       ref={setNodeRef}
+      tabIndex={0}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       onClick={(e) => onSelect(item.id, e.shiftKey)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect(item.id, e.shiftKey);
+        }
+      }}
       className={cn(
         "relative flex flex-col items-center gap-1 rounded-lg p-1 bg-white app-dark:bg-stone-900 cursor-pointer select-none",
         "transition-[box-shadow,opacity,transform]",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60 focus-visible:ring-offset-1",
         isDragging ? "opacity-50 scale-105 shadow-lg z-10" : "",
         selected ? "ring-2 ring-brand-500 bg-amber-50/40 app-dark:bg-brand-950/40" : "border border-stone-200 hover:border-stone-300 app-dark:border-stone-800 app-dark:hover:border-stone-700",
       )}
@@ -362,20 +370,20 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
             </div>
 
             <p className="text-[10px] text-stone-400 app-dark:text-stone-500 -mt-3">
-              Click a page to select · Shift-click for a range · drag the grip to reorder · keyboard: Tab, Space to lift, arrows, Space to drop.
+              Click to select · Shift-click for a range · Drag the grip to reorder · Keyboard: Tab, Space to lift, arrows, Space to drop.
             </p>
 
             {hasDividers && (
               <p className="text-[10px] text-amber-600 -mt-3 flex items-center gap-1">
                 <Scissors className="h-3 w-3" />
-                {dividers.size} split line{dividers.size !== 1 ? "s" : ""} placed — Save will produce {dividers.size + 1} PDF{dividers.size !== 0 ? "s" : ""} as a ZIP.
+                {dividers.size} split line{dividers.size !== 1 ? "s" : ""} placed — Save will produce {dividers.size + 1} PDFs as a ZIP.
               </p>
             )}
 
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={plan.map(p => p.id)} strategy={rectSortingStrategy}>
                 {/* Pages with inter-page hover split zones */}
-                <div className="flex flex-wrap items-start" style={{ gap: "8px 0" }}>
+                <div className="flex flex-wrap items-start gap-y-2">
                   {plan.map((item, idx) => (
                     <div key={item.id} className="flex items-stretch">
                       {/* Page card */}
@@ -392,9 +400,17 @@ export default function Rearrange({ initialFile }: RearrangeProps = {}) {
                       {/* Split divider zone after this page (not after the last) */}
                       {idx < plan.length - 1 && (
                         <div
-                          className="group/gap relative w-8 flex-shrink-0 flex items-center justify-center cursor-pointer select-none"
+                          role="button"
+                          tabIndex={0}
+                          aria-label={dividers.has(idx) ? "Remove split here" : "Add split here"}
+                          className="group/gap relative w-8 flex-shrink-0 flex items-center justify-center cursor-pointer select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/60 rounded-sm"
                           onClick={() => toggleDivider(idx)}
-                          title={dividers.has(idx) ? "Remove split here" : "Add split here"}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              toggleDivider(idx);
+                            }
+                          }}
                         >
                           {/* Vertical line — always visible when a divider is set; fades in on hover */}
                           <div className={cn(

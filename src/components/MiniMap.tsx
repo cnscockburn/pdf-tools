@@ -261,6 +261,23 @@ export default function MiniMap({
     }
   }
 
+  function onKeyDown(e: React.KeyboardEvent) {
+    const step = e.shiftKey ? 10 : 1;
+    if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+      e.preventDefault();
+      onGoTo(Math.max(1, currentPage - step));
+    } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+      e.preventDefault();
+      onGoTo(Math.min(totalPages, currentPage + step));
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      onGoTo(1);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      onGoTo(totalPages);
+    }
+  }
+
   function onPointerLeave() {
     if (draggingRef.current) return;
     hoverFracRef.current = null;
@@ -316,8 +333,14 @@ export default function MiniMap({
     >
       {/* Centered strip — narrower than container for small PDFs */}
       <div
+        role="slider"
+        tabIndex={0}
         aria-label="Page navigator"
-        className="absolute top-0 bottom-0 cursor-pointer"
+        aria-valuemin={1}
+        aria-valuemax={totalPages}
+        aria-valuenow={currentPage}
+        aria-valuetext={`Page ${currentPage} of ${totalPages}`}
+        className="absolute top-0 bottom-0 cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
         style={{
           left:  containerWidth > 0 ? (containerWidth - stripWidth) / 2 : 0,
           width: stripWidth || "100%",
@@ -326,6 +349,7 @@ export default function MiniMap({
         onPointerLeave={onPointerLeave}
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
+        onKeyDown={onKeyDown}
       >
         <canvas
           ref={canvasRef}
@@ -334,9 +358,10 @@ export default function MiniMap({
         />
       </div>
 
-      {/* Floating page number + thumbnail */}
+      {/* Floating page number + thumbnail — decorative, hidden from assistive technology */}
       {hover !== null && hoverPage !== null && badgeLeft !== null && stripWidth > 0 && (
         <div
+          aria-hidden="true"
           className="pointer-events-none absolute bottom-full mb-1 -translate-x-1/2 flex flex-col items-center gap-1 z-50"
           style={{ left: Math.max(28, Math.min(containerWidth - 28, badgeLeft)) }}
         >
