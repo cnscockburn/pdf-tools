@@ -63,10 +63,13 @@ fn start_backend(app: &AppHandle, token: String, port: u16) {
     use std::io::Write;
     use std::process::Stdio;
 
+    // Rationale: temp_dir() is only a fallback location for the sidecar's
+    // stderr log file when the OS app-log directory is unavailable. It holds
+    // no secrets and is never used for a trust or authorization decision.
     let log_dir = app
         .path()
         .app_log_dir()
-        .unwrap_or_else(|_| std::env::temp_dir());
+        .unwrap_or_else(|_| std::env::temp_dir()); // nosemgrep: rust.lang.security.temp-dir.temp-dir
     let _ = std::fs::create_dir_all(&log_dir);
     let log_path = log_dir.join("sidecar.log");
 
@@ -117,13 +120,12 @@ fn start_backend(app: &AppHandle, token: String, port: u16) {
 /// Tauri names sidecars as `<name>-<target-triple>[.exe]` when bundling.
 /// At runtime we look for the exe next to the Tauri binary.
 fn sidecar_path() -> std::path::PathBuf {
-    // nosemgrep: rust.lang.security.current-exe.current-exe
     // Rationale: current_exe() is used solely to locate the *directory* that
     // contains the bundled sidecar — not for authentication, authorisation, or
     // any trust decision.  This is the standard Tauri sidecar discovery pattern
     // and there is no alternative API.  A spoofed exe path would at most cause
     // the sidecar launch to fail at startup, not grant elevated access.
-    let base = std::env::current_exe()
+    let base = std::env::current_exe() // nosemgrep: rust.lang.security.current-exe.current-exe
         .expect("cannot resolve current exe")
         .parent()
         .expect("exe has no parent")
@@ -246,14 +248,13 @@ fn list_recovery_files(app: tauri::AppHandle) -> Result<Vec<std::collections::Ha
 /// Returns None if no file argument was provided or if the path is invalid.
 #[tauri::command]
 fn get_cli_file_path() -> Option<String> {
-    // nosemgrep: rust.lang.security.args.args
     // Rationale: we use args_os() (preferred for file paths — handles non-UTF-8
     // names on Windows) and unconditionally skip args[0] (the exe path, which the
     // semgrep rule warns can be spoofed).  Whatever path we extract is then passed
     // through validate_pdf_path(), which canonicalizes it, verifies the extension,
     // and confirms the file exists — so a spoofed or malicious argument cannot
     // escape to an arbitrary read.
-    let raw = std::env::args_os()
+    let raw = std::env::args_os() // nosemgrep: rust.lang.security.args-os.args-os
         .skip(1)                          // skip the exe path
         .filter_map(|a| a.into_string().ok())
         .find(|a| !a.starts_with('-') && !a.starts_with('/'))
