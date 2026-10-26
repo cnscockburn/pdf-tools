@@ -24,7 +24,7 @@
     "clsx": "^2.1.1",
     "dompurify": "^3.4.7",
     "jszip": "^3.10.1",
-    "katex": "^0.17.0",
+    "katex": "^0.19.1",
     "lucide-react": "^0.441.0",
     "pdfjs-dist": "^4.10.38",
     "react": "^18.3.1",
@@ -42,13 +42,13 @@
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.7.0",
-    "@vitest/ui": "^4.1.11",
+    "@vitest/ui": "^4.1.12",
     "autoprefixer": "^10.4.20",
     "jsdom": "^29.1.1",
     "postcss": "^8.4.45",
     "tailwindcss": "^3.4.11",
     "typescript": "^5.5.3",
     "vite": "^6.4.2",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   }
 }
